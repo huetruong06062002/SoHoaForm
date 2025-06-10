@@ -9,9 +9,9 @@ namespace SoHoaFormApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class AuController : ControllerBase
+    public class AuthController : ControllerBase
     {
-        public AuController()
+        public AuthController()
         {
         }
 
