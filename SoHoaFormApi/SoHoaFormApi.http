@@ -1,0 +1,6 @@
+@SoHoaFormApi_HostAddress = http://localhost:5047
+
+GET {{SoHoaFormApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
