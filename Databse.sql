@@ -6,38 +6,38 @@ GO
 USE SoHoaForm;
 GO
 
--- Tạo bảng Roles
+-- Create tabe Roles
 CREATE TABLE Roles (
-    Id INT PRIMARY KEY IDENTITY(1,1),
+    Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     RoleName NVARCHAR(50) NOT NULL
 );
 GO
 
--- Tạo bảng User
-CREATE TABLE User (
-    Id INT PRIMARY KEY IDENTITY(1,1),
-    Name NVARCHAR(100) NOT NULL,
-    RoleId INT NOT NULL,
+-- Create tabe [User]
+CREATE TABLE [User] (
+    Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    Name NVARCHAR(100),
+    RoleId UNIQUEIDENTIFIER NOT NULL,
     FOREIGN KEY (RoleId) REFERENCES Roles(Id)
 );
 GO
 
--- Tạo bảng Form
+-- Create tabe Form
 CREATE TABLE Form (
-    Id INT PRIMARY KEY IDENTITY(1,1),
+    Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
     Name NVARCHAR(255) NOT NULL,
     Category NVARCHAR(100),
-    CreatedBy INT NOT NULL,
+    CreatedBy UNIQUEIDENTIFIER NOT NULL,
     WordFilePath NVARCHAR(500),
-    Status NVARCHAR(50) NOT NULL, -- Thay vì PublishStatus để ngắn gọn hơn
-    FOREIGN KEY (CreatedBy) REFERENCES User(Id)
+    Status NVARCHAR(50) NOT NULL,
+    FOREIGN KEY (CreatedBy) REFERENCES [User](Id)
 );
 GO
 
--- Tạo bảng FormFields
+-- Create tabe FormFields
 CREATE TABLE FormFields (
-    Id INT PRIMARY KEY IDENTITY(1,1),
-    FormId INT NOT NULL,
+    Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    FormId UNIQUEIDENTIFIER NOT NULL,
     FieldName NVARCHAR(255) NOT NULL,
     DefaultValue NVARCHAR(255),
     Formula NVARCHAR(500),
@@ -45,13 +45,34 @@ CREATE TABLE FormFields (
 );
 GO
 
--- Tạo bảng Submissions
+-- Create tabe Submissions
 CREATE TABLE Submissions (
-    Id INT PRIMARY KEY IDENTITY(1,1),
-    FormId INT NOT NULL,
-    UserId INT NOT NULL,
+    Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    FormId UNIQUEIDENTIFIER NOT NULL,
+    UserId UNIQUEIDENTIFIER NOT NULL,
     SubmissionDate DATETIME NOT NULL DEFAULT GETDATE(),
     FOREIGN KEY (FormId) REFERENCES Form(Id),
-    FOREIGN KEY (UserId) REFERENCES User(Id)
+    FOREIGN KEY (UserId) REFERENCES [User](Id)
 );
 GO
+
+-- Insert data into Roles table
+INSERT INTO Roles (Id, RoleName)
+VALUES 
+    (NEWID(), 'Admin'),
+    (NEWID(), 'User');
+GO
+
+-- Insert data into [User] table
+--CREATE AdminRoleId variant
+DECLARE @AdminRoleId UNIQUEIDENTIFIER = (SELECT Id FROM Roles WHERE RoleName = 'Admin');
+--CREATE UserRoleId variant
+DECLARE @UserRoleId UNIQUEIDENTIFIER = (SELECT Id FROM Roles WHERE RoleName = 'User');
+
+INSERT INTO [User] (Id, Name, RoleId)
+VALUES 
+    (NEWID(), '', @AdminRoleId),
+    (NEWID(), '', @UserRoleId),
+    (NEWID(), '', @UserRoleId);
+GO
+
