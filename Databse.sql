@@ -89,3 +89,19 @@ CREATE TABLE UserFillFormHistory (
     Status NVARCHAR(50),
     FOREIGN KEY (UserFillFormId) REFERENCES UserFillForm(Id)
 );
+
+
+
+BEGIN TRANSACTION;
+DELETE FROM [Form];
+DELETE FROM [FormCategory];
+COMMIT TRANSACTION;
+
+
+SELECT * FROM [FormField] WHERE FormId = '807eef00-f015-4e5a-b994-acec95bd2aba' 
+
+SELECT f.Name 
+FROM [Field] f
+INNER JOIN [FormField] ff ON f.Id = ff.FieldId
+INNER JOIN [Form] form ON ff.FormId = form.Id
+WHERE form.Id = '807eef00-f015-4e5a-b994-acec95bd2aba'

@@ -151,3 +151,12 @@ D:\SoHoaForm\SoHoaFormApi\bin\Debug\net8.0\runtimes\win\lib\net6.0\System.Securi
 D:\SoHoaForm\SoHoaFormApi\bin\Debug\net8.0\runtimes\win\lib\net6.0\System.Windows.Extensions.dll
 D:\SoHoaForm\SoHoaFormApi\bin\Debug\net8.0\Castle.Core.dll
 D:\SoHoaForm\SoHoaFormApi\bin\Debug\net8.0\Microsoft.EntityFrameworkCore.Proxies.dll
+d:\SoHoaForm\SoHoaFormApi\bin\Debug\net8.0\Xceed.Document.NET.dll
+d:\SoHoaForm\SoHoaFormApi\bin\Debug\net8.0\Xceed.Drawing.NET.dll
+d:\SoHoaForm\SoHoaFormApi\bin\Debug\net8.0\Xceed.Words.NET.dll
+d:\SoHoaForm\SoHoaFormApi\bin\Debug\net8.0\SkiaSharp.dll
+d:\SoHoaForm\SoHoaFormApi\bin\Debug\net8.0\System.IO.Packaging.dll
+d:\SoHoaForm\SoHoaFormApi\bin\Debug\net8.0\runtimes\osx\native\libSkiaSharp.dylib
+d:\SoHoaForm\SoHoaFormApi\bin\Debug\net8.0\runtimes\win-arm64\native\libSkiaSharp.dll
+d:\SoHoaForm\SoHoaFormApi\bin\Debug\net8.0\runtimes\win-x64\native\libSkiaSharp.dll
+d:\SoHoaForm\SoHoaFormApi\bin\Debug\net8.0\runtimes\win-x86\native\libSkiaSharp.dll

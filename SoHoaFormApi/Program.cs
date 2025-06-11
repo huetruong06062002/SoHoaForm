@@ -20,9 +20,27 @@ var connectionString = builder.Configuration.GetConnectionString("SoHoaFormConne
 builder.Services.AddDbContext<SoHoaFormContext>(options => 
     options.UseLazyLoadingProxies(false).UseSqlServer(connectionString));
 
+
+// Đăng ký các repository
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IRoleRepository, RoleRepository>();
+builder.Services.AddScoped<IFormRepository, FormRepository>();
+builder.Services.AddScoped<IFormCategoryRepository, FormCategoryRepository>();
+builder.Services.AddScoped<IFieldRepository, FieldRepository>();
+builder.Services.AddScoped<IFormFieldRepository, FormFieldRepository>();
+builder.Services.AddScoped<IPdfRepository, PdfRepository>();
+builder.Services.AddScoped<IUserFillFormRepository, UserFillFormRepository>();
+builder.Services.AddScoped<IUserFillFormHistoryRepository, UserFillFormHistoryRepository>();
+
+
+
+//Đăng kí unit of work
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 // Đăng ký Services
 builder.Services.AddScoped<JwtAuthService>();
-builder.Services.AddScoped<IAuthService,AuthService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
+builder.Services.AddScoped<IUserService, UserService>();
 
 // Cấu hình CORS
 builder.Services.AddCors(option =>
