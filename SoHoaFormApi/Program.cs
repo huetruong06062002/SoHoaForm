@@ -22,7 +22,7 @@ builder.Services.AddDbContext<SoHoaFormContext>(options =>
 
 // Đăng ký Services
 builder.Services.AddScoped<JwtAuthService>();
-builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<IAuthService,AuthService>();
 
 // Cấu hình CORS
 builder.Services.AddCors(option =>

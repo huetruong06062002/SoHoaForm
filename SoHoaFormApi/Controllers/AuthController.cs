@@ -1,11 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using SoHoaFormApi.Infrastructure.Services;
 using SoHoaFormApi.Models.ViewModel.Request;
-//using SoHoaFormApi.Models;
 
 namespace SoHoaFormApi.Controllers
 {
@@ -13,9 +8,9 @@ namespace SoHoaFormApi.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-       private readonly AuthService _authService;
+        private readonly IAuthService _authService;
 
-        public AuthController(AuthService authService)
+        public AuthController(IAuthService authService)
         {
             _authService = authService;
         }
@@ -25,18 +20,12 @@ namespace SoHoaFormApi.Controllers
         {
             var result = await _authService.LoginAsync(request);
             
-            if (result.Success)
+            if (result.StatusCode == 200)
             {
                 return Ok(result);
             }
             
-            return BadRequest(result);
-        }
-
-        [HttpGet("")]
-        public async Task<ActionResult> TestAuth()
-        {
-            return Ok(new { message = "Auth Controller is working", success = true });
+            return StatusCode(result.StatusCode, result);
         }
 
     }

@@ -5,7 +5,12 @@ using SoHoaFormApi.Models.ViewModel.Response;
 
 namespace SoHoaFormApi.Infrastructure.Services
 {
-    public class AuthService
+    public interface IAuthService
+    {
+        Task<HTTPResponseClient<LoginResponse>> LoginAsync(LoginRequest request);
+    }
+
+    public class AuthService : IAuthService
     {
         private readonly SoHoaFormContext _context;
         private readonly JwtAuthService _jwtService;
@@ -16,26 +21,30 @@ namespace SoHoaFormApi.Infrastructure.Services
             _jwtService = jwtService;
         }
 
-        public async Task<LoginResponse> LoginAsync(LoginRequest request)
+        public async Task<HTTPResponseClient<LoginResponse>> LoginAsync(LoginRequest request)
         {
             try
             {
                 if (string.IsNullOrEmpty(request.Role))
                 {
-                    return new LoginResponse
+                    return new HTTPResponseClient<LoginResponse>
                     {
-                        Success = false,
-                        Message = "Role is required"
+                        Message = "Role is required",
+                        StatusCode = 400,
+                        Data = null,
+                        DateTime = DateTime.Now,
                     };
                 }
 
                 var role = request.Role.ToLower();
                 if (role != "admin" && role != "user")
                 {
-                    return new LoginResponse
+                    return new HTTPResponseClient<LoginResponse>
                     {
-                        Success = false,
-                        Message = "Role must be 'admin' or 'user'"
+                        Message = "Role must be 'admin' or 'user'",
+                        StatusCode = 400,
+                        Data = null,
+                        DateTime = DateTime.Now,
                     };
                 }
 
@@ -43,10 +52,12 @@ namespace SoHoaFormApi.Infrastructure.Services
                 var dbRole = await _context.Roles.FirstOrDefaultAsync(r => r.RoleName.ToLower() == role);
                 if (dbRole == null)
                 {
-                    return new LoginResponse
+                    return new HTTPResponseClient<LoginResponse>
                     {
-                        Success = false,
-                        Message = "Invalid role"
+                        Message = "Invalid role",
+                        StatusCode = 400,
+                        Data = null,
+                        DateTime = DateTime.Now,
                     };
                 }
 
@@ -66,7 +77,7 @@ namespace SoHoaFormApi.Infrastructure.Services
 
                 var token = _jwtService.GenerateToken(user);
 
-                return new LoginResponse
+                var loginResponse = new LoginResponse
                 {
                     Token = token,
                     Role = role,
@@ -74,13 +85,23 @@ namespace SoHoaFormApi.Infrastructure.Services
                     Success = true,
                     Message = "Login successful"
                 };
+
+                return new HTTPResponseClient<LoginResponse>
+                {
+                    Message = "Login successful",
+                    StatusCode = 200,
+                    Data = loginResponse,
+                    DateTime = DateTime.Now,
+                };
             }
             catch (Exception ex)
             {
-                return new LoginResponse
+                return new HTTPResponseClient<LoginResponse>
                 {
-                    Success = false,
-                    Message = $"Login failed: {ex.Message}"
+                    Message = $"Login failed: {ex.Message}",
+                    StatusCode = 500,
+                    Data = null,
+                    DateTime = DateTime.Now,
                 };
             }
         }
