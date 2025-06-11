@@ -9,17 +9,21 @@ public partial class Form
 
     public string Name { get; set; } = null!;
 
-    public string? Category { get; set; }
+    public Guid? CategoryId { get; set; }
 
-    public Guid CreatedBy { get; set; }
+    public Guid? UserId { get; set; }
 
     public string? WordFilePath { get; set; }
 
-    public string Status { get; set; } = null!;
+    public string? Status { get; set; }
 
-    public virtual User CreatedByNavigation { get; set; } = null!;
+    public DateTime? CreatedAt { get; set; }
+
+    public virtual FormCategory? Category { get; set; }
 
     public virtual ICollection<FormField> FormFields { get; set; } = new List<FormField>();
 
-    public virtual ICollection<Submission> Submissions { get; set; } = new List<Submission>();
+    public virtual User? User { get; set; }
+
+    public virtual ICollection<UserFillForm> UserFillForms { get; set; } = new List<UserFillForm>();
 }

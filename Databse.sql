@@ -6,73 +6,86 @@ GO
 USE SoHoaForm;
 GO
 
--- Create tabe Roles
+-- Bảng Roles
 CREATE TABLE Roles (
     Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    RoleName NVARCHAR(50) NOT NULL
+    RoleName NVARCHAR(100) NOT NULL
 );
-GO
 
--- Create tabe [User]
+-- Bảng FormCategory
+CREATE TABLE FormCategory (
+    Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    CategoryName NVARCHAR(100) NOT NULL
+);
+
+-- Bảng User
 CREATE TABLE [User] (
     Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    Name NVARCHAR(100),
-    RoleId UNIQUEIDENTIFIER NOT NULL,
+    Name NVARCHAR(100) NOT NULL,
+    RoleId UNIQUEIDENTIFIER,
     FOREIGN KEY (RoleId) REFERENCES Roles(Id)
 );
-GO
 
--- Create tabe Form
+-- Bảng Form
 CREATE TABLE Form (
     Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    Name NVARCHAR(255) NOT NULL,
-    Category NVARCHAR(100),
-    CreatedBy UNIQUEIDENTIFIER NOT NULL,
-    WordFilePath NVARCHAR(500),
-    Status NVARCHAR(50) NOT NULL,
-    FOREIGN KEY (CreatedBy) REFERENCES [User](Id)
+    Name NVARCHAR(100) NOT NULL,
+    CategoryId UNIQUEIDENTIFIER,
+    UserId UNIQUEIDENTIFIER,
+    WordFilePath NVARCHAR(255),
+    Status NVARCHAR(50),
+    CreatedAt DATETIME,
+    FOREIGN KEY (CategoryId) REFERENCES FormCategory(Id),
+    FOREIGN KEY (UserId) REFERENCES [User](Id)
 );
-GO
 
--- Create tabe FormFields
-CREATE TABLE FormFields (
+-- Bảng Field
+CREATE TABLE Field (
     Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    FormId UNIQUEIDENTIFIER NOT NULL,
-    FieldName NVARCHAR(255) NOT NULL,
-    DefaultValue NVARCHAR(255),
-    Formula NVARCHAR(500),
-    FOREIGN KEY (FormId) REFERENCES Form(Id)
+    Name NVARCHAR(100) NOT NULL,
+    Type NVARCHAR(50),
+    Description NVARCHAR(255),
+    IsRequired BIT DEFAULT 0,
+    IsUpperCase BIT DEFAULT 0
 );
-GO
 
--- Create tabe Submissions
-CREATE TABLE Submissions (
+-- Bảng FormField
+CREATE TABLE FormField (
     Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
-    FormId UNIQUEIDENTIFIER NOT NULL,
-    UserId UNIQUEIDENTIFIER NOT NULL,
-    SubmissionDate DATETIME NOT NULL DEFAULT GETDATE(),
+    FormId UNIQUEIDENTIFIER,
+    FieldId UNIQUEIDENTIFIER,
+    Formula NVARCHAR(255),
+    FOREIGN KEY (FormId) REFERENCES Form(Id),
+    FOREIGN KEY (FieldId) REFERENCES Field(Id)
+);
+
+-- Bảng UserFillForm
+CREATE TABLE UserFillForm (
+    Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    FormId UNIQUEIDENTIFIER,
+    UserId UNIQUEIDENTIFIER,
+    json_field_value NVARCHAR(MAX),
+    Status NVARCHAR(50),
+    DateTime DATETIME,
     FOREIGN KEY (FormId) REFERENCES Form(Id),
     FOREIGN KEY (UserId) REFERENCES [User](Id)
 );
-GO
 
--- Insert data into Roles table
-INSERT INTO Roles (Id, RoleName)
-VALUES 
-    (NEWID(), 'Admin'),
-    (NEWID(), 'User');
-GO
+-- Bảng PDF
+CREATE TABLE PDF (
+    Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    UserFillFormId UNIQUEIDENTIFIER,
+    PdfPath NVARCHAR(255),
+    FOREIGN KEY (UserFillFormId) REFERENCES UserFillForm(Id)
+);
 
--- Insert data into [User] table
---CREATE AdminRoleId variant
-DECLARE @AdminRoleId UNIQUEIDENTIFIER = (SELECT Id FROM Roles WHERE RoleName = 'Admin');
---CREATE UserRoleId variant
-DECLARE @UserRoleId UNIQUEIDENTIFIER = (SELECT Id FROM Roles WHERE RoleName = 'User');
-
-INSERT INTO [User] (Id, Name, RoleId)
-VALUES 
-    (NEWID(), '', @AdminRoleId),
-    (NEWID(), '', @UserRoleId),
-    (NEWID(), '', @UserRoleId);
-GO
-
+-- Bảng UserFillFormHistory
+CREATE TABLE UserFillFormHistory (
+    Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    UserFillFormId UNIQUEIDENTIFIER,
+    DateFill DATETIME,
+    DateWrite DATETIME,
+    DateFinish DATETIME,
+    Status NVARCHAR(50),
+    FOREIGN KEY (UserFillFormId) REFERENCES UserFillForm(Id)
+);

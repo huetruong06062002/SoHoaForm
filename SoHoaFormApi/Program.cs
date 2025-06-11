@@ -1,23 +1,30 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-
+using SoHoaFormApi.Infrastructure.Services;
+using SoHoaFormApi.Models.DbSoHoaForm;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using System.Security.Claims;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-
 
 // Đọc connection string từ appsettings.json
 var connectionString = builder.Configuration.GetConnectionString("SoHoaFormConnectionString");
 
-//Kết nối db
-// builder.Services.AddDbContext<>(options => 
-//     options.UseLazyLoadingProxies(false).UseSqlServer(connectionString));
+// Kết nối db
+builder.Services.AddDbContext<SoHoaFormContext>(options => 
+    options.UseLazyLoadingProxies(false).UseSqlServer(connectionString));
 
+// Đăng ký Services
+builder.Services.AddScoped<JwtAuthService>();
+builder.Services.AddScoped<AuthService>();
 
-builder.Services.AddSwaggerGen();
-
+// Cấu hình CORS
 builder.Services.AddCors(option =>
 {
     option.AddPolicy("allowOrigin", policy =>
@@ -29,14 +36,71 @@ builder.Services.AddCors(option =>
     });
 });
 
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// Cấu hình JWT Authentication
+var jwtSettings = builder.Configuration.GetSection("jwt");
+var secretKey = jwtSettings["Secret-Key"]; // Sửa typo: Secret-Key thay vì Serect-Key
+var issuer = jwtSettings["Issuer"];
+var audience = jwtSettings["Audience"];
 
+// Kiểm tra null
+if (string.IsNullOrEmpty(secretKey))
+{
+    throw new ArgumentNullException("Secret-Key is missing in appsettings.json");
+}
 
-builder.Services.AddAuthorization();
-builder.Services.AddAuthentication(); 
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters()
+        {
+            ValidateIssuer = true,
+            ValidIssuer = issuer,
+            ValidateAudience = true,
+            ValidAudience = audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+            ClockSkew = TimeSpan.Zero,
+            RoleClaimType = ClaimTypes.Role,
+            NameClaimType = ClaimTypes.Name,
+            ValidateLifetime = true
+        };
+    });
 
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("admin"));
+    options.AddPolicy("UserOnly", policy => policy.RequireRole("user"));
+});
+
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "SoHoaForm API", Version = "v1" });
+
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "Bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Nhập token vào ô bên dưới theo định dạng: Bearer {token}"
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
+});
 
 var app = builder.Build();
 
@@ -49,10 +113,12 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Sửa thứ tự middleware - CORS phải đặt trước Authentication
+app.UseCors("allowOrigin"); // Sửa tên policy cho đúng
+
+app.UseAuthentication(); // Authentication phải đặt trước Authorization
 app.UseAuthorization();
-app.UseAuthentication();
+
 app.MapControllers();
-// Configure CORS
-app.UseCors("allow_origin");
 
 app.Run();
