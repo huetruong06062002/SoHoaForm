@@ -24,6 +24,13 @@ jobs:
         script: |
           echo "🚀 Starting deployment..."
           
+          # Kiểm tra Docker status
+          echo "🐳 Checking Docker status..."
+          if ! docker --version > /dev/null 2>&1; then
+            echo "❌ Docker not available"
+            exit 1
+          fi
+          
           # Navigate to project directory
           cd /home/${{ secrets.VPS_USERNAME }}/sohoaform || {
             echo "❌ Project directory not found. Cloning repository..."
@@ -37,21 +44,40 @@ jobs:
           git reset --hard origin/main
           
           echo "🛑 Stopping existing containers..."
-          docker-compose down || echo "No containers to stop"
+          docker-compose down --remove-orphans --timeout 30 || echo "No containers to stop"
           
-          echo "🧹 Cleaning up old images..."
+          echo "🧹 Cleaning up old resources..."
           docker system prune -f
+          docker volume prune -f || echo "No volumes to clean"
           
           echo "🏗️ Building and starting containers..."
-          docker-compose up -d --build --force-recreate
+          if ! docker-compose up -d --build --force-recreate; then
+            echo "❌ Failed to start containers"
+            docker-compose logs
+            exit 1
+          fi
           
           echo "⏳ Waiting for services to start..."
-          sleep 30
+          sleep 45
           
           echo "🔍 Checking container status..."
           docker-compose ps
           
-          echo "📋 Checking logs..."
-          docker-compose logs --tail=20
+          echo "🩺 Health check..."
+          for i in {1..10}; do
+            if docker-compose ps | grep -q "Up"; then
+              echo "✅ Containers are running"
+              break
+            fi
+            echo "⏳ Waiting for containers... ($i/10)"
+            sleep 10
+          done
           
-          echo "✅ Deployment completed!"
+          echo "📋 Checking logs..."
+          docker-compose logs --tail=50
+          
+          echo "🌐 Testing connectivity..."
+          sleep 10
+          curl -f http://localhost:3000/health || curl -f http://localhost:3000 || echo "⚠️  App health check failed - manual verification needed"
+          
+          echo "✅ Deployment completed successfully!"
