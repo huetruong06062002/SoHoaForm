@@ -1,39 +1,41 @@
 version: '3.8'
 
 services:
+  # SQL Server Database
   sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: sohoaform-sqlserver
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: sohoaform-sqlserver  # Đổi từ sohoaform-db thành sohoaform-sqlserver
     environment:
-      SA_PASSWORD: "YourStrong@Passw0rd"
-      ACCEPT_EULA: "Y"
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong!Passw0rd
+      - MSSQL_PID=Express
     ports:
       - "1433:1433"
     volumes:
-      - sqlserver_data:/var/opt/mssql
-      - ./Databse.sql:/docker-entrypoint-initdb.d/init.sql
+      - sqldata:/var/opt/mssql
+    restart: unless-stopped
     networks:
       - sohoaform-network
-    restart: unless-stopped
 
-  backend:
-    build:
+  # API Backend
+  api:
+    build: 
       context: ./SoHoaFormApi
       dockerfile: Dockerfile
-    container_name: sohoaform-backend
+    container_name: sohoaform-api
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__SoHoaFormConnectionString=Server=sqlserver,1433;Database=SoHoaForm;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=true;
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__SoHoaFormConnectionString=Server=sqlserver,1433;Database=SoHoaForm;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=true;
     ports:
       - "5000:80"
     depends_on:
       - sqlserver
+    restart: unless-stopped
     networks:
       - sohoaform-network
-    restart: unless-stopped
-    volumes:
-      - ./SoHoaFormApi/uploads:/app/uploads
 
+  # Frontend
   frontend:
     build:
       context: ./fe
@@ -41,14 +43,12 @@ services:
     container_name: sohoaform-frontend
     ports:
       - "3000:80"
-    depends_on:
-      - backend
+    restart: unless-stopped
     networks:
       - sohoaform-network
-    restart: unless-stopped
 
 volumes:
-  sqlserver_data:
+  sqldata:
 
 networks:
   sohoaform-network:

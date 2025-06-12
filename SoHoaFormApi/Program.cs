@@ -126,6 +126,19 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
+async Task SeedBasicData(SoHoaFormContext context)
+{
+    // Seed Roles nếu chưa có
+    if (!context.Roles.Any())
+    {
+        context.Roles.AddRange(
+            new Role { Id = Guid.NewGuid(), RoleName = "admin" },
+            new Role { Id = Guid.NewGuid(), RoleName = "user" }
+        );
+        await context.SaveChangesAsync();
+    }
+}
+
 app.UseHttpsRedirection();
 
 // Sửa thứ tự middleware - CORS phải đặt trước Authentication
