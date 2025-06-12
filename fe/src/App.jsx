@@ -6,6 +6,9 @@ import HomePage from './pages/HomePage';
 // import 'antd/dist/reset.css';
 import './App.css';
 import LoginPage from './pages/LoginPage';
+import ManageFormPage from './pages/ManageFormPage';
+import ProtectedRoute from './components/ProtectedRoute';
+import FormConfigPage from './pages/FormConfigPage';
 
 // Ant Design theme configuration
 const theme = {
@@ -24,6 +27,17 @@ function App() {
             {/* Public routes */}
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
+            
+            {/* Protected routes */}
+            <Route 
+              path="/manage-form" 
+              element={
+                <ProtectedRoute>
+                  <ManageFormPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route path="/form-config/:formId" element={<FormConfigPage />} />
           </Routes>
         </Router>
       </ConfigProvider>

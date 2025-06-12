@@ -33,6 +33,7 @@ public class UserService : IUserService
       // Sử dụng Include để lấy forms cùng với category thông tin
       var forms = await _context.Forms
           .Where(f => f.Status == "Active")
+           .AsNoTracking()
           .Include(f => f.Category)
           .ToListAsync();
 

@@ -109,7 +109,7 @@ const AppLayout = ({ children }) => {
                 fontSize: '14px',
                 opacity: window.location.pathname === '/manage' ? 1 : 0.85
               }}
-              onClick={() => navigate('/manage')}
+              onClick={() => navigate('/manage-form')}
             >
               Quản lý form
             </div>

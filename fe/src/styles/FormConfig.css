@@ -1,0 +1,179 @@
+/* Variables List Card */
+.variables-list-card {
+  height: calc(100vh - 200px);
+}
+
+.variables-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #1890ff;
+  color: white;
+  padding: 12px 16px;
+  margin: -24px -24px 0;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+
+.variables-list-header button {
+  color: white;
+  border-color: white;
+}
+
+.variables-list-header button:hover {
+  color: #1890ff;
+  background-color: white;
+}
+
+/* Preview Table */
+.preview-header {
+  background-color: #2e7d32;
+  color: white;
+  padding: 8px 16px;
+  font-weight: normal;
+  font-size: 14px;
+  line-height: 1.5715;
+}
+
+.preview-table {
+  height: calc(100vh - 200px);
+}
+
+/* Fix table header styles */
+.preview-table .ant-table-header {
+  background: #333 !important;
+}
+
+.preview-table .ant-table-thead {
+  background: #333 !important;
+}
+
+.preview-table .ant-table-thead > tr {
+  background: #333 !important;
+}
+
+.preview-table .ant-table-thead > tr > th {
+  background: #333 !important;
+  color: white !important;
+  font-weight: normal !important;
+  padding: 12px 16px !important;
+  border: none !important;
+  border-right: 1px solid #4a4a4a !important;
+}
+
+.preview-table .ant-table-thead > tr > th:last-child {
+  border-right: none !important;
+}
+
+/* Remove extra spaces and borders */
+.preview-table .ant-table {
+  border-radius: 0 !important;
+}
+
+.preview-table .ant-table-container {
+  border-radius: 0 !important;
+}
+
+.preview-table .ant-table-container::before {
+  display: none !important;
+}
+
+.preview-table .ant-card-body {
+  padding: 0 !important;
+}
+
+.preview-table .ant-table-cell {
+  background: transparent !important;
+}
+
+/* Table body styles */
+.preview-table .ant-table-tbody > tr.ant-table-row:nth-child(even) {
+  background-color: #f5f5f5;
+}
+
+.preview-table .ant-table-tbody > tr.ant-table-row:nth-child(odd) {
+  background-color: white;
+}
+
+.preview-table .ant-table-tbody > tr > td {
+  padding: 12px 16px !important;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* Tags styling */
+.ant-tag {
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  border: none;
+  margin-right: 0;
+}
+
+.ant-tag-blue {
+  background-color: #e6f4ff;
+  color: #1890ff;
+}
+
+.ant-tag-success {
+  background-color: #f6ffed;
+  color: #52c41a;
+}
+
+.ant-tag-warning {
+  background-color: #fffbe6;
+  color: #faad14;
+}
+
+.ant-tag-purple {
+  background-color: #f9f0ff;
+  color: #722ed1;
+}
+
+/* Expanded row styling */
+.ant-table-expanded-row .ant-space {
+  background-color: #fafafa;
+  padding: 16px;
+  border-radius: 4px;
+}
+
+.ant-table-expanded-row .ant-btn {
+  background-color: #1890ff;
+  border-color: #1890ff;
+}
+
+/* Table row hover effect */
+.preview-table .ant-table-tbody > tr:hover > td {
+  background-color: #e6f7ff !important;
+}
+
+/* Checkbox styling */
+.ant-checkbox-wrapper {
+  margin-left: 0 !important;
+}
+
+/* Scrollbar styling */
+.ant-table-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ant-table-body::-webkit-scrollbar-thumb {
+  background-color: #d9d9d9;
+  border-radius: 3px;
+}
+
+.ant-table-body::-webkit-scrollbar-track {
+  background-color: #f5f5f5;
+}
+
+/* Preview Table Header (Green background) */
+.preview-table .ant-card-head {
+  padding: 0 !important;
+  min-height: unset !important;
+  border-bottom: none !important;
+  border-radius: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.preview-table .ant-card-head-title {
+  padding: 0 !important;
+} 

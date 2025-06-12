@@ -19,14 +19,6 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    // Log request for debugging
-    console.log('API Request:', {
-      method: config.method?.toUpperCase(),
-      url: config.url,
-      data: config.data,
-    });
-    
     return config;
   },
   (error) => {
@@ -38,12 +30,6 @@ apiClient.interceptors.request.use(
 // Response interceptor
 apiClient.interceptors.response.use(
   (response) => {
-    // Log successful response
-    console.log('API Response:', {
-      status: response.status,
-      data: response.data,
-    });
-    
     return response;
   },
   (error) => {
@@ -52,34 +38,31 @@ apiClient.interceptors.response.use(
     const { response } = error;
     
     if (response) {
-      const { status, data } = response;
+      const { status } = response;
       
       switch (status) {
         case 401:
-          message.error('Unauthorized. Please login again.');
+          message.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!');
           localStorage.removeItem('authToken');
           localStorage.removeItem('userInfo');
-          // Redirect to login page
           window.location.href = '/login';
           break;
         case 403:
-          message.error('Access forbidden');
+          message.error('Bạn không có quyền truy cập tính năng này!');
           break;
         case 404:
-          message.error('Resource not found');
+          message.error('Không tìm thấy tài nguyên yêu cầu!');
           break;
         case 500:
-          message.error('Internal server error');
+          message.error('Lỗi hệ thống. Vui lòng thử lại sau!');
           break;
         default:
-          // Display error message from API response
-          const errorMessage = data?.message || `Error: ${status}`;
-          message.error(errorMessage);
+          message.error('Đã có lỗi xảy ra. Vui lòng thử lại!');
       }
     } else if (error.request) {
-      message.error('Network error. Please check your connection.');
+      message.error('Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối!');
     } else {
-      message.error('Something went wrong. Please try again.');
+      message.error('Đã có lỗi xảy ra. Vui lòng thử lại!');
     }
     
     return Promise.reject(error);

@@ -14,5 +14,7 @@ namespace SoHoaFormApi.Models.Helper
         public bool IsUpperCase { get; set; } = false;
 
         public string Formula { get; set; } = string.Empty;
+
+        public int Order { get; set; } = 0;//Thứ tự field
     }
 }
