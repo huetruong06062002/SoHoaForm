@@ -17,7 +17,7 @@ builder.Services.AddEndpointsApiExplorer();
 var connectionString = builder.Configuration.GetConnectionString("SoHoaFormConnectionString");
 
 // Kết nối db
-builder.Services.AddDbContext<SoHoaFormContext>(options => 
+builder.Services.AddDbContext<SoHoaFormContext>(options =>
     options.UseLazyLoadingProxies(false).UseSqlServer(connectionString));
 
 
@@ -48,9 +48,9 @@ builder.Services.AddCors(option =>
     option.AddPolicy("allowOrigin", policy =>
     {
         policy.WithOrigins("http://localhost:5173")
-              .AllowAnyHeader() 
-              .AllowAnyMethod() 
-              .AllowCredentials(); 
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 
@@ -123,11 +123,8 @@ builder.Services.AddSwaggerGen(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
 
