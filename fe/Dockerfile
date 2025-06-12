@@ -1,22 +1,21 @@
 # Build stage
-FROM node:18-alpine AS build
+FROM node:18-alpine
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies (bao gồm cả devDependencies để có vite)
-RUN npm ci --only=production
+# Install all dependencies (including devDependencies for build tools)
+RUN npm ci
 
 # Copy source code
 COPY . .
 
-# Build the app
+# Build the app for production
 RUN npm run build
 
-# Production stage
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/nginx.conf
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# Expose port 
+EXPOSE 3000
+
+# Start the application
+CMD ["npm", "run", "preview"]
