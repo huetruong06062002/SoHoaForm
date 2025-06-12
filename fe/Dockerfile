@@ -1,9 +1,17 @@
 # Build stage
 FROM node:18-alpine AS build
 WORKDIR /app
+
+# Copy package files
 COPY package*.json ./
-RUN npm ci --only=production
+
+# Install dependencies (bao gồm cả devDependencies để có vite)
+RUN npm ci
+
+# Copy source code
 COPY . .
+
+# Build the app
 RUN npm run build
 
 # Production stage
