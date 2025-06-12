@@ -41,7 +41,7 @@ builder.Services.AddScoped<JwtAuthService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IUserService, UserService>();
-// builder.WebHost.UseUrls("http://*:80");
+builder.WebHost.UseUrls("http://*:80");
 // Cấu hình CORS
 builder.Services.AddCors(option =>
 {
