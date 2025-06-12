@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sohoaform-sqlserver
+    environment:
+      SA_PASSWORD: "YourStrong@Passw0rd"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+      - ./Databse.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - sohoaform-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./SoHoaFormApi
+      dockerfile: Dockerfile
+    container_name: sohoaform-backend
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__SoHoaFormConnectionString=Server=sqlserver,1433;Database=SoHoaForm;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=true;
+    ports:
+      - "5000:80"
+    depends_on:
+      - sqlserver
+    networks:
+      - sohoaform-network
+    restart: unless-stopped
+    volumes:
+      - ./SoHoaFormApi/uploads:/app/uploads
+
+  frontend:
+    build:
+      context: ./fe
+      dockerfile: Dockerfile
+    container_name: sohoaform-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - sohoaform-network
+    restart: unless-stopped
+
+volumes:
+  sqlserver_data:
+
+networks:
+  sohoaform-network:
+    driver: bridge
