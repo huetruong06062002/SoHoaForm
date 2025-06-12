@@ -9,7 +9,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+    environment: Key_SoHoa_Form
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
