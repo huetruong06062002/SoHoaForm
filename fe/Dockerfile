@@ -1,12 +1,16 @@
 # Build stage
-FROM node:18-alpine
+FROM node:20-alpine
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install all dependencies (including devDependencies for build tools)
-RUN npm ci
+# Install dependencies with retry and timeout settings
+RUN npm config set registry https://registry.npmjs.org/ && \
+    npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm ci --prefer-offline --no-audit
 
 # Copy source code
 COPY . .
