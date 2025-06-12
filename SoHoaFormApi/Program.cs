@@ -41,18 +41,7 @@ builder.Services.AddScoped<JwtAuthService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IUserService, UserService>();
-// Sửa lại cấu hình port
-if (builder.Environment.IsDevelopment())
-{
-    // Development - Windows
-    builder.WebHost.UseUrls("http://localhost:5000", "https://localhost:7000");
-}
-else
-{
-    // Production - Linux/Docker
-    builder.WebHost.UseUrls("http://0.0.0.0:80");
-}
-
+// builder.WebHost.UseUrls("http://*:80");
 // Cấu hình CORS
 builder.Services.AddCors(option =>
 {
