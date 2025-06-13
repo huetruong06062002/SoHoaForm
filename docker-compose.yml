@@ -15,7 +15,6 @@ services:
       - "1433:1433"
     volumes:
       - sqldata:/var/opt/mssql
-      - ./mssql.conf:/var/opt/mssql/mssql.conf
     restart: unless-stopped
     networks:
       - sohoaform-network
