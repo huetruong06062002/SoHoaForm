@@ -1,13 +1,13 @@
 version: '3.8'
 
 services:
-# SQL Server Database
+  # SQL Server Database
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: sohoaform-sqlserver  
     environment:
       - ACCEPT_EULA=Y
-      - SA_PASSWORD=YourStrong!Passw0rd123
+      - SA_PASSWORD=YourStrong!Passw0rd
       - MSSQL_PID=Express
     ports:
       - "1433:1433"
@@ -16,6 +16,12 @@ services:
     restart: unless-stopped
     networks:
       - sohoaform-network
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P YourStrong!Passw0rd -Q 'SELECT 1' -C"]
+      interval: 30s
+      timeout: 30s
+      retries: 5
+      start_period: 60s
 
   # API Backend
   api:
