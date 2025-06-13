@@ -13,7 +13,6 @@ services:
       - "0.0.0.0:1433:1433"
     volumes:
       - sqldata:/var/opt/mssql
-      - ./init-sql:/docker-entrypoint-initdb.d
     restart: unless-stopped
     networks:
       - sohoaform-network
