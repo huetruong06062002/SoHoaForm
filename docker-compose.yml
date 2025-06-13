@@ -13,17 +13,40 @@ services:
       - "0.0.0.0:1433:1433"
     volumes:
       - sqldata:/var/opt/mssql
-      - ./init-db.sh:/init-db.sh
+      - ./sql-init:/docker-entrypoint-initdb.d
     restart: unless-stopped
     networks:
       - sohoaform-network
-    entrypoint: |
-      bash -c '
-      /opt/mssql/bin/sqlservr &
-      sleep 60
-      /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourVeryStrong!Password123" -C -Q "EXEC sp_configure \"remote access\", 1; RECONFIGURE;" || true
-      wait'
-  
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourVeryStrong!Password123' -C -Q 'SELECT 1' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Thêm init container để configure SQL Server
+  sqlserver-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - sohoaform-network
+    command: >
+      /bin/bash -c "
+      echo 'Configuring SQL Server for remote access...'
+      /opt/mssql-tools18/bin/sqlcmd -S sqlserver -U sa -P 'YourVeryStrong!Password123' -C -Q \"
+      EXEC sp_configure 'show advanced options', 1;
+      RECONFIGURE;
+      EXEC sp_configure 'remote access', 1;
+      RECONFIGURE;
+      EXEC sp_configure 'remote query timeout', 0;
+      RECONFIGURE;
+      SELECT name, value FROM sys.configurations WHERE name = 'remote access';
+      \"
+      echo 'SQL Server remote access configured successfully!'
+      "
+    restart: "no"
 
   api:
     build:
@@ -36,7 +59,7 @@ services:
     ports:
       - "5000:5000"
     depends_on:
-      - sqlserver
+      - sqlserver-init
     restart: unless-stopped
     networks:
       - sohoaform-network
