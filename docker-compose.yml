@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # SQL Server Database
   sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: mcr.microsoft.com/mssql/server:2019-latest
     container_name: sohoaform-sqlserver  # Đổi từ sohoaform-db thành sohoaform-sqlserver
     environment:
       - ACCEPT_EULA=Y
