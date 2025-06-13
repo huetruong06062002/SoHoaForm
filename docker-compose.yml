@@ -9,6 +9,8 @@ services:
       - ACCEPT_EULA=Y
       - SA_PASSWORD=YourStrong!Passw0rd
       - MSSQL_PID=Express
+      - MSSQL_TCP_PORT=1433
+      - MSSQL_AGENT_ENABLED=true
     ports:
       - "1433:1433"
     volumes:
