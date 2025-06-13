@@ -13,31 +13,17 @@ services:
       - "0.0.0.0:1433:1433"
     volumes:
       - sqldata:/var/opt/mssql
-      - ./init-sql:/docker-entrypoint-initdb.d
+      - ./init-db.sh:/init-db.sh
     restart: unless-stopped
     networks:
       - sohoaform-network
-    command: >
-      /bin/bash -c "
-      # Start SQL Server in background
+    entrypoint: |
+      bash -c '
       /opt/mssql/bin/sqlservr &
-      
-      # Wait for SQL Server to be ready
       sleep 60
-      
-      # Configure remote access
-      /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourVeryStrong!Password123' -C -Q \"
-      EXEC sp_configure 'show advanced options', 1;
-      RECONFIGURE;
-      EXEC sp_configure 'remote access', 1;
-      RECONFIGURE;
-      EXEC sp_configure 'remote query timeout', 600;
-      RECONFIGURE;
-      \"
-      
-      # Keep SQL Server running
-      wait
-      "
+      /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "YourVeryStrong!Password123" -C -Q "EXEC sp_configure \"remote access\", 1; RECONFIGURE;" || true
+      wait'
+  
 
   api:
     build:
