@@ -9,6 +9,8 @@ import LoginPage from './pages/LoginPage';
 import ManageFormPage from './pages/ManageFormPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import FormConfigPage from './pages/FormConfigPage';
+import PreviewFormPage from './pages/PreviewFormPage';
+import AssessmentForm from './components/AssessmentForm';
 
 // Ant Design theme configuration
 const theme = {
@@ -26,8 +28,7 @@ function App() {
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<HomePage />} />
-            <Route path="/login" element={<LoginPage />} />
-            
+            <Route path="/login" element={<LoginPage />} />        
             {/* Protected routes */}
             <Route 
               path="/manage-form" 
@@ -38,6 +39,7 @@ function App() {
               } 
             />
             <Route path="/form-config/:formId" element={<FormConfigPage />} />
+            <Route path="/preview-form/:formId" element={<PreviewFormPage />} />
           </Routes>
         </Router>
       </ConfigProvider>

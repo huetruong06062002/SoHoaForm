@@ -11,6 +11,14 @@ const formService = {
     return response.data;
   },
 
+
+  getWordFile: async (formId) => {
+    const response = await apiClient.get(`/User/form/${formId}/word-file`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+
   createForm: async (formData) => {
     const response = await apiClient.post('/Admin/forms', formData, {
       headers: {

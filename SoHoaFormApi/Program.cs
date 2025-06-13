@@ -41,6 +41,8 @@ builder.Services.AddScoped<JwtAuthService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IWordReaderService, WordReaderService>();
+
 if (builder.Environment.IsProduction())
 {
     builder.WebHost.UseUrls("http://*:80");

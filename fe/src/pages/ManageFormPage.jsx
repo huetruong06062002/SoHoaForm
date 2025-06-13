@@ -124,7 +124,12 @@ const ManageFormPage = () => {
           >
             Cấu hình biến
           </Button>
-          <Button style={{ backgroundColor: '#52c41a', color: 'white' }}>Xem trước</Button>
+          <Button 
+            style={{ backgroundColor: '#52c41a', color: 'white' }}
+            onClick={() => navigate(`/preview-form/${record.key}`)}
+          >
+            Xem trước
+          </Button>
           <Button danger>Xóa</Button>
         </div>
       ),
