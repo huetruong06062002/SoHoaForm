@@ -21,5 +21,5 @@ RUN npm run build
 # Expose port 
 EXPOSE 3000
 
-# Start the application  
-CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0"]
+# Start the application với port 3000 explicit
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "3000"]
