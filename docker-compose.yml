@@ -10,6 +10,7 @@ services:
       - SA_PASSWORD=YourStrong!Passw0rd
       - MSSQL_PID=Express
       - MSSQL_AGENT_ENABLED=true
+      - MSSQL_TCP_PORT=1433
     ports:
       - "1433:1433"
     volumes:
