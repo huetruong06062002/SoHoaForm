@@ -8,6 +8,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: Key_SoHoa_Form
+    timeout-minutes: 30 
 
     steps:
     - name: Deploy to VPS
@@ -17,6 +18,7 @@ jobs:
         username: ${{ secrets.VPS_USERNAME }}
         key: ${{ secrets.VPS_SSH_KEY }}
         port: ${{ secrets.VPS_PORT || 22 }}
+        command_timeout: 30m 
         script: |
           cd /home/${{ secrets.VPS_USERNAME }}/sohoaform || {
             cd /home/${{ secrets.VPS_USERNAME }}
