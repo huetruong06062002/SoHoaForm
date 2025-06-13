@@ -12,21 +12,14 @@ services:
       - MSSQL_AGENT_ENABLED=true
       - MSSQL_TCP_PORT=1433
     ports:
-      - "0.0.0.0:1433:1433"
+      - "1433:1433"
     volumes:
       - sqldata:/var/opt/mssql
       - ./mssql.conf:/var/opt/mssql/mssql.conf
     restart: unless-stopped
     networks:
       - sohoaform-network
-    command: >
-      /bin/bash -c "
-      /opt/mssql/bin/sqlservr &
-      sleep 60
-      /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong!Passw0rd' -C -Q 'EXEC sp_configure \"remote access\", 1; RECONFIGURE;'
-      /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'YourStrong!Passw0rd' -C -Q 'EXEC sp_configure \"show advanced options\", 1; RECONFIGURE;'
-      wait
-      "
+
   # API Backend
   api:
     build: 
