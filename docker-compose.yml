@@ -49,7 +49,7 @@ services:
       dockerfile: Dockerfile
     container_name: sohoaform-frontend
     ports:
-      - "3000:4173"
+      - "3000:3000"
     restart: unless-stopped
     networks:
       - sohoaform-network

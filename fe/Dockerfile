@@ -4,7 +4,7 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install ALL dependencies (remove --only=production)
+# Install ALL dependencies
 RUN npm config set registry https://registry.npmjs.org/ && \
     npm config set fetch-retries 3 && \
     npm config set fetch-retry-mintimeout 10000 && \
@@ -18,8 +18,8 @@ COPY . .
 # Build the app for production
 RUN npm run build
 
-# Expose port 
-EXPOSE 4173
+# Expose port 3000 (match với CMD)
+EXPOSE 3000
 
-# Start the application với port 3000 explicit
+# Start the application
 CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "3000"]
