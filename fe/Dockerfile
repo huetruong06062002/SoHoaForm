@@ -9,7 +9,7 @@ RUN npm config set registry https://registry.npmjs.org/ && \
     npm config set fetch-retries 5 && \
     npm config set fetch-retry-mintimeout 20000 && \
     npm config set fetch-retry-maxtimeout 120000 && \
-    npm ci --prefer-offline --no-audit
+    npm ci --prefer-offline --no-audit --legacy-peer-deps
 
 # Copy source code
 COPY . .
