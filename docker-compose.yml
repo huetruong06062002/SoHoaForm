@@ -1,48 +1,49 @@
 version: '3.8'
 
 services:
+  # SQL Server Database
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: sohoaform-sqlserver  
+    container_name: sohoaform-sqlserver  # Đổi từ sohoaform-db thành sohoaform-sqlserver
     environment:
       - ACCEPT_EULA=Y
-      - SA_PASSWORD=YourVeryStrong!Password123
+      - SA_PASSWORD=YourStrong!Passw0rd
       - MSSQL_PID=Express
-      - MSSQL_TCP_PORT=1433
     ports:
-      - "0.0.0.0:1433:1433"
+      - "1433:1433"
     volumes:
       - sqldata:/var/opt/mssql
     restart: unless-stopped
     networks:
       - sohoaform-network
-  
 
+
+  # API Backend
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile.api
+    build: 
+      context: ./SoHoaFormApi
+      dockerfile: Dockerfile
     container_name: sohoaform-api
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=SoHoaFormDB;User Id=sa;Password=YourVeryStrong!Password123;TrustServerCertificate=true;
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__SoHoaFormConnectionString=Server=sqlserver,1433;Database=SoHoaForm;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=true;
     ports:
-      - "5000:5000"
+      - "5000:80"
     depends_on:
       - sqlserver
     restart: unless-stopped
     networks:
       - sohoaform-network
 
+  # Frontend
   frontend:
     build:
-      context: .
-      dockerfile: Dockerfile.frontend
+      context: ./fe
+      dockerfile: Dockerfile
     container_name: sohoaform-frontend
     ports:
       - "3000:3000"
-    depends_on:
-      - api
     restart: unless-stopped
     networks:
       - sohoaform-network
