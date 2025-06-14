@@ -181,5 +181,64 @@ namespace SoHoaFormApi.Controllers
                 return StatusCode(500, $"Error: {ex.Message}");
             }
         }
+
+        [HttpGet("form/{formId}/information")]
+        public async Task<IActionResult> GetFormInformation(Guid formId)
+        {
+            try
+            {
+                var result = await _userService.GetFormInformationAsync(formId);
+
+                if (result.Data == null)
+                {
+                    if (result.StatusCode == 404)
+                    {
+                        return NotFound(result);
+                    }
+                    return BadRequest(result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new HTTPResponseClient<object>
+                {
+                    Data = null,
+                    Message = $"Internal server error: {ex.Message}",
+                    StatusCode = 500,
+                    DateTime = DateTime.Now
+                });
+            }
+        }
+
+        [HttpGet("forms/order-by-category")]
+public async Task<IActionResult> GetAllFormsOrderByCategory()
+{
+    try
+    {
+        var result = await _userService.GetAllFormsOrderByCategoryAsync();
+        
+        if (result.Data == null)
+        {
+            return StatusCode(result.StatusCode, result);
+        }
+
+        return Ok(result);
     }
+    catch (Exception ex)
+    {
+        return StatusCode(500, new HTTPResponseClient<object>
+        {
+            Message = $"Internal server error: {ex.Message}",
+            StatusCode = 500,
+            DateTime = DateTime.Now
+        });
+    }
+}
+
+    }
+
+
+
 }

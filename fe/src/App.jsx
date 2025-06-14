@@ -10,6 +10,8 @@ import ManageFormPage from './pages/ManageFormPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import FormConfigPage from './pages/FormConfigPage';
 import PreviewFormPage from './pages/PreviewFormPage';
+import AllFormPage from './pages/AllFormPage';
+import FormHistoryPage from './pages/FormHistoryPage';
 import AssessmentForm from './components/AssessmentForm';
 
 // Ant Design theme configuration
@@ -40,6 +42,8 @@ function App() {
             />
             <Route path="/form-config/:formId" element={<FormConfigPage />} />
             <Route path="/preview-form/:formId" element={<PreviewFormPage />} />
+            <Route path="/allForm" element={<AllFormPage />} />
+            {/* <Route path="/form-history/:formId" element={<FormHistoryPage />} /> */}
           </Routes>
         </Router>
       </ConfigProvider>

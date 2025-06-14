@@ -162,7 +162,7 @@ const HomePage = () => {
                 flexDirection: 'column',
                 justifyContent: 'space-between'
               }}
-              onClick={() => navigate('/form')}
+              onClick={() => navigate('/allForm')}
             >
               <div>
                 <div style={{

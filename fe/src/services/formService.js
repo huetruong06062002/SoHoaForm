@@ -12,6 +12,16 @@ const formService = {
   },
 
 
+  getFormInfo: async (formId) => {
+    const response = await apiClient.get(`/User/form/${formId}/information`);
+    return response.data;
+  },
+
+  getFormsByCategory: async () => {
+    const response = await apiClient.get('/User/forms/order-by-category');
+    return response.data;
+  },
+
   getWordFile: async (formId) => {
     const response = await apiClient.get(`/User/form/${formId}/word-file`, {
       responseType: 'blob'
