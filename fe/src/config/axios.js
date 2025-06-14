@@ -1,45 +1,45 @@
 import axios from 'axios';
 import { message } from 'antd';
-import ENV from './env';
 
-// Create axios instance
-const apiClient = axios.create({
-  baseURL: ENV.API_BASE_URL,
-  timeout: ENV.API_TIMEOUT,
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://157.66.100.51:5047/api';
+
+const axiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 30000, // Tăng timeout lên 30 giây
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
   },
 });
 
 // Request interceptor
-apiClient.interceptors.request.use(
+axiosInstance.interceptors.request.use(
   (config) => {
-    // Get token from localStorage
     const token = localStorage.getItem('authToken');
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      config.headers['Authorization'] = `Bearer ${token}`;
     }
+    
+    console.log('Making request to:', config.baseURL + config.url);
     return config;
   },
   (error) => {
-    console.error('Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
 
 // Response interceptor
-apiClient.interceptors.response.use(
+axiosInstance.interceptors.response.use(
   (response) => {
     return response;
   },
   (error) => {
-    console.error('API Error:', error);
+    console.error('Axios error:', error);
     
-    const { response } = error;
-    
-    if (response) {
-      const { status } = response;
-      
+    if (error.code === 'ECONNABORTED') {
+      message.error('Kết nối timeout. Vui lòng thử lại!');
+    } else if (error.response) {
+      const { status } = error.response;
       switch (status) {
         case 401:
           message.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!');
@@ -69,4 +69,4 @@ apiClient.interceptors.response.use(
   }
 );
 
-export default apiClient; 
+export default axiosInstance;
