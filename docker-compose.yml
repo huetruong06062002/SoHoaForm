@@ -1,56 +1,40 @@
 version: '3.8'
 
 services:
-  # SQL Server Database
-  sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: sohoaform-sqlserver  # Đổi từ sohoaform-db thành sohoaform-sqlserver
-    environment:
-      - ACCEPT_EULA=Y
-      - SA_PASSWORD=YourStrong!Passw0rd
-      - MSSQL_PID=Express
-    ports:
-      - "1433:1433"
-    volumes:
-      - sqldata:/var/opt/mssql
-    restart: unless-stopped
-    networks:
-      - sohoaform-network
-
-
-  # API Backend
+  # Backend API Service
   api:
-    build: 
+    build:
       context: ./SoHoaFormApi
       dockerfile: Dockerfile
-    container_name: sohoaform-api
+    ports:
+      - "5047:80"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:80
-      - ConnectionStrings__SoHoaFormConnectionString=Server=sqlserver,1433;Database=SoHoaForm;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=true;
-    ports:
-      - "5000:80"
-    depends_on:
-      - sqlserver
-    restart: unless-stopped
+    volumes:
+      - ./SoHoaFormApi/uploads:/app/uploads
     networks:
       - sohoaform-network
+    restart: unless-stopped
 
-  # Frontend
+  # Frontend Service  
   frontend:
     build:
       context: ./fe
       dockerfile: Dockerfile
-    container_name: sohoaform-frontend
     ports:
       - "3000:3000"
-    restart: unless-stopped
+    environment:
+      - VITE_API_BASE_URL=http://161.248.147.59:5047/api
+    depends_on:
+      - api
     networks:
       - sohoaform-network
-
-volumes:
-  sqldata:
+    restart: unless-stopped
 
 networks:
   sohoaform-network:
     driver: bridge
+
+volumes:
+  uploads:

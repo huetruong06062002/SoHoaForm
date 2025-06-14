@@ -2,6 +2,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 WORKDIR /app
 EXPOSE 80
 
+# Tạo thư mục uploads
+RUN mkdir -p /app/uploads/forms
+
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY ["SoHoaFormApi.csproj", "./"]
@@ -15,4 +18,8 @@ RUN dotnet publish "SoHoaFormApi.csproj" -c Release -o /app/publish /p:UseAppHos
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+
+# Set permissions cho uploads folder
+RUN chmod -R 755 /app/uploads
+
 ENTRYPOINT ["dotnet", "SoHoaFormApi.dll"]
