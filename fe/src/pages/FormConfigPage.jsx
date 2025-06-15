@@ -9,6 +9,7 @@ import { isApiSuccess, getApiData } from '../utils/apiUtils';
 import '../styles/FormConfig.css';
 
 const { Title } = Typography;
+const { TextArea } = Input;
 
 const FormConfigPage = () => {
   const { formId } = useParams();
@@ -17,6 +18,8 @@ const FormConfigPage = () => {
   const [fields, setFields] = useState([]);
   const [expandedRowKeys, setExpandedRowKeys] = useState([]);
   const [formulaValues, setFormulaValues] = useState({});
+  const [selectOptions, setSelectOptions] = useState({});
+  const [dependentVariables, setDependentVariables] = useState({});
   const [configChanges, setConfigChanges] = useState({});
 
   const fetchFormConfig = async () => {
@@ -56,6 +59,8 @@ const FormConfigPage = () => {
         return <Tag color="purple">Đúng/Sai</Tag>;
       case 'Formula':
         return <Tag color="orange">Công thức</Tag>;
+      case 'Select':
+        return <Tag color="cyan">Lựa chọn</Tag>;
       default:
         return <Tag>{type}</Tag>;
     }
@@ -70,10 +75,38 @@ const FormConfigPage = () => {
         [record.formFieldId]: record.formula || ''
       }));
     }
+    // Initialize select options if it's a select field
+    if (expanded && record.fieldType === 'Select' && !selectOptions[record.formFieldId]) {
+      setSelectOptions(prev => ({
+        ...prev,
+        [record.formFieldId]: record.options || ''
+      }));
+    }
+    // Initialize dependent variables if it's a boolean field
+    if (expanded && record.fieldType === 'Boolean' && !dependentVariables[record.formFieldId]) {
+      setDependentVariables(prev => ({
+        ...prev,
+        [record.formFieldId]: record.dependentVariables || ''
+      }));
+    }
   };
 
   const handleFormulaChange = (fieldId, value) => {
     setFormulaValues(prev => ({
+      ...prev,
+      [fieldId]: value
+    }));
+  };
+
+  const handleSelectOptionsChange = (fieldId, value) => {
+    setSelectOptions(prev => ({
+      ...prev,
+      [fieldId]: value
+    }));
+  };
+
+  const handleDependentVariablesChange = (fieldId, value) => {
+    setDependentVariables(prev => ({
       ...prev,
       [fieldId]: value
     }));
@@ -129,6 +162,94 @@ const FormConfigPage = () => {
       }
     } catch (error) {
       console.error('Error updating formula:', error);
+      // Lỗi sẽ được hiển thị tự động bởi axios interceptor
+    }
+  };
+
+  const handleSaveSelectOptions = async (record) => {
+    try {
+      const options = selectOptions[record.formFieldId];
+      if (!options || options.trim() === '') {
+        message.warning('Vui lòng nhập các lựa chọn');
+        return;
+      }
+      
+      console.log('Saving select options:', {
+        formId: formId,
+        fieldId: record.fieldId,
+        formFieldId: record.formFieldId,
+        options: options
+      });
+      
+      const response = await formService.updateFieldConfig(formId, record.fieldId, {
+        options: options.trim(),
+        description: ""
+      });
+      if (isApiSuccess(response)) {
+        // Message thành công sẽ được hiển thị tự động bởi axios interceptor
+        console.log('Select options updated successfully:', response);
+        
+        // Cập nhật lại data trong state
+        setFields(prevFields => 
+          prevFields.map(field => 
+            field.formFieldId === record.formFieldId 
+              ? { ...field, options: options.trim() }
+              : field
+          )
+        );
+        
+        // Cập nhật selectOptions để hiển thị giá trị mới
+        setSelectOptions(prev => ({
+          ...prev,
+          [record.formFieldId]: options.trim()
+        }));
+      }
+    } catch (error) {
+      console.error('Error updating select options:', error);
+      // Lỗi sẽ được hiển thị tự động bởi axios interceptor
+    }
+  };
+
+  const handleSaveDependentVariables = async (record) => {
+    try {
+      const depVars = dependentVariables[record.formFieldId];
+      if (!depVars || depVars.trim() === '') {
+        message.warning('Vui lòng nhập danh sách biến phụ thuộc');
+        return;
+      }
+      
+      console.log('Saving dependent variables:', {
+        formId: formId,
+        fieldId: record.fieldId,
+        formFieldId: record.formFieldId,
+        dependentVariables: depVars
+      });
+      
+      const response = await formService.updateFieldConfig(formId, record.fieldId, {
+        dependentVariables: depVars.trim(),
+        description: ""
+      });
+      if (isApiSuccess(response)) {
+        // Message thành công sẽ được hiển thị tự động bởi axios interceptor
+        console.log('Dependent variables updated successfully:', response);
+        
+        // Cập nhật lại data trong state
+        setFields(prevFields => 
+          prevFields.map(field => 
+            field.formFieldId === record.formFieldId 
+              ? { ...field, dependentVariables: depVars.trim() }
+              : field
+          )
+        );
+        
+        // Cập nhật dependentVariables để hiển thị giá trị mới
+        setDependentVariables(prev => ({
+          ...prev,
+          [record.formFieldId]: depVars.trim()
+        }));
+      }
+    } catch (error) {
+      console.error('Error updating dependent variables:', error);
       // Lỗi sẽ được hiển thị tự động bởi axios interceptor
     }
   };
@@ -209,6 +330,92 @@ const FormConfigPage = () => {
                   transition={{ delay: 0.1 }}
                 >
                   <Checkbox checked={record.isUpperCase}>Bắt buộc nhập chữ hoa</Checkbox>
+                </motion.div>
+              )}
+
+              {record.fieldType === 'Boolean' && (
+                <motion.div
+                  initial={{ x: -20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: 0.1 }}
+                  style={{ width: '100%' }}
+                >
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ fontWeight: '500', marginBottom: '4px', display: 'block' }}>
+                      Danh sách biến phụ thuộc:
+                    </label>
+                    <div style={{ 
+                      backgroundColor: '#f0f9ff', 
+                      border: '1px solid #bfdbfe', 
+                      borderRadius: '4px', 
+                      padding: '8px', 
+                      marginBottom: '8px',
+                      fontSize: '12px',
+                      color: '#1e40af'
+                    }}>
+                      Ví dụ: [bien1], [bien2], [bien3]
+                    </div>
+                    <Input
+                      value={dependentVariables[record.formFieldId] || record.dependentVariables || ''}
+                      onChange={(e) => handleDependentVariablesChange(record.formFieldId, e.target.value)}
+                      placeholder="Nhập danh sách tên biến bị ảnh hưởng khi checkbox này được chọn. Sử dụng cú pháp [tên biến], ... các tên biến cách nhau bởi dấu phẩy."
+                      style={{ marginBottom: '8px' }}
+                    />
+                    <div style={{ 
+                      fontSize: '12px', 
+                      color: '#6b7280', 
+                      marginBottom: '8px',
+                      lineHeight: '1.4'
+                    }}>
+                      Nhập danh sách tên biến bị ảnh hưởng khi checkbox này được chọn. Sử dụng cú pháp [tên biến], ... các tên biến cách nhau bởi dấu phẩy.
+                    </div>
+                    <Button 
+                      type="primary" 
+                      size="small"
+                      onClick={() => handleSaveDependentVariables(record)}
+                      style={{
+                        height: '28px',
+                        fontSize: '12px',
+                        padding: '4px 12px'
+                      }}
+                    >
+                      Lưu cấu hình
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+              
+              {record.fieldType === 'Select' && (
+                <motion.div
+                  initial={{ x: -20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: 0.1 }}
+                  style={{ width: '100%' }}
+                >
+                  <div style={{ marginBottom: '8px' }}>
+                    <label style={{ fontWeight: '500', marginBottom: '4px', display: 'block' }}>
+                      Danh sách lựa chọn (mỗi dòng 1 lựa chọn):
+                    </label>
+                    <TextArea
+                      value={selectOptions[record.formFieldId] || record.options || ''}
+                      onChange={(e) => handleSelectOptionsChange(record.formFieldId, e.target.value)}
+                      placeholder="Nhập các lựa chọn, mỗi dòng một lựa chọn&#10;Ví dụ:&#10;Lựa chọn 1&#10;Lựa chọn 2&#10;Lựa chọn 3"
+                      rows={4}
+                      style={{ marginBottom: '8px' }}
+                    />
+                    <Button 
+                      type="primary" 
+                      size="small"
+                      onClick={() => handleSaveSelectOptions(record)}
+                      style={{
+                        height: '28px',
+                        fontSize: '12px',
+                        padding: '4px 12px'
+                      }}
+                    >
+                      Lưu danh sách lựa chọn
+                    </Button>
+                  </div>
                 </motion.div>
               )}
               
@@ -421,6 +628,8 @@ const FormConfigPage = () => {
           description = 'Ngày tháng';
         } else if (record.fieldType?.toLowerCase() === 'formula') {
           description = 'Tính toán tự động';
+        } else if (record.fieldType?.toLowerCase() === 'select') {
+          description = 'Chọn từ danh sách (Bắt buộc)';
         } else {
           description = 'Văn bản tự do';
         }
