@@ -492,16 +492,21 @@
 
 .formula-input {
   min-width: 120px;
-  background-color: #f5f5f5;
-  color: #666;
-  font-style: italic;
-  cursor: default;
+  background-color: #f0f9ff !important;
+  color: #1890ff !important;
+  font-weight: 600;
+  text-align: center;
+  cursor: not-allowed;
+  border: 1px solid #91d5ff !important;
+  border-radius: 4px;
+  padding: 4px 8px;
 }
 
 .formula-input:focus {
-  background-color: #f5f5f5;
-  border-bottom-color: #1890ff;
-  cursor: text;
+  background-color: #f0f9ff !important;
+  border-color: #91d5ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+  cursor: not-allowed;
 }
 
 /* Word mode specific styles for different input types */

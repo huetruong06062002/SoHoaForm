@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Table, Button, Typography, message, Card, Row, Col, Tag, Checkbox, Space } from 'antd';
-import { CaretRightOutlined, CaretDownOutlined } from '@ant-design/icons';
+import { Table, Button, Typography, message, Card, Row, Col, Tag, Checkbox, Space, Input, Collapse } from 'antd';
+import { CaretRightOutlined, CaretDownOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import AppLayout from '../components/layout/AppLayout';
 import formService from '../services/formService';
+import { isApiSuccess, getApiData } from '../utils/apiUtils';
 import '../styles/FormConfig.css';
 
 const { Title } = Typography;
@@ -15,6 +16,8 @@ const FormConfigPage = () => {
   const [formData, setFormData] = useState(null);
   const [fields, setFields] = useState([]);
   const [expandedRowKeys, setExpandedRowKeys] = useState([]);
+  const [formulaValues, setFormulaValues] = useState({});
+  const [configChanges, setConfigChanges] = useState({});
 
   const fetchFormConfig = async () => {
     try {
@@ -51,6 +54,8 @@ const FormConfigPage = () => {
         return <Tag color="warning">Ngày tháng</Tag>;
       case 'Boolean':
         return <Tag color="purple">Đúng/Sai</Tag>;
+      case 'Formula':
+        return <Tag color="orange">Công thức</Tag>;
       default:
         return <Tag>{type}</Tag>;
     }
@@ -58,6 +63,132 @@ const FormConfigPage = () => {
 
   const handleExpand = (expanded, record) => {
     setExpandedRowKeys(expanded ? [record.formFieldId] : []);
+    // Initialize formula value if it's a formula field
+    if (expanded && record.fieldType === 'Formula' && !formulaValues[record.formFieldId]) {
+      setFormulaValues(prev => ({
+        ...prev,
+        [record.formFieldId]: record.formula || ''
+      }));
+    }
+  };
+
+  const handleFormulaChange = (fieldId, value) => {
+    setFormulaValues(prev => ({
+      ...prev,
+      [fieldId]: value
+    }));
+  };
+
+  const handleConfigChange = (fieldId, configType, value) => {
+    setConfigChanges(prev => ({
+      ...prev,
+      [fieldId]: {
+        ...prev[fieldId],
+        [configType]: value
+      }
+    }));
+  };
+
+  const handleSaveFormula = async (record) => {
+    try {
+      const formula = formulaValues[record.formFieldId];
+      if (!formula || formula.trim() === '') {
+        message.warning('Vui lòng nhập công thức');
+        return;
+      }
+      
+      console.log('Saving formula:', {
+        formId: formId,
+        fieldId: record.fieldId,
+        formFieldId: record.formFieldId,
+        formula: formula
+      });
+      
+      const response = await formService.updateFormula(formId, record.fieldId, {
+        formula: formula.trim(),
+        description: ""
+      });
+      if (isApiSuccess(response)) {
+        // Message thành công sẽ được hiển thị tự động bởi axios interceptor
+        console.log('Formula updated successfully:', response);
+        
+        // Cập nhật lại data trong state
+        setFields(prevFields => 
+          prevFields.map(field => 
+            field.formFieldId === record.formFieldId 
+              ? { ...field, formula: formula.trim() }
+              : field
+          )
+        );
+        
+        // Cập nhật formulaValues để hiển thị giá trị mới
+        setFormulaValues(prev => ({
+          ...prev,
+          [record.formFieldId]: formula.trim()
+        }));
+      }
+    } catch (error) {
+      console.error('Error updating formula:', error);
+      // Lỗi sẽ được hiển thị tự động bởi axios interceptor
+    }
+  };
+
+  const handleSaveConfig = async (record) => {
+    try {
+      console.log('Saving config for field:', record);
+      
+      // Lấy giá trị config hiện tại (từ changes hoặc original)
+      const currentConfig = configChanges[record.formFieldId] || {};
+      const isRequired = currentConfig.isRequired ?? record.isRequired;
+      const isUpperCase = currentConfig.isUpperCase ?? (record.isUpperCase || false);
+      
+      // Nếu là Formula field, cần có formula trong payload
+      let payload;
+      if (record.fieldType === 'Formula') {
+        const currentFormula = formulaValues[record.formFieldId] || record.formula || '';
+        payload = {
+          formula: currentFormula,
+          description: "",
+          isRequired: isRequired,
+          isUpperCase: isUpperCase
+        };
+      } else {
+        // Cho các field khác, chỉ gửi config
+        payload = {
+          isRequired: isRequired,
+          isUpperCase: isUpperCase,
+          description: ""
+        };
+      }
+      
+      console.log('Config payload:', payload);
+      
+      const response = await formService.updateFieldConfig(formId, record.fieldId, payload);
+      if (isApiSuccess(response)) {
+        // Message thành công sẽ được hiển thị tự động bởi axios interceptor
+        console.log('Config updated successfully:', response);
+        
+        // Cập nhật lại data trong state
+        setFields(prevFields => 
+          prevFields.map(field => 
+            field.formFieldId === record.formFieldId 
+              ? { ...field, isRequired: isRequired, isUpperCase: isUpperCase }
+              : field
+          )
+        );
+        
+        // Clear config changes cho field này
+        setConfigChanges(prev => {
+          const newChanges = { ...prev };
+          delete newChanges[record.formFieldId];
+          return newChanges;
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error saving config:', error);
+      // Lỗi sẽ được hiển thị tự động bởi axios interceptor
+    }
   };
 
   const expandedRowRender = (record) => {
@@ -80,19 +211,156 @@ const FormConfigPage = () => {
                   <Checkbox checked={record.isUpperCase}>Bắt buộc nhập chữ hoa</Checkbox>
                 </motion.div>
               )}
+              
+              {record.fieldType === 'Formula' && (
+                <motion.div
+                  initial={{ x: -20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: 0.1 }}
+                  style={{ width: '100%' }}
+                >
+                  <div style={{ marginBottom: '8px' }}>
+                    <label style={{ fontWeight: '500', marginBottom: '4px', display: 'block' }}>
+                      Công thức:
+                    </label>
+                    <Input
+                      value={formulaValues[record.formFieldId] || record.formula || ''}
+                      onChange={(e) => handleFormulaChange(record.formFieldId, e.target.value)}
+                      placeholder="Nhập công thức (ví dụ: [so1] * [so2])"
+                      style={{ marginBottom: '8px' }}
+                    />
+                    <Button 
+                      type="default" 
+                      size="small" 
+                      icon={<InfoCircleOutlined />}
+                      onClick={() => {
+                        // Toggle formula help
+                        const helpElement = document.getElementById(`formula-help-${record.formFieldId}`);
+                        if (helpElement) {
+                          helpElement.style.display = helpElement.style.display === 'none' ? 'block' : 'none';
+                        }
+                      }}
+                      style={{ 
+                        padding: '4px 12px',
+                        height: '28px',
+                        fontSize: '12px',
+                        borderColor: '#1890ff',
+                        color: '#1890ff',
+                        backgroundColor: '#f0f9ff'
+                      }}
+                    >
+                      Hiển thị hướng dẫn công thức
+                    </Button>
+                    <div 
+                      id={`formula-help-${record.formFieldId}`}
+                      style={{ 
+                        display: 'none',
+                        marginTop: '12px',
+                        padding: '12px',
+                        backgroundColor: '#f8f9fa',
+                        border: '1px solid #e9ecef',
+                        borderRadius: '6px',
+                        fontSize: '12px'
+                      }}
+                    >
+                      <div style={{ marginBottom: '12px' }}>
+                        <strong>Hướng dẫn nhập công thức</strong>
+                      </div>
+                      
+                      <div style={{ marginBottom: '8px' }}>
+                        <strong>Cú pháp cơ bản:</strong> Sử dụng [tenBien] để tham chiếu đến biến khác. Sử dụng $$funName$$ để cho phép người dùng tự nhập nếu muốn.
+                      </div>
+                      
+                      <div style={{ marginBottom: '8px' }}>
+                        <strong>Các phép toán số học:</strong> +, -, *, /, %, Math.pow(x,y), Math.round(x)
+                      </div>
+                      
+                      <div style={{ marginBottom: '8px' }}>
+                        <strong>Hàm toán học:</strong> Math.abs(), Math.max(), Math.min(), Math.floor(), Math.ceil()
+                      </div>
+                      
+                                             <div style={{ marginBottom: '8px' }}>
+                         <strong>Các toán tử so sánh:</strong> ==, ===, !=, !==, &gt;, &lt;, &gt;=, &lt;=
+                       </div>
+                      
+                      <div style={{ marginBottom: '8px' }}>
+                        <strong>Các toán tử logic:</strong> && (VÀ), || (HOẶC), ! (PHỦ ĐỊNH)
+                      </div>
+                      
+                      <div style={{ marginBottom: '8px' }}>
+                        <strong>Toán tử điều kiện:</strong> điều_kiện ? giá_trị_nếu_đúng : giá_trị_nếu_sai
+                      </div>
+                      
+                      <div style={{ marginBottom: '12px' }}>
+                        <strong>Các ví dụ:</strong>
+                        <ul style={{ margin: '4px 0', paddingLeft: '16px' }}>
+                          <li>Tính tổng: <code style={{ backgroundColor: '#e9ecef', padding: '2px 4px' }}>[soLuong] * [donGia]</code></li>
+                          <li>Làm tròn 2 chữ số: <code style={{ backgroundColor: '#e9ecef', padding: '2px 4px' }}>Math.round([tongTien] * 100) / 100</code></li>
+                                                     <li>Điều kiện đơn giản: <code style={{ backgroundColor: '#e9ecef', padding: '2px 4px' }}>[tuoi] &gt;= 18 ? "Đủ tuổi" : "Chưa đủ tuổi"</code></li>
+                           <li>Điều kiện lồng nhau: <code style={{ backgroundColor: '#e9ecef', padding: '2px 4px' }}>[diem] &gt;= 8 ? "Giỏi" : ([diem] &gt;= 6.5 ? "Khá" : "Trung bình")</code></li>
+                          <li>Cho phép người dùng tự nhập: <code style={{ backgroundColor: '#e9ecef', padding: '2px 4px' }}>$$tuNhap$$</code></li>
+                        </ul>
+                      </div>
+                      
+                                             <div style={{ display: 'flex', gap: '8px' }}>
+                         <Button 
+                           type="primary" 
+                           size="small"
+                           onClick={() => handleSaveFormula(record)}
+                           style={{
+                             height: '28px',
+                             fontSize: '12px',
+                             padding: '4px 12px'
+                           }}
+                         >
+                           Lưu công thức
+                         </Button>
+                         <Button 
+                           type="default" 
+                           size="small"
+                           onClick={() => {
+                             document.getElementById(`formula-help-${record.formFieldId}`).style.display = 'none';
+                           }}
+                           style={{
+                             height: '28px',
+                             fontSize: '12px',
+                             padding: '4px 12px'
+                           }}
+                         >
+                           Ẩn hướng dẫn
+                         </Button>
+                       </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+              
               <motion.div
                 initial={{ x: -20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 transition={{ delay: 0.2 }}
               >
-                <Checkbox checked={record.isRequired}>Bắt buộc nhập</Checkbox>
+                <Checkbox 
+                  checked={configChanges[record.formFieldId]?.isRequired ?? record.isRequired}
+                  onChange={(e) => {
+                    handleConfigChange(record.formFieldId, 'isRequired', e.target.checked);
+                  }}
+                >
+                  Bắt buộc nhập
+                </Checkbox>
               </motion.div>
               <motion.div
                 initial={{ x: -20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 transition={{ delay: 0.3 }}
               >
-                <Button type="primary" size="small">Lưu cấu hình</Button>
+                <Button 
+                  type="primary" 
+                  size="small"
+                  onClick={() => handleSaveConfig(record)}
+                >
+                  Lưu cấu hình
+                </Button>
               </motion.div>
             </Space>
           </div>
@@ -151,6 +419,8 @@ const FormConfigPage = () => {
           description = 'Nhập số';
         } else if (record.fieldType?.toLowerCase() === 'date') {
           description = 'Ngày tháng';
+        } else if (record.fieldType?.toLowerCase() === 'formula') {
+          description = 'Tính toán tự động';
         } else {
           description = 'Văn bản tự do';
         }

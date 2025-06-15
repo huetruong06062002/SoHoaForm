@@ -316,6 +316,15 @@ public class AdminService : IAdminService
     }
 
     var name = fieldName.ToLower();
+
+    //Phân tích theo prefix trong field name TRƯỚC (ưu tiên cao nhất)**
+    if (name.StartsWith("f_")) return "Formula";     // f_ = formula
+    if (name.StartsWith("n_")) return "Number";      // n_ = number  
+    if (name.StartsWith("t_")) return "Text";        // t_ = text
+    if (name.StartsWith("d_")) return "Date";        // d_ = date
+    if (name.StartsWith("c_") || name.StartsWith("b_")) return "Boolean"; // c_/b_ = boolean
+    if (name.StartsWith("s_")) return "Select";      // s_ = select/dropdown
+
     // 1. Phân tích Number fields trước 
     if (name.Contains("score") || name.Contains("duration") ||
         name.Contains("grade") || name.Contains("number") ||
@@ -453,8 +462,16 @@ public class AdminService : IAdminService
                     ? ff.Field.Name.Substring(ff.Field.Name.IndexOf('_') + 1)
                     : (ff.Field?.Name ?? "Unknown");
 
-                 // Sử dụng formula để xác định type
-                 var fieldType = DetermineFieldType(ff.Field?.Name ?? "", ff.Formula ?? "");
+
+
+                 // **Sử dụng Type từ database TRƯỚC, nếu không có thì mới phân tích**
+                 var fieldType = ff.Field?.Type ?? "Text";
+
+                 // Chỉ re-analyze nếu type trong DB là null/empty hoặc không hợp lệ
+                 if (string.IsNullOrEmpty(fieldType) || fieldType == "Unknown")
+                 {
+                   fieldType = DetermineFieldType(ff.Field?.Name ?? "", ff.Formula ?? "");
+                 }
 
                  return new FormFieldDto
                  {

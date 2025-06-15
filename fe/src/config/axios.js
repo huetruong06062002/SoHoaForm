@@ -1,10 +1,9 @@
 import axios from 'axios';
 import { message } from 'antd';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5047/api';
-
-const axiosInstance = axios.create({
-  baseURL: API_BASE_URL,
+// Create axios instance
+const apiClient = axios.create({
+  baseURL: 'http://localhost:5047/api',
   timeout: 30000, // Tăng timeout lên 30 giây
   headers: {
     'Content-Type': 'application/json',
@@ -13,30 +12,50 @@ const axiosInstance = axios.create({
 });
 
 // Request interceptor
-axiosInstance.interceptors.request.use(
+apiClient.interceptors.request.use(
   (config) => {
+    // Get token from localStorage
     const token = localStorage.getItem('authToken');
     if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+      config.headers.Authorization = `Bearer ${token}`;
     }
     
     console.log('Making request to:', config.baseURL + config.url);
     return config;
   },
   (error) => {
+    console.error('Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
 
 // Response interceptor
-axiosInstance.interceptors.response.use(
+apiClient.interceptors.response.use(
   (response) => {
+    // Tự động hiển thị message từ API response nếu có
+    if (response.data && response.data.message) {
+      // Chỉ hiển thị message cho các request không phải GET (để tránh spam message khi load data)
+      const method = response.config.method?.toLowerCase();
+      if (method && ['post', 'put', 'patch', 'delete'].includes(method)) {
+        // Kiểm tra statusCode để quyết định loại message
+        if (response.data.statusCode >= 200 && response.data.statusCode < 300) {
+          message.success(response.data.message);
+        } else if (response.data.statusCode >= 400) {
+          message.error(response.data.message);
+        } else {
+          message.info(response.data.message);
+        }
+      }
+    }
     return response;
   },
   (error) => {
-    console.error('Axios error:', error);
+    console.error('API Error:', error);
     
-    if (error.code === 'ECONNABORTED') {
+    // Kiểm tra nếu API trả về lỗi nhưng vẫn có format chuẩn
+    if (error.response?.data?.message) {
+      message.error(error.response.data.message);
+    } else if (error.code === 'ECONNABORTED') {
       message.error('Kết nối timeout. Vui lòng thử lại!');
     } else if (error.response) {
       const { status } = error.response;
@@ -69,4 +88,4 @@ axiosInstance.interceptors.response.use(
   }
 );
 
-export default axiosInstance;
+export default apiClient; 

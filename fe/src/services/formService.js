@@ -37,6 +37,24 @@ const formService = {
     });
     return response.data;
   },
+
+  // API để cập nhật formula field
+  updateFormula: async (formId, fieldId, payload) => {
+    const response = await apiClient.put(`/Admin/form/${formId}/field/${fieldId}/formula`, payload);
+    return response.data;
+  },
+
+  // API để cập nhật field config
+  updateFieldConfig: async (formId, fieldId, config) => {
+    const response = await apiClient.put(`/Admin/form/${formId}/field/${fieldId}/formula`, config);
+    return response.data;
+  },
+
+  // API để lấy form fields với thông tin chi tiết
+  getFormFields: async (formId) => {
+    const response = await apiClient.get(`/Admin/forms/${formId}/fields`);
+    return response.data;
+  },
 };
 
 export default formService; 

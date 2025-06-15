@@ -13,18 +13,149 @@ const PreviewFormPage = () => {
   const [isWordMode, setIsWordMode] = useState(false);
   const [wordContent, setWordContent] = useState('');
   const [formInfo, setFormInfo] = useState(null);
+  const [formFields, setFormFields] = useState([]);
   const containerRef = useRef(null);
+
+  // Function để tính toán công thức
+  const calculateFormula = (formula, fieldValues) => {
+    try {
+      if (!formula) return '';
+      
+      console.log('Calculating formula:', formula, 'with values:', fieldValues);
+      
+      let calculatedFormula = formula;
+      
+      // Thay thế các biến [fieldName] bằng giá trị thực
+      const variableMatches = formula.match(/\[([^\]]+)\]/g);
+      if (variableMatches) {
+        variableMatches.forEach(match => {
+          const fieldName = match.slice(1, -1); // Bỏ dấu []
+          let value = fieldValues[fieldName];
+          
+          // Xử lý các loại giá trị khác nhau
+          if (value === undefined || value === null || value === '') {
+            value = 0;
+          } else if (typeof value === 'string') {
+            // Thử parse thành số
+            const numValue = parseFloat(value);
+            value = isNaN(numValue) ? 0 : numValue;
+          } else if (typeof value === 'boolean') {
+            value = value ? 1 : 0;
+          }
+          
+          calculatedFormula = calculatedFormula.replace(new RegExp('\\[' + fieldName + '\\]', 'g'), value);
+        });
+      }
+      
+      console.log('Formula after variable replacement:', calculatedFormula);
+      
+      // Xử lý các hàm Math (đảm bảo Math object có sẵn)
+      calculatedFormula = calculatedFormula.replace(/Math\.(\w+)\(/g, 'Math.$1(');
+      
+      // Đánh giá biểu thức một cách an toàn
+      const result = Function('"use strict"; return (' + calculatedFormula + ')')();
+      
+      console.log('Calculation result:', result);
+      
+      // Làm tròn kết quả nếu là số
+      if (typeof result === 'number' && !isNaN(result)) {
+        return Math.round(result * 100) / 100; // Làm tròn 2 chữ số thập phân
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Error calculating formula:', error, 'Formula:', formula);
+      return 'Lỗi';
+    }
+  };
+
+  // Function để cập nhật tất cả các formula fields
+  const updateFormulaFields = () => {
+    if (!containerRef.current) return;
+    
+    console.log('Updating formula fields...');
+    
+    // Lấy tất cả giá trị hiện tại từ form
+    const fieldValues = {};
+    const inputs = containerRef.current.querySelectorAll('.form-input');
+    inputs.forEach(input => {
+      const fieldName = input.dataset.fieldName;
+      if (fieldName && input.dataset.fieldType !== 'f') {
+        let value = '';
+        
+        switch (input.dataset.fieldType?.toLowerCase()) {
+          case 'c': // checkbox
+            value = input.checked ? 1 : 0;
+            break;
+          case 'd': // number hoặc date
+            if (input.type === 'date') {
+              value = input.value || '';
+            } else {
+              value = parseFloat(input.value) || 0;
+            }
+            break;
+          case 'dt': // date
+            value = input.value || '';
+            break;
+          case 's': // select
+            value = input.value || '';
+            break;
+          case 't': // text
+          default:
+            value = input.value || '';
+            // Thử parse thành số nếu có thể
+            const numValue = parseFloat(value);
+            if (!isNaN(numValue) && value.trim() !== '') {
+              value = numValue;
+            }
+            break;
+        }
+        
+        fieldValues[fieldName] = value;
+      }
+    });
+    
+    console.log('Current field values:', fieldValues);
+    
+    // Cập nhật các formula fields
+    const formulaInputs = containerRef.current.querySelectorAll('.form-input[data-field-type="f"]');
+    console.log('Found formula inputs:', formulaInputs.length);
+    
+    formulaInputs.forEach(input => {
+      const fieldName = input.dataset.fieldName;
+      console.log('Processing formula field:', fieldName);
+      
+      const fieldInfo = formFields.find(f => f.fieldName === fieldName);
+      if (fieldInfo && fieldInfo.formula) {
+        console.log('Found field info with formula:', fieldInfo.formula);
+        const result = calculateFormula(fieldInfo.formula, fieldValues);
+        input.value = result;
+        console.log('Updated formula field', fieldName, 'with result:', result);
+      } else {
+        console.log('No field info or formula found for:', fieldName);
+      }
+    });
+  };
 
     const createInputElement = (fieldType, fieldName) => {
     let element;
     console.log('Creating input element:', { fieldType, fieldName }); // Debug log
     
+    // Map field type từ API sang internal field type
+    let internalFieldType = fieldType.toLowerCase();
+    if (fieldType === 'Number') internalFieldType = 'd';
+    if (fieldType === 'Formula') internalFieldType = 'f';
+    if (fieldType === 'Text') internalFieldType = 't';
+    if (fieldType === 'Boolean') internalFieldType = 'c';
+    if (fieldType === 'Date') internalFieldType = 'dt';
+    if (fieldType === 'Select') internalFieldType = 's';
+    
     // Kiểm tra nếu fieldName chứa "date" thì tạo date input
     const isDateField = fieldName.toLowerCase().includes('date') || 
                        fieldName.toLowerCase().includes('ngay') ||
-                       fieldType.toLowerCase() === 'dt';
+                       internalFieldType === 'dt';
     
-    switch (fieldType.toLowerCase()) {
+    switch (internalFieldType) {
       case 't': // text
         element = document.createElement('input');
         element.type = 'text';
@@ -70,7 +201,10 @@ const PreviewFormPage = () => {
         element = document.createElement('input');
         element.type = 'text';
         element.className = 'form-input formula-input';
-        element.placeholder = 'Nhập công thức';
+        element.placeholder = 'Tự động tính theo công thức';
+        element.readOnly = true;
+        element.style.backgroundColor = '#f0f9ff';
+        element.style.cursor = 'not-allowed';
         break;
         
       default:
@@ -81,8 +215,17 @@ const PreviewFormPage = () => {
         break;
     }
     
-    element.dataset.fieldType = fieldType;
+    element.dataset.fieldType = internalFieldType;
     element.dataset.fieldName = fieldName;
+    element.dataset.originalFieldType = fieldType; // Lưu field type gốc từ API
+    
+    // Thêm event listener để tự động tính toán formula khi có thay đổi
+    if (internalFieldType !== 'f') {
+      const eventType = element.type === 'checkbox' ? 'change' : 'input';
+      element.addEventListener(eventType, () => {
+        setTimeout(() => updateFormulaFields(), 100); // Delay nhỏ để đảm bảo giá trị đã được cập nhật
+      });
+    }
     
     return element;
   };
@@ -120,7 +263,13 @@ const PreviewFormPage = () => {
       const fieldType = matches[1];
       const fieldName = matches[2];
       console.log('Found field:', { fieldType, fieldName, text }); // Debug log
-      const inputElement = createInputElement(fieldType, fieldName);
+      
+      // Tìm field info từ API để lấy field type chính xác
+      const fieldInfo = formFields.find(f => f.fieldName === fieldName);
+      const actualFieldType = fieldInfo ? fieldInfo.fieldType : fieldType;
+      console.log('Field info from API:', fieldInfo);
+      
+      const inputElement = createInputElement(actualFieldType, fieldName);
 
       // Nếu placeholder nằm trong text node có nhiều nội dung khác
       if (text.length > matches[0].length) {
@@ -156,14 +305,17 @@ const PreviewFormPage = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch form information và Word file song song
-        const [formInfoResponse, wordFile] = await Promise.all([
+        // Fetch form information, form fields và Word file song song
+        const [formInfoResponse, formFieldsResponse, wordFile] = await Promise.all([
           formService.getFormInfo(formId),
+          formService.getFormFields(formId),
           formService.getWordFile(formId)
         ]);
         
-        // Set form info
+        // Set form info và fields
         setFormInfo(formInfoResponse.data);
+        setFormFields(formFieldsResponse.data?.fields || []);
+        console.log('Loaded form fields:', formFieldsResponse.data);
         
         // Convert Word to HTML using mammoth
         const result = await mammoth.convertToHtml({ arrayBuffer: wordFile });
@@ -172,6 +324,12 @@ const PreviewFormPage = () => {
         if (containerRef.current) {
           containerRef.current.innerHTML = result.value;
           makeFieldsEditable();
+          // Tính toán formula fields ban đầu
+          setTimeout(() => {
+            console.log('Initial formula calculation...');
+            console.log('Form fields available:', formFields);
+            updateFormulaFields();
+          }, 500);
         }
       } catch (err) {
         console.error('Error fetching data:', err);

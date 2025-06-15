@@ -100,9 +100,8 @@ COMMIT TRANSACTION;
 
 BEGIN TRANSACTION;
 -- Delete from dependent tables first
-DELETE FROM [UserFillFormHistory];
-DELETE FROM [PDF];
-DELETE FROM [UserFillForm];
+
+
 DELETE FROM [FormField];
 DELETE FROM [Form];
 -- Delete from reference tables last

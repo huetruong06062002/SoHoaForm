@@ -29,7 +29,9 @@ const AllFormPage = () => {
         formService.getFormsByCategory()
       ]);
 
+
       setAllForms(allFormsResponse.data || []);
+      console.log("allFormsResponse", allFormsResponse)
       setCategorizedForms(categorizedResponse.data?.categories || []);
       setFilteredForms(allFormsResponse.data || []);
     } catch (error) {
