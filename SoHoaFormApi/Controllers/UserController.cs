@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using SoHoaFormApi.Infrastructure.Services;
 using SoHoaFormApi.Models.DbSoHoaForm;
 using SoHoaFormApi.Models.DTO;
+using SoHoaFormApi.Models.ViewModel.Request;
 using SoHoaFormApi.Models.ViewModel.Response;
 //using SoHoaFormApi.Models;
 
@@ -213,30 +215,195 @@ namespace SoHoaFormApi.Controllers
         }
 
         [HttpGet("forms/order-by-category")]
-public async Task<IActionResult> GetAllFormsOrderByCategory()
-{
-    try
-    {
-        var result = await _userService.GetAllFormsOrderByCategoryAsync();
-        
-        if (result.Data == null)
+        public async Task<IActionResult> GetAllFormsOrderByCategory()
         {
-            return StatusCode(result.StatusCode, result);
+            try
+            {
+                var result = await _userService.GetAllFormsOrderByCategoryAsync();
+
+                if (result.Data == null)
+                {
+                    return StatusCode(result.StatusCode, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new HTTPResponseClient<object>
+                {
+                    Message = $"Internal server error: {ex.Message}",
+                    StatusCode = 500,
+                    DateTime = DateTime.Now
+                });
+            }
         }
 
-        return Ok(result);
-    }
-    catch (Exception ex)
-    {
-        return StatusCode(500, new HTTPResponseClient<object>
-        {
-            Message = $"Internal server error: {ex.Message}",
-            StatusCode = 500,
-            DateTime = DateTime.Now
-        });
-    }
-}
 
+        [HttpGet("fill-form/{formId}")]
+        [Authorize]
+        public async Task<IActionResult> GetUserFillForm(Guid formId)
+        {
+            try
+            {
+                // Lấy UserId từ token
+                var userIdClaim = User.FindFirst("UserId");
+                if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+                {
+                    return BadRequest(new HTTPResponseClient<object>
+                    {
+                        StatusCode = 400,
+                        Message = "Không thể xác định UserId",
+                        Data = null,
+                        DateTime = DateTime.Now
+                    });
+                }
+
+                var userFillForm = await _context.UserFillForms
+                    .Include(uff => uff.Form)
+                    .Include(uff => uff.User)
+                    .FirstOrDefaultAsync(uff => uff.FormId == formId && uff.UserId == userId);
+
+                if (userFillForm == null)
+                {
+                    return NotFound(new HTTPResponseClient<object>
+                    {
+                        StatusCode = 404,
+                        Message = "Không tìm thấy dữ liệu đã lưu",
+                        Data = null,
+                        DateTime = DateTime.Now
+                    });
+                }
+
+                // Parse JSON field values về List<FieldValueDto>
+                List<FieldValueDto>? fieldValues = null;
+                if (!string.IsNullOrEmpty(userFillForm.JsonFieldValue))
+                {
+                    try
+                    {
+                        fieldValues = System.Text.Json.JsonSerializer.Deserialize<List<FieldValueDto>>(
+                            userFillForm.JsonFieldValue,
+                            new JsonSerializerOptions
+                            {
+                                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                            });
+                    }
+                    catch
+                    {
+                        fieldValues = new List<FieldValueDto>();
+                    }
+                }
+
+                var response = new
+                {
+                    UserFillFormId = userFillForm.Id,
+                    FormId = userFillForm.FormId,
+                    FormName = userFillForm.Form?.Name,
+                    UserId = userFillForm.UserId,
+                    UserName = userFillForm.User?.Name,
+                    Status = userFillForm.Status,
+                    FieldValues = fieldValues ?? new List<FieldValueDto>(),
+                    LastUpdated = userFillForm.DateTime
+                };
+
+                return Ok(new HTTPResponseClient<object>
+                {
+                    StatusCode = 200,
+                    Message = "Lấy dữ liệu thành công",
+                    Data = response,
+                    DateTime = DateTime.Now
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new HTTPResponseClient<object>
+                {
+                    StatusCode = 500,
+                    Message = $"Lỗi khi lấy dữ liệu: {ex.Message}",
+                    Data = null,
+                    DateTime = DateTime.Now
+                });
+            }
+        }
+
+        [HttpPost("fill-form/save")]
+        [Authorize] // Yêu cầu đăng nhập
+        public async Task<IActionResult> SaveUserFillForm([FromBody] SaveUserFillFormRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                // Lấy UserId từ token nếu không được truyền
+                if (request.UserId == Guid.Empty)
+                {
+                    var userIdClaim = User.FindFirst("UserId");
+                    if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out var tokenUserId))
+                    {
+                        request.UserId = tokenUserId;
+                    }
+                    else
+                    {
+                        return BadRequest(new HTTPResponseClient<object>
+                        {
+                            StatusCode = 400,
+                            Message = "Không thể xác định UserId",
+                            Data = null,
+                            DateTime = DateTime.Now
+                        });
+                    }
+                }
+
+                var result = await _userService.SaveUserFillFormAsync(request);
+
+                if (result.StatusCode != 200)
+                {
+                    return StatusCode(result.StatusCode, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new HTTPResponseClient<object>
+                {
+                    StatusCode = 500,
+                    Message = $"Internal server error: {ex.Message}",
+                    Data = null,
+                    DateTime = DateTime.Now
+                });
+            }
+        }
+
+
+        [HttpGet("fill-form/latest/{formId}")]
+        public async Task<IActionResult> GetLatestFieldValuesByFormId(Guid formId)
+        {
+            try
+            {
+                var result = await _userService.GetLatestFieldValuesByFormIdAsync(formId);
+
+                if (result.StatusCode != 200)
+                {
+                    return StatusCode(result.StatusCode, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new HTTPResponseClient<object>
+                {
+                    StatusCode = 500,
+                    Message = $"Internal server error: {ex.Message}",
+                    Data = null,
+                    DateTime = DateTime.Now
+                });
+            }
+        }
     }
 
 
