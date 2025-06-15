@@ -57,7 +57,38 @@ namespace SoHoaFormApi.Controllers
             return StatusCode(result.StatusCode, result);
         }
 
-        
+
+        [HttpPut("form/{formId}/field/{fieldId}/formula")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateFormula(Guid formId, Guid fieldId, [FromBody] UpdateFormulaRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                var result = await _adminService.UpdateFormulaAsync(formId, fieldId, request);
+
+                if (result.StatusCode != 200)
+                {
+                    return StatusCode(result.StatusCode, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new HTTPResponseClient<object>
+                {
+                    StatusCode = 500,
+                    Message = $"Internal server error: {ex.Message}",
+                    Data = null,
+                    DateTime = DateTime.Now
+                });
+            }
+        }
 
     }
 }

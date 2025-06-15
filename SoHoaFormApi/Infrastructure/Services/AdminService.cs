@@ -16,6 +16,7 @@ public interface IAdminService
   Task<HTTPResponseClient<CreateFormResponse>> CreateFormAsync(CreateFormRequest request, ClaimsPrincipal user);
   Task<HTTPResponseClient<FormPreviewResponse>> GetFormFieldsAsync(Guid formId);
 
+  Task<HTTPResponseClient<UpdateFormulaResponse>> UpdateFormulaAsync(Guid formId, Guid fieldId, UpdateFormulaRequest request);
 }
 
 public class AdminService : IAdminService
@@ -876,4 +877,101 @@ public class AdminService : IAdminService
 
     return orderMap;
   }
+
+  public async Task<HTTPResponseClient<UpdateFormulaResponse>> UpdateFormulaAsync(Guid formId, Guid fieldId, UpdateFormulaRequest request)
+{
+    try
+    {
+        await _unitOfWork.BeginTransaction();
+
+        // Tìm FormField dựa trên formId và fieldId
+        var formField = await _context.FormFields
+            .Include(ff => ff.Field)
+            .Include(ff => ff.Form)
+            .FirstOrDefaultAsync(ff => ff.FormId == formId && ff.FieldId == fieldId);
+
+        if (formField == null)
+        {
+            await _unitOfWork.RollBack();
+            return new HTTPResponseClient<UpdateFormulaResponse>
+            {
+                StatusCode = 404,
+                Message = $"Không tìm thấy field với FormId '{formId}' và FieldId '{fieldId}'",
+                Data = null,
+                DateTime = DateTime.Now
+            };
+        }
+
+        // Kiểm tra field có phải là Formula type không
+        if (formField.Field?.Type != "Formula")
+        {
+            await _unitOfWork.RollBack();
+            return new HTTPResponseClient<UpdateFormulaResponse>
+            {
+                StatusCode = 400,
+                Message = $"Field '{formField.Field?.Name}' không phải là Formula field (Type: {formField.Field?.Type})",
+                Data = null,
+                DateTime = DateTime.Now
+            };
+        }
+
+        // Lưu giá trị cũ để trả về
+        var oldFormula = formField.Formula ?? "";
+        var oldDescription = formField.Field?.Description ?? "";
+
+        // Cập nhật Formula trong FormField
+        formField.Formula = request.Formula;
+
+        // Cập nhật Description trong Field nếu có
+        if (!string.IsNullOrEmpty(request.Description) && formField.Field != null)
+        {
+            formField.Field.Description = request.Description;
+            _context.Fields.Update(formField.Field);
+        }
+
+        // Update FormField
+        _context.FormFields.Update(formField);
+
+        // Commit transaction
+        await _context.SaveChangesAsync();
+        await _unitOfWork.CommitTransaction();
+
+        var response = new UpdateFormulaResponse
+        {
+            FormId = formId,
+            FieldId = fieldId,
+            FormFieldId = formField.Id,
+            FieldName = formField.Field?.Name ?? "Unknown",
+            FieldType = formField.Field?.Type ?? "Unknown",
+            Formula = request.Formula,
+            OldFormula = oldFormula,
+            Description = request.Description ?? formField.Field?.Description,
+            OldDescription = oldDescription,
+            IsUpdated = true,
+            Message = $"Cập nhật formula cho field '{formField.Field?.Name}' thành công",
+            UpdatedAt = DateTime.Now
+        };
+
+        return new HTTPResponseClient<UpdateFormulaResponse>
+        {
+            StatusCode = 200,
+            Message = "Cập nhật formula thành công",
+            Data = response,
+            DateTime = DateTime.Now
+        };
+    }
+    catch (Exception ex)
+    {
+        await _unitOfWork.RollBack();
+        return new HTTPResponseClient<UpdateFormulaResponse>
+        {
+            StatusCode = 500,
+            Message = $"Lỗi khi cập nhật formula: {ex.Message}",
+            Data = null,
+            DateTime = DateTime.Now
+        };
+    }
+}
+
+
 }
