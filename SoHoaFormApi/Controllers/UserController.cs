@@ -404,8 +404,83 @@ namespace SoHoaFormApi.Controllers
                 });
             }
         }
+
+        [HttpGet("user-fill-forms/form/{formId}/ids")]
+        public async Task<IActionResult> GetUserFillFormIdsByFormId(Guid formId)
+        {
+            try
+            {
+                var result = await _userService.GetUserFillFormIdsByFormIdAsync(formId);
+
+                if (result.StatusCode != 200)
+                {
+                    return StatusCode(result.StatusCode, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new HTTPResponseClient<object>
+                {
+                    StatusCode = 500,
+                    Message = $"Internal server error: {ex.Message}",
+                    Data = null,
+                    DateTime = DateTime.Now
+                });
+            }
+        }
+
+        [HttpGet("user-fill-form/{userFillFormId}/json-field-value")]
+        public async Task<IActionResult> GetJsonFieldValueByUserFillFormId(Guid userFillFormId)
+        {
+            try
+            {
+                var result = await _userService.GetJsonFieldValueByUserFillFormIdAsync(userFillFormId);
+
+                if (result.StatusCode != 200)
+                {
+                    return StatusCode(result.StatusCode, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new HTTPResponseClient<object>
+                {
+                    StatusCode = 500,
+                    Message = $"Internal server error: {ex.Message}",
+                    Data = null,
+                    DateTime = DateTime.Now
+                });
+            }
+        }
+
+        [HttpGet("user-fill-form/{userFillFormId}/raw-json")]
+        public async Task<IActionResult> GetRawJsonFieldValue(Guid userFillFormId)
+        {
+            try
+            {
+                var result = await _userService.GetRawJsonFieldValueAsync(userFillFormId);
+
+                if (result.StatusCode != 200)
+                {
+                    return StatusCode(result.StatusCode, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new HTTPResponseClient<object>
+                {
+                    StatusCode = 500,
+                    Message = $"Internal server error: {ex.Message}",
+                    Data = null,
+                    DateTime = DateTime.Now
+                });
+            }
+        }
     }
-
-
-
 }

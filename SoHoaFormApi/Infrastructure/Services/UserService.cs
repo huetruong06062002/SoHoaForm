@@ -13,6 +13,11 @@ public interface IUserService
 
   Task<HTTPResponseClient<SaveUserFillFormResponse>> SaveUserFillFormAsync(SaveUserFillFormRequest request);
   Task<HTTPResponseClient<object>> GetLatestFieldValuesByFormIdAsync(Guid formId);
+
+  Task<HTTPResponseClient<object>> GetUserFillFormIdsByFormIdAsync(Guid formId);
+
+  Task<HTTPResponseClient<object>> GetJsonFieldValueByUserFillFormIdAsync(Guid userFillFormId);
+  Task<HTTPResponseClient<string>> GetRawJsonFieldValueAsync(Guid userFillFormId);
 }
 
 public class UserService : IUserService
@@ -220,39 +225,19 @@ public class UserService : IUserService
         WriteIndented = true
       });
 
-      // Kiểm tra xem user đã có UserFillForm cho form này chưa
-      var existingUserFillForm = await _context.UserFillForms
-          .FirstOrDefaultAsync(uff => uff.FormId == request.FormId && uff.UserId == request.UserId);
-
-      UserFillForm userFillForm;
-      bool isNewRecord = false;
-
-      if (existingUserFillForm == null)
+      // **LUÔN TẠO RECORD MỚI** - bỏ tên nếu không có field Name trong DB
+      var userFillForm = new UserFillForm
       {
-        // Tạo mới UserFillForm
-        userFillForm = new UserFillForm
-        {
-          Id = Guid.NewGuid(),
-          FormId = request.FormId,
-          UserId = request.UserId,
-          JsonFieldValue = jsonFieldValue,
-          Status = request.Status,
-          DateTime = DateTime.Now
-        };
+        Id = Guid.NewGuid(),
+        FormId = request.FormId,
+        UserId = request.UserId,
+        // Name = submissionName, // BỎ DÒNG NÀY nếu không có field Name
+        JsonFieldValue = jsonFieldValue,
+        Status = request.Status,
+        DateTime = DateTime.Now
+      };
 
-        _context.UserFillForms.Add(userFillForm);
-        isNewRecord = true;
-      }
-      else
-      {
-        // Cập nhật UserFillForm hiện có
-        existingUserFillForm.JsonFieldValue = jsonFieldValue;
-        existingUserFillForm.Status = request.Status;
-        existingUserFillForm.DateTime = DateTime.Now;
-
-        _context.UserFillForms.Update(existingUserFillForm);
-        userFillForm = existingUserFillForm;
-      }
+      _context.UserFillForms.Add(userFillForm);
 
       // Tạo UserFillFormHistory
       var userFillFormHistory = new UserFillFormHistory
@@ -278,7 +263,8 @@ public class UserService : IUserService
           userFillFormHistory.DateFinish = DateTime.Now;
           break;
         default:
-          userFillFormHistory.DateFinish = DateTime.Now;
+          userFillFormHistory.DateFill = DateTime.Now; // SỬA: DateFill thay vì DateFinish
+          userFillFormHistory.DateFinish = null; // Không có DateFinish nếu không phải Completed hay Submitted
           break;
       }
 
@@ -292,18 +278,19 @@ public class UserService : IUserService
         UserFillFormId = userFillForm.Id,
         FormId = request.FormId,
         UserId = request.UserId,
+        Name = request.Name ?? $"Submission_{DateTime.Now:yyyyMMdd_HHmmss}", // Chỉ dùng trong response
         Status = userFillForm.Status ?? "",
-        FieldValues = request.FieldValues, // Trả về array như đã gửi lên
+        FieldValues = request.FieldValues,
         SavedAt = userFillForm.DateTime ?? DateTime.Now,
         HistoryId = userFillFormHistory.Id,
-        Message = isNewRecord ? "Tạo mới và lưu dữ liệu thành công" : "Cập nhật dữ liệu thành công",
-        IsNewRecord = isNewRecord
+        Message = "Tạo submission mới thành công",
+        IsNewRecord = true
       };
 
       return new HTTPResponseClient<SaveUserFillFormResponse>
       {
         StatusCode = 200,
-        Message = response.Message,
+        Message = "Lưu dữ liệu thành công",
         Data = response,
         DateTime = DateTime.Now
       };
@@ -396,6 +383,203 @@ public class UserService : IUserService
       };
     }
   }
+
+
   // ...existing code...
+  public async Task<HTTPResponseClient<object>> GetUserFillFormIdsByFormIdAsync(Guid formId)
+  {
+    try
+    {
+      // Kiểm tra form có tồn tại không
+      var form = await _context.Forms.FirstOrDefaultAsync(f => f.Id == formId);
+      if (form == null)
+      {
+        return new HTTPResponseClient<object>
+        {
+          StatusCode = 404,
+          Message = "Không tìm thấy form",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      // Lấy tất cả UserFillFormId theo FormId
+      var userFillFormIds = await _context.UserFillForms
+          .Where(uff => uff.FormId == formId)
+          .Select(uff => new
+          {
+            UserFillFormId = uff.Id,
+            UserId = uff.UserId,
+            Status = uff.Status,
+            CreatedAt = uff.DateTime
+          })
+          .OrderByDescending(uff => uff.CreatedAt)
+          .ToListAsync();
+
+      if (!userFillFormIds.Any())
+      {
+        return new HTTPResponseClient<object>
+        {
+          StatusCode = 404,
+          Message = "Không tìm thấy UserFillForm nào cho form này",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      var response = new
+      {
+        FormId = formId,
+        FormName = form.Name,
+        TotalRecords = userFillFormIds.Count,
+        UserFillFormIds = userFillFormIds
+      };
+
+      return new HTTPResponseClient<object>
+      {
+        StatusCode = 200,
+        Message = $"Tìm thấy {userFillFormIds.Count} UserFillForm cho form này",
+        Data = response,
+        DateTime = DateTime.Now
+      };
+    }
+    catch (Exception ex)
+    {
+      return new HTTPResponseClient<object>
+      {
+        StatusCode = 500,
+        Message = $"Lỗi khi lấy dữ liệu: {ex.Message}",
+        Data = null,
+        DateTime = DateTime.Now
+      };
+    }
+  }
+
+  public async Task<HTTPResponseClient<object>> GetJsonFieldValueByUserFillFormIdAsync(Guid userFillFormId)
+  {
+    try
+    {
+      // Lấy UserFillForm theo ID
+      var userFillForm = await _context.UserFillForms
+          .Include(uff => uff.Form)
+          .Include(uff => uff.User)
+          .FirstOrDefaultAsync(uff => uff.Id == userFillFormId);
+
+      if (userFillForm == null)
+      {
+        return new HTTPResponseClient<object>
+        {
+          StatusCode = 404,
+          Message = "Không tìm thấy UserFillForm với ID này",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      // Parse JSON field values
+      List<FieldValueDto>? fieldValues = null;
+      string rawJsonValue = userFillForm.JsonFieldValue ?? "";
+
+      if (!string.IsNullOrEmpty(rawJsonValue))
+      {
+        try
+        {
+          fieldValues = System.Text.Json.JsonSerializer.Deserialize<List<FieldValueDto>>(
+              rawJsonValue,
+              new JsonSerializerOptions
+              {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+              });
+        }
+        catch (JsonException ex)
+        {
+          return new HTTPResponseClient<object>
+          {
+            StatusCode = 400,
+            Message = $"Lỗi khi parse JSON: {ex.Message}",
+            Data = new
+            {
+              UserFillFormId = userFillFormId,
+              RawJsonValue = rawJsonValue,
+              Error = ex.Message
+            },
+            DateTime = DateTime.Now
+          };
+        }
+      }
+
+      var response = new
+      {
+        UserFillFormId = userFillForm.Id,
+        FormId = userFillForm.FormId,
+        FormName = userFillForm.Form?.Name,
+        UserId = userFillForm.UserId,
+        UserName = userFillForm.User?.Name,
+        Status = userFillForm.Status,
+        CreatedAt = userFillForm.DateTime,
+        RawJsonFieldValue = rawJsonValue, // JSON string gốc
+        ParsedFieldValues = fieldValues ?? new List<FieldValueDto>(), // JSON đã parse
+        FieldCount = fieldValues?.Count ?? 0
+      };
+
+      return new HTTPResponseClient<object>
+      {
+        StatusCode = 200,
+        Message = "Lấy json_field_value thành công",
+        Data = response,
+        DateTime = DateTime.Now
+      };
+    }
+    catch (Exception ex)
+    {
+      return new HTTPResponseClient<object>
+      {
+        StatusCode = 500,
+        Message = $"Lỗi khi lấy dữ liệu: {ex.Message}",
+        Data = null,
+        DateTime = DateTime.Now
+      };
+    }
+  }
+
+  public async Task<HTTPResponseClient<string>> GetRawJsonFieldValueAsync(Guid userFillFormId)
+  {
+    try
+    {
+      var jsonFieldValue = await _context.UserFillForms
+          .Where(uff => uff.Id == userFillFormId)
+          .Select(uff => uff.JsonFieldValue)
+          .FirstOrDefaultAsync();
+
+      if (jsonFieldValue == null)
+      {
+        return new HTTPResponseClient<string>
+        {
+          StatusCode = 404,
+          Message = "Không tìm thấy UserFillForm hoặc không có dữ liệu JSON",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      return new HTTPResponseClient<string>
+      {
+        StatusCode = 200,
+        Message = "Lấy raw JSON thành công",
+        Data = jsonFieldValue,
+        DateTime = DateTime.Now
+      };
+    }
+    catch (Exception ex)
+    {
+      return new HTTPResponseClient<string>
+      {
+        StatusCode = 500,
+        Message = $"Lỗi khi lấy dữ liệu: {ex.Message}",
+        Data = null,
+        DateTime = DateTime.Now
+      };
+    }
+  }
 
 }
