@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SoHoaFormApi")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+29d39f7a54ad9a8968e080e8609477909c7777a0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+64dc192618ab3d275d7d4e4b4e2e921e9ba50ac6")]
 [assembly: System.Reflection.AssemblyProductAttribute("SoHoaFormApi")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SoHoaFormApi")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

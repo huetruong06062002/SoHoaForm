@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualBasic.FileIO;
+using SoHoaFormApi.Infrastructure.Services;
 using SoHoaFormApi.Models.Config;
 using SoHoaFormApi.Models.DbSoHoaForm;
 using SoHoaFormApi.Models.DTO;
@@ -17,19 +18,24 @@ public interface IAdminService
   Task<HTTPResponseClient<FormPreviewResponse>> GetFormFieldsAsync(Guid formId);
 
   Task<HTTPResponseClient<UpdateFormulaResponse>> UpdateFormulaAsync(Guid formId, Guid fieldId, UpdateFormulaRequest request);
+
+  Task<HTTPResponseClient<DeleteFormResponse>> DeleteFormAsync(Guid formId);
 }
 
 public class AdminService : IAdminService
 {
   private readonly IUnitOfWork _unitOfWork;
   private readonly IWebHostEnvironment _environment;
+
+  private readonly IFileService _fileService;
   private readonly SoHoaFormContext _context;
 
-  public AdminService(IUnitOfWork unitOfWork, IWebHostEnvironment environment, SoHoaFormContext context)
+  public AdminService(IUnitOfWork unitOfWork, IWebHostEnvironment environment, SoHoaFormContext context, IFileService fileService)
   {
     _unitOfWork = unitOfWork;
     _environment = environment;
     _context = context;
+    _fileService = fileService;
   }
 
   public async Task<HTTPResponseClient<CreateFormResponse>> CreateFormAsync(CreateFormRequest request, ClaimsPrincipal user)
@@ -879,99 +885,221 @@ public class AdminService : IAdminService
   }
 
   public async Task<HTTPResponseClient<UpdateFormulaResponse>> UpdateFormulaAsync(Guid formId, Guid fieldId, UpdateFormulaRequest request)
-{
+  {
     try
     {
-        await _unitOfWork.BeginTransaction();
+      await _unitOfWork.BeginTransaction();
 
-        // Tìm FormField dựa trên formId và fieldId
-        var formField = await _context.FormFields
-            .Include(ff => ff.Field)
-            .Include(ff => ff.Form)
-            .FirstOrDefaultAsync(ff => ff.FormId == formId && ff.FieldId == fieldId);
+      // Tìm FormField dựa trên formId và fieldId
+      var formField = await _context.FormFields
+          .Include(ff => ff.Field)
+          .Include(ff => ff.Form)
+          .FirstOrDefaultAsync(ff => ff.FormId == formId && ff.FieldId == fieldId);
 
-        if (formField == null)
-        {
-            await _unitOfWork.RollBack();
-            return new HTTPResponseClient<UpdateFormulaResponse>
-            {
-                StatusCode = 404,
-                Message = $"Không tìm thấy field với FormId '{formId}' và FieldId '{fieldId}'",
-                Data = null,
-                DateTime = DateTime.Now
-            };
-        }
-
-        // Kiểm tra field có phải là Formula type không
-        if (formField.Field?.Type != "Formula")
-        {
-            await _unitOfWork.RollBack();
-            return new HTTPResponseClient<UpdateFormulaResponse>
-            {
-                StatusCode = 400,
-                Message = $"Field '{formField.Field?.Name}' không phải là Formula field (Type: {formField.Field?.Type})",
-                Data = null,
-                DateTime = DateTime.Now
-            };
-        }
-
-        // Lưu giá trị cũ để trả về
-        var oldFormula = formField.Formula ?? "";
-        var oldDescription = formField.Field?.Description ?? "";
-
-        // Cập nhật Formula trong FormField
-        formField.Formula = request.Formula;
-
-        // Cập nhật Description trong Field nếu có
-        if (!string.IsNullOrEmpty(request.Description) && formField.Field != null)
-        {
-            formField.Field.Description = request.Description;
-            _context.Fields.Update(formField.Field);
-        }
-
-        // Update FormField
-        _context.FormFields.Update(formField);
-
-        // Commit transaction
-        await _context.SaveChangesAsync();
-        await _unitOfWork.CommitTransaction();
-
-        var response = new UpdateFormulaResponse
-        {
-            FormId = formId,
-            FieldId = fieldId,
-            FormFieldId = formField.Id,
-            FieldName = formField.Field?.Name ?? "Unknown",
-            FieldType = formField.Field?.Type ?? "Unknown",
-            Formula = request.Formula,
-            OldFormula = oldFormula,
-            Description = request.Description ?? formField.Field?.Description,
-            OldDescription = oldDescription,
-            IsUpdated = true,
-            Message = $"Cập nhật formula cho field '{formField.Field?.Name}' thành công",
-            UpdatedAt = DateTime.Now
-        };
-
+      if (formField == null)
+      {
+        await _unitOfWork.RollBack();
         return new HTTPResponseClient<UpdateFormulaResponse>
         {
+          StatusCode = 404,
+          Message = $"Không tìm thấy field với FormId '{formId}' và FieldId '{fieldId}'",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      // Kiểm tra field có phải là Formula type không
+      if (formField.Field?.Type != "Formula")
+      {
+        await _unitOfWork.RollBack();
+        return new HTTPResponseClient<UpdateFormulaResponse>
+        {
+          StatusCode = 400,
+          Message = $"Field '{formField.Field?.Name}' không phải là Formula field (Type: {formField.Field?.Type})",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      // Lưu giá trị cũ để trả về
+      var oldFormula = formField.Formula ?? "";
+      var oldDescription = formField.Field?.Description ?? "";
+
+      // Cập nhật Formula trong FormField
+      formField.Formula = request.Formula;
+
+      // Cập nhật Description trong Field nếu có
+      if (!string.IsNullOrEmpty(request.Description) && formField.Field != null)
+      {
+        formField.Field.Description = request.Description;
+        _context.Fields.Update(formField.Field);
+      }
+
+      // Update FormField
+      _context.FormFields.Update(formField);
+
+      // Commit transaction
+      await _context.SaveChangesAsync();
+      await _unitOfWork.CommitTransaction();
+
+      var response = new UpdateFormulaResponse
+      {
+        FormId = formId,
+        FieldId = fieldId,
+        FormFieldId = formField.Id,
+        FieldName = formField.Field?.Name ?? "Unknown",
+        FieldType = formField.Field?.Type ?? "Unknown",
+        Formula = request.Formula,
+        OldFormula = oldFormula,
+        Description = request.Description ?? formField.Field?.Description,
+        OldDescription = oldDescription,
+        IsUpdated = true,
+        Message = $"Cập nhật formula cho field '{formField.Field?.Name}' thành công",
+        UpdatedAt = DateTime.Now
+      };
+
+      return new HTTPResponseClient<UpdateFormulaResponse>
+      {
+        StatusCode = 200,
+        Message = "Cập nhật formula thành công",
+        Data = response,
+        DateTime = DateTime.Now
+      };
+    }
+    catch (Exception ex)
+    {
+      await _unitOfWork.RollBack();
+      return new HTTPResponseClient<UpdateFormulaResponse>
+      {
+        StatusCode = 500,
+        Message = $"Lỗi khi cập nhật formula: {ex.Message}",
+        Data = null,
+        DateTime = DateTime.Now
+      };
+    }
+  }
+
+
+  public async Task<HTTPResponseClient<DeleteFormResponse>> DeleteFormAsync(Guid formId)
+  {
+     try
+    {
+        // Gọi stored procedure
+        var formIdParam = new Microsoft.Data.SqlClient.SqlParameter("@FormId", System.Data.SqlDbType.UniqueIdentifier)
+        {
+            Value = formId
+        };
+
+        var result = await _context.Database
+            .SqlQueryRaw<DeleteFormStoredProcResult>(
+                "EXEC sp_DeleteFormAndRelatedData @FormId",
+                formIdParam)
+            .ToListAsync();
+
+        var spResult = result.FirstOrDefault();
+
+        if (spResult == null)
+        {
+            return new HTTPResponseClient<DeleteFormResponse>
+            {
+                StatusCode = 500,
+                Message = "Không nhận được kết quả từ stored procedure",
+                Data = null,
+                DateTime = DateTime.Now
+            };
+        }
+
+        // Kiểm tra trạng thái từ SP
+        if (spResult.Status == "Error")
+        {
+            var httpStatusCode = spResult.ErrorNumber == 404 ? 404 : 500;
+
+            return new HTTPResponseClient<DeleteFormResponse>
+            {
+                StatusCode = httpStatusCode,
+                Message = spResult.Message,
+                Data = null,
+                DateTime = DateTime.Now
+            };
+        }
+
+        // **SỬA VẤN ĐỀ XÓA FILE WORD**
+        bool wordFileDeleted = false;
+        string wordFilePath = null;
+
+        // Lấy WordFilePath từ database TRƯỚC KHI stored procedure xóa
+        // Vì stored procedure đã xóa Form record rồi, nên spResult.WordFilePath có thể null
+        if (!string.IsNullOrEmpty(spResult.WordFilePath))
+        {
+            wordFilePath = spResult.WordFilePath;
+            var fullPath = Path.Combine(_environment.WebRootPath ?? "", wordFilePath.TrimStart('/'));
+            
+            Console.WriteLine($"Attempting to delete file at: {fullPath}");
+            Console.WriteLine($"File exists: {File.Exists(fullPath)}");
+            
+            if (File.Exists(fullPath))
+            {
+                wordFileDeleted = await _fileService.DeleteFileAsync(fullPath);
+                Console.WriteLine($"File deletion result: {wordFileDeleted}");
+            }
+            else
+            {
+                Console.WriteLine($"File not found at path: {fullPath}");
+            }
+        }
+        else
+        {
+            Console.WriteLine("WordFilePath is null or empty from stored procedure");
+        }
+
+        var response = new DeleteFormResponse
+        {
+            DeletedFormId = formId,
+            Status = "Success", 
+            Message = "Xóa form và tất cả dữ liệu liên quan thành công",
+            DeletedAt = spResult.DeletedAt,
+            TotalAffectedRecords = spResult.TotalAffectedRecords,
+            WordFilePath = wordFilePath,
+            WordFileDeleted = wordFileDeleted,
+            Details = new DeleteFormDetails
+            {
+                PDFsDeleted = spResult.PDFsDeleted,
+                UserFillFormHistoriesDeleted = spResult.HistoriesDeleted,
+                UserFillFormsDeleted = spResult.UserFillFormsDeleted,
+                FormFieldsDeleted = spResult.FormFieldsDeleted,
+                FieldsDeleted = spResult.FieldsDeleted,
+                FormDeleted = true
+            }
+        };
+
+        return new HTTPResponseClient<DeleteFormResponse>
+        {
             StatusCode = 200,
-            Message = "Cập nhật formula thành công",
+            Message = "Xóa form thành công",
             Data = response,
+            DateTime = DateTime.Now
+        };
+    }
+    catch (Microsoft.Data.SqlClient.SqlException sqlEx)
+    {
+        return new HTTPResponseClient<DeleteFormResponse>
+        {
+            StatusCode = 500,
+            Message = $"Database error: {sqlEx.Message}",
+            Data = null,
             DateTime = DateTime.Now
         };
     }
     catch (Exception ex)
     {
-        await _unitOfWork.RollBack();
-        return new HTTPResponseClient<UpdateFormulaResponse>
+        return new HTTPResponseClient<DeleteFormResponse>
         {
             StatusCode = 500,
-            Message = $"Lỗi khi cập nhật formula: {ex.Message}",
+            Message = $"Lỗi khi xóa form: {ex.Message}",
             Data = null,
             DateTime = DateTime.Now
         };
     }
-}
-
+  }
 
 }

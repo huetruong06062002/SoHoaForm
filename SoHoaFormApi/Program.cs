@@ -42,6 +42,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IWordReaderService, WordReaderService>();
+builder.Services.AddScoped<IFileService, FileService>();
 
 if (builder.Environment.IsProduction())
 {

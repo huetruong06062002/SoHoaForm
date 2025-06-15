@@ -119,6 +119,169 @@ INNER JOIN [Form] form ON ff.FormId = form.Id
 WHERE form.Id = '807eef00-f015-4e5a-b994-acec95bd2aba'
 
 
+CREATE PROCEDURE sp_DeleteFormAndRelatedData
+    @FormId UNIQUEIDENTIFIER
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    BEGIN TRANSACTION;
+    
+    BEGIN TRY
+        -- Khai báo biến để chuyển đổi GUID thành string
+        DECLARE @FormIdString NVARCHAR(50);
+        SET @FormIdString = CAST(@FormId AS NVARCHAR(50));
+        
+        -- Lấy đường dẫn file Word trước khi xóa
+        DECLARE @WordFilePath NVARCHAR(MAX);
+        SELECT @WordFilePath = WordFilePath FROM Form WHERE Id = @FormId;
+        
+        -- Kiểm tra Form có tồn tại không
+        IF NOT EXISTS (SELECT 1 FROM Form WHERE Id = @FormId)
+        BEGIN
+            -- Trả về error format giống success format
+            SELECT 
+                @FormId AS DeletedFormId,
+                'Error' AS Status,
+                'Form không tồn tại với ID: ' + @FormIdString AS Message,
+                GETDATE() AS DeletedAt,
+                0 AS PDFsDeleted,
+                0 AS HistoriesDeleted,
+                0 AS UserFillFormsDeleted,
+                0 AS FormFieldsDeleted,
+                0 AS FieldsDeleted,
+                0 AS TotalAffectedRecords,
+                NULL AS WordFilePath,
+                404 AS ErrorNumber,
+                16 AS ErrorSeverity,
+                1 AS ErrorState;
+            RETURN;
+        END
+        
+        -- Khai báo biến đếm để tracking
+        DECLARE @PDFCount INT = 0;
+        DECLARE @HistoryCount INT = 0;
+        DECLARE @UserFillFormCount INT = 0;
+        DECLARE @FormFieldCount INT = 0;
+        DECLARE @FieldCount INT = 0;
+        
+        -- Đếm số records sẽ bị xóa
+        SELECT @PDFCount = COUNT(*) 
+        FROM PDF 
+        WHERE UserFillFormId IN (
+            SELECT Id FROM UserFillForm WHERE FormId = @FormId
+        );
+        
+        SELECT @HistoryCount = COUNT(*) 
+        FROM UserFillFormHistory 
+        WHERE UserFillFormId IN (
+            SELECT Id FROM UserFillForm WHERE FormId = @FormId
+        );
+        
+        SELECT @UserFillFormCount = COUNT(*) 
+        FROM UserFillForm
+        WHERE FormId = @FormId;
+        
+        SELECT @FormFieldCount = COUNT(*) 
+        FROM FormField
+        WHERE FormId = @FormId;
+        
+        -- Đếm Fields sẽ bị xóa (chỉ những Field không được dùng bởi Form khác)
+        SELECT @FieldCount = COUNT(DISTINCT f.Id)
+        FROM Field f
+        INNER JOIN FormField ff ON f.Id = ff.FieldId
+        WHERE ff.FormId = @FormId
+        AND f.Id NOT IN (
+            SELECT DISTINCT FieldId 
+            FROM FormField 
+            WHERE FormId != @FormId AND FieldId IS NOT NULL
+        );
+        
+        -- 1. Xóa PDF files liên quan đến UserFillForm của Form này
+        DELETE FROM PDF
+        WHERE UserFillFormId IN (
+            SELECT Id FROM UserFillForm WHERE FormId = @FormId
+        );
+        
+        -- 2. Xóa UserFillFormHistory liên quan đến UserFillForm của Form này
+        DELETE FROM UserFillFormHistory
+        WHERE UserFillFormId IN (
+            SELECT Id FROM UserFillForm WHERE FormId = @FormId
+        );
+        
+        -- 3. Xóa UserFillForms của Form này
+        DELETE FROM UserFillForm
+        WHERE FormId = @FormId;
+        
+        -- 4. Xóa FormFields của Form này
+        DELETE FROM FormField
+        WHERE FormId = @FormId;
+        
+        -- 5. Xóa Fields chỉ thuộc về Form này (không được dùng bởi Form khác)
+        DELETE FROM Field
+        WHERE Id IN (
+            SELECT f.Id
+            FROM Field f
+            INNER JOIN FormField ff ON f.Id = ff.FieldId
+            WHERE ff.FormId = @FormId
+            AND f.Id NOT IN (
+                SELECT DISTINCT FieldId 
+                FROM FormField 
+                WHERE FormId != @FormId AND FieldId IS NOT NULL
+            )
+        );
+        
+        -- 6. Cuối cùng xóa Form
+        DELETE FROM Form
+        WHERE Id = @FormId;
+        
+        COMMIT TRANSACTION;
+        
+        -- Trả về thông tin thành công
+        SELECT 
+            @FormId AS DeletedFormId,
+            'Success' AS Status,
+            'Form và tất cả dữ liệu liên quan đã được xóa thành công' AS Message,
+            GETDATE() AS DeletedAt,
+            @PDFCount AS PDFsDeleted,
+            @HistoryCount AS HistoriesDeleted,
+            @UserFillFormCount AS UserFillFormsDeleted,
+            @FormFieldCount AS FormFieldsDeleted,
+            @FieldCount AS FieldsDeleted,
+            (@PDFCount + @HistoryCount + @UserFillFormCount + @FormFieldCount + @FieldCount + 1) AS TotalAffectedRecords,
+            @WordFilePath AS WordFilePath,
+            NULL AS ErrorNumber,
+            NULL AS ErrorSeverity,
+            NULL AS ErrorState;
+            
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        
+        -- Trả về thông tin lỗi với format giống success
+        SELECT 
+            @FormId AS DeletedFormId,
+            'Error' AS Status,
+            ERROR_MESSAGE() AS Message,
+            GETDATE() AS DeletedAt,
+            0 AS PDFsDeleted,
+            0 AS HistoriesDeleted,
+            0 AS UserFillFormsDeleted,
+            0 AS FormFieldsDeleted,
+            0 AS FieldsDeleted,
+            0 AS TotalAffectedRecords,
+            NULL AS WordFilePath,
+            ERROR_NUMBER() AS ErrorNumber,
+            ERROR_SEVERITY() AS ErrorSeverity,
+            ERROR_STATE() AS ErrorState;
+            
+        THROW;
+    END CATCH
+END
+
+DECLARE @TestFormId UNIQUEIDENTIFIER = 'f6d1bb13-c1d1-4c3d-8aad-56522a6b29e3';
+EXEC sp_DeleteFormAndRelatedData @FormId = @TestFormId
 
 
-              
+DECLARE @NonExistFormId UNIQUEIDENTIFIER = NEWID();
+EXEC sp_DeleteFormAndRelatedData @FormId = @NonExistFormId;
