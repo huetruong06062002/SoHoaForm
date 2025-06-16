@@ -53,14 +53,27 @@ builder.Services.AddCors(option =>
 {
     option.AddPolicy("allowOrigin", policy =>
     {
-        policy.WithOrigins(
-            "http://localhost:5173",
-            "http://localhost:3000",
-            "http://157.66.100.51:3000",
-            "http://157.66.100.51")
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
+        if (builder.Environment.IsDevelopment())
+        {
+            // Development: Cho phép tất cả origins
+            policy.AllowAnyOrigin()
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
+        else
+        {
+            // Production: Chỉ định cụ thể
+            policy.WithOrigins(
+                "http://localhost:5173",
+                "http://localhost:3000",
+                "http://157.66.100.51:3000",
+                "http://157.66.100.51",
+                "https://157.66.100.51:3000",
+                "https://157.66.100.51")
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        }
     });
 });
 
