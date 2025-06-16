@@ -45,6 +45,7 @@ namespace SoHoaFormApi.Controllers
             return StatusCode(result.StatusCode, result);
         }
         [HttpGet("forms/{formId}/fields/")]
+        [AllowAnonymous] 
         public async Task<IActionResult> GetFormFields(Guid formId)
         {
             var result = await _adminService.GetFormFieldsAsync(formId);
