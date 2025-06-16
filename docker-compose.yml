@@ -11,18 +11,11 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:80
-      - ConnectionStrings__SoHoaFormConnectionString=Server=157.66.100.51,1433;Database=SoHoaForm;User Id=sa;Password=12345;TrustServerCertificate=True;Encrypt=False;Connection Timeout=30;MultipleActiveResultSets=true;
     volumes:
-      - ./uploads:/app/uploads
+      - ./SoHoaFormApi/uploads:/app/uploads
     networks:
       - sohoaform-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
   # Frontend Service  
   frontend:
@@ -32,10 +25,9 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - VITE_API_BASE_URL=http://157.66.100.51:5047/api
+      - VITE_API_BASE_URL=http://161.248.147.59:5047/api
     depends_on:
-      api:
-        condition: service_healthy
+      - api
     networks:
       - sohoaform-network
     restart: unless-stopped
@@ -46,4 +38,3 @@ networks:
 
 volumes:
   uploads:
-    driver: local

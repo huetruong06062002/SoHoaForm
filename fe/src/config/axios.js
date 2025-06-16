@@ -1,8 +1,17 @@
 import axios from 'axios';
 
+// Tự động detect environment
+const getBaseURL = () => {
+  if (import.meta.env.DEV) {
+    return 'http://localhost:5047/api';
+  }
+  return 'http://157.66.100.51:5047/api';
+};
+
+
 // Create axios instance
 const apiClient = axios.create({
-  baseURL: 'http://157.66.100.51:5047/ap',
+  baseURL: getBaseURL(),
   timeout: 30000, // Tăng timeout lên 30 giây
   headers: {
     'Content-Type': 'application/json',
