@@ -11,7 +11,6 @@ const formService = {
     return response.data;
   },
 
-
   getFormInfo: async (formId) => {
     const response = await apiClient.get(`/User/form/${formId}/information`);
     return response.data;
@@ -38,6 +37,12 @@ const formService = {
     return response.data;
   },
 
+  // API để xóa form
+  deleteForm: async (formId) => {
+    const response = await apiClient.delete(`/Admin/forms/${formId}`);
+    return response.data;
+  },
+
   // API để cập nhật formula field
   updateFormula: async (formId, fieldId, payload) => {
     const response = await apiClient.put(`/Admin/form/${formId}/field/${fieldId}/formula`, payload);
@@ -50,9 +55,27 @@ const formService = {
     return response.data;
   },
 
-  // API để lấy form fields với thông tin chi tiết
-  getFormFields: async (formId) => {
-    const response = await apiClient.get(`/Admin/forms/${formId}/fields`);
+  // API để lưu dữ liệu form đã điền
+  saveFormData: async (payload) => {
+    const response = await apiClient.post('/User/fill-form/save', payload);
+    return response.data;
+  },
+
+  // API để lấy dữ liệu form đã điền gần nhất
+  getLatestFormData: async (formId) => {
+    const response = await apiClient.get(`/User/fill-form/latest/${formId}`);
+    return response.data;
+  },
+
+  // API để lấy lịch sử điền form
+  getFormHistory: async (formId) => {
+    const response = await apiClient.get(`/User/user-fill-forms/form/${formId}/ids`);
+    return response.data;
+  },
+
+  // API để lấy dữ liệu form đã điền theo userFillFormId
+  getFilledFormData: async (userFillFormId) => {
+    const response = await apiClient.get(`/User/user-fill-form/${userFillFormId}/json-field-value`);
     return response.data;
   },
 };

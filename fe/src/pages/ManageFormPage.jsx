@@ -1,5 +1,5 @@
-import { Table, Button, Typography, message, Modal, Form, Input, Upload } from 'antd';
-import { PlusOutlined, UploadOutlined } from '@ant-design/icons';
+import { Table, Button, Typography, Modal, Form, Input, Upload, App } from 'antd';
+import { PlusOutlined, UploadOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '../components/layout/AppLayout';
@@ -10,9 +10,13 @@ const { Title } = Typography;
 
 const ManageFormPage = () => {
   const navigate = useNavigate();
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [forms, setForms] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
+  const [deletingForm, setDeletingForm] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
 
@@ -34,7 +38,7 @@ const ManageFormPage = () => {
       }
     } catch (error) {
       console.error('Error fetching forms:', error);
-      message.error('Đã có lỗi xảy ra khi tải danh sách form');
+      // Không hiển thị message ở đây vì axios interceptor đã xử lý
     } finally {
       setLoading(false);
     }
@@ -89,12 +93,46 @@ const ManageFormPage = () => {
             messages.forEach(msg => message.error(msg));
           }
         });
+      } else if (error.response?.data?.message) {
+        message.error(error.response.data.message);
       } else {
         message.error('Đã có lỗi xảy ra khi tạo form');
       }
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const showDeleteModal = (formId, formName) => {
+    setDeletingForm({ id: formId, name: formName });
+    setIsDeleteModalVisible(true);
+  };
+
+  const handleDeleteForm = async () => {
+    try {
+      setDeleteLoading(true);
+      const response = await formService.deleteForm(deletingForm.id);
+      if (response.statusCode === 200) {
+        message.success(response.message || 'Xóa form thành công');
+        setIsDeleteModalVisible(false);
+        setDeletingForm(null);
+        fetchForms(); // Reload danh sách form
+      }
+    } catch (error) {
+      console.error('Error deleting form:', error);
+      if (error.response?.data?.message) {
+        message.error(error.response.data.message);
+      } else {
+        message.error('Đã có lỗi xảy ra khi xóa form');
+      }
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setIsDeleteModalVisible(false);
+    setDeletingForm(null);
   };
 
   const columns = [
@@ -117,7 +155,7 @@ const ManageFormPage = () => {
       title: 'Thao tác',
       key: 'actions',
       render: (_, record) => (
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <Button 
             type="primary"
             onClick={() => navigate(`/form-config/${record.key}`)}
@@ -130,7 +168,19 @@ const ManageFormPage = () => {
           >
             Xem trước
           </Button>
-          <Button danger>Xóa</Button>
+          <Button 
+            style={{ backgroundColor: '#722ed1', color: 'white' }}
+            onClick={() => navigate(`/form-history/${record.key}`)}
+          >
+            Xem lịch sử
+          </Button>
+          <Button 
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => showDeleteModal(record.key, record.name)}
+          >
+            Xóa
+          </Button>
         </div>
       ),
     },
@@ -161,6 +211,7 @@ const ManageFormPage = () => {
           loading={loading}
         />
 
+        {/* Modal tạo form mới */}
         <Modal
           title="Tạo form mới"
           open={isModalVisible}
@@ -230,6 +281,26 @@ const ManageFormPage = () => {
               </div>
             </Form.Item>
           </Form>
+        </Modal>
+
+        {/* Modal xác nhận xóa */}
+        <Modal
+          title="Xác nhận xóa form"
+          open={isDeleteModalVisible}
+          onOk={handleDeleteForm}
+          onCancel={handleCancelDelete}
+          okText="Xóa"
+          cancelText="Hủy"
+          okType="danger"
+          confirmLoading={deleteLoading}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ExclamationCircleOutlined style={{ color: '#faad14', fontSize: '22px' }} />
+            <span>
+              Bạn có chắc chắn muốn xóa form "<strong>{deletingForm?.name}</strong>"? 
+              Hành động này không thể hoàn tác.
+            </span>
+          </div>
         </Modal>
       </div>
     </AppLayout>

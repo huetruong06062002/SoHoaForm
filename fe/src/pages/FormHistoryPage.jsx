@@ -1,74 +1,49 @@
-import { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Table, Tag, message, Spin, Space, Tooltip } from 'antd';
 import { ArrowLeftOutlined, EyeOutlined, DownloadOutlined, CalendarOutlined } from '@ant-design/icons';
 import formService from '../services/formService';
 import AppLayout from '../components/layout/AppLayout';
 import './FormHistoryPage.css';
+import moment from 'moment';
 
 const FormHistoryPage = () => {
   const { formId } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [formInfo, setFormInfo] = useState(null);
   const [historyData, setHistoryData] = useState([]);
+  const [formInfo, setFormInfo] = useState(null);
 
   useEffect(() => {
-    fetchData();
+    fetchHistoryData();
   }, [formId]);
 
-  const fetchData = async () => {
+  const fetchHistoryData = async () => {
     setLoading(true);
     try {
-      // Fetch form info
-      const formInfoResponse = await formService.getFormInfo(formId);
+      // Fetch form info và history data
+      const [formInfoResponse, historyResponse] = await Promise.all([
+        formService.getFormInfo(formId),
+        formService.getFormHistory(formId)
+      ]);
+
       setFormInfo(formInfoResponse.data);
-      
-      // Mock history data - replace with actual API call
-      const mockHistory = [
-        {
-          id: '1',
-          submissionDate: '2025-06-14T10:30:00',
-          submittedBy: 'Nguyễn Văn A',
-          status: 'completed',
-          version: '1.0',
-          fileSize: '2.5 MB'
-        },
-        {
-          id: '2',
-          submissionDate: '2025-06-13T15:45:00',
-          submittedBy: 'Trần Thị B',
-          status: 'pending',
-          version: '1.0',
-          fileSize: '1.8 MB'
-        },
-        {
-          id: '3',
-          submissionDate: '2025-06-12T09:15:00',
-          submittedBy: 'Lê Văn C',
-          status: 'completed',
-          version: '1.0',
-          fileSize: '3.2 MB'
-        }
-      ];
-      setHistoryData(mockHistory);
-      
+      setHistoryData(historyResponse.data?.userFillFormIds || []);
     } catch (error) {
-      console.error('Error fetching data:', error);
-      message.error('Lỗi khi tải dữ liệu');
+      console.error('Error fetching history:', error);
+      message.error('Lỗi khi tải lịch sử form');
     } finally {
       setLoading(false);
     }
   };
 
   const handleViewSubmission = (record) => {
-    message.info(`Xem chi tiết submission ${record.id}`);
-    // Navigate to submission detail page
-    // navigate(`/submission/${record.id}`);
+    // Navigate to view specific submission
+    navigate(`/form-submission/${record.userFillFormId}`);
   };
 
   const handleDownloadPDF = (record) => {
-    message.info(`Tải xuống PDF submission ${record.id}`);
+    message.info(`Tải xuống PDF submission ${record.userFillFormId}`);
     // Download PDF logic
   };
 
@@ -90,67 +65,44 @@ const FormHistoryPage = () => {
   const columns = [
     {
       title: 'STT',
+      dataIndex: 'index',
       key: 'index',
       width: 60,
       render: (_, __, index) => index + 1,
     },
     {
-      title: 'Ngày nộp',
-      dataIndex: 'submissionDate',
-      key: 'submissionDate',
-      render: (date) => (
-        <div className="date-cell">
-          <CalendarOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-          {formatDate(date)}
-        </div>
-      ),
+      title: 'Ngày điền',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: (date) => moment(date).format('HH:mm:ss DD/MM/YYYY'),
     },
     {
-      title: 'Người nộp',
-      dataIndex: 'submittedBy',
-      key: 'submittedBy',
+      title: 'Ngày hoàn tất',
+      dataIndex: 'completedAt',
+      key: 'completedAt',
+      render: (date) => date ? moment(date).format('HH:mm:ss DD/MM/YYYY') : 'Chưa hoàn tất',
     },
     {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
-      render: (status) => getStatusTag(status),
-    },
-    {
-      title: 'Phiên bản',
-      dataIndex: 'version',
-      key: 'version',
-      width: 100,
-    },
-    {
-      title: 'Kích thước',
-      dataIndex: 'fileSize',
-      key: 'fileSize',
-      width: 120,
+      render: (status) => (
+        <Tag color={status === 'Draft' ? 'orange' : 'green'}>
+          {status === 'Draft' ? 'Đã điền' : 'Hoàn tất'}
+        </Tag>
+      ),
     },
     {
       title: 'Thao tác',
-      key: 'actions',
-      width: 150,
+      key: 'action',
       render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="Xem chi tiết">
-            <Button
-              type="text"
-              icon={<EyeOutlined />}
-              onClick={() => handleViewSubmission(record)}
-              size="small"
-            />
-          </Tooltip>
-          <Tooltip title="Tải xuống PDF">
-            <Button
-              type="text"
-              icon={<DownloadOutlined />}
-              onClick={() => handleDownloadPDF(record)}
-              size="small"
-            />
-          </Tooltip>
-        </Space>
+        <Button
+          type="primary"
+          icon={<EyeOutlined />}
+          onClick={() => navigate(`/view-filled-form/${record.userFillFormId}`)}
+        >
+          Xem
+        </Button>
       ),
     },
   ];
@@ -158,72 +110,49 @@ const FormHistoryPage = () => {
   return (
     <AppLayout>
       <div className="form-history-page">
-        <Spin spinning={loading}>
-          <div className="page-header">
-            <div className="header-left">
-              <Button
-                icon={<ArrowLeftOutlined />}
-                onClick={() => navigate('/allForm')}
-                className="back-btn"
-              >
-                Quay lại
-              </Button>
-              <div className="header-info">
-                <h1 className="page-title">Lịch sử điền form</h1>
-                {formInfo && (
-                  <p className="form-name">{formInfo.formName}</p>
-                )}
-              </div>
-            </div>
-            <div className="header-actions">
-              <Button
-                type="primary"
-                onClick={() => navigate(`/preview-form/${formId}`)}
-              >
-                Điền form mới
-              </Button>
+        <div className="page-header">
+          <div className="header-left">
+            <Button
+              icon={<ArrowLeftOutlined />}
+              onClick={() => navigate('/manage-form')}
+              style={{ marginRight: 16 }}
+            >
+              Quay lại
+            </Button>
+            <div className="page-title">
+              <h2>Lịch sử điền form</h2>
+              {formInfo && (
+                <div className="form-info">
+                  <span>Form: {formInfo.formName}</span>
+                  <span>Danh mục: {formInfo.categoryName}</span>
+                </div>
+              )}
             </div>
           </div>
+        </div>
 
-          <div className="history-content">
-            <div className="stats-row">
-              <div className="stat-card">
-                <div className="stat-number">{historyData.length}</div>
-                <div className="stat-label">Tổng số lần nộp</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-number">
-                  {historyData.filter(item => item.status === 'completed').length}
-                </div>
-                <div className="stat-label">Đã hoàn thành</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-number">
-                  {historyData.filter(item => item.status === 'pending').length}
-                </div>
-                <div className="stat-label">Đang xử lý</div>
-              </div>
-            </div>
-
-            <div className="table-container">
-              <Table
-                columns={columns}
-                dataSource={historyData}
-                rowKey="id"
-                pagination={{
-                  pageSize: 10,
-                  showSizeChanger: true,
-                  showQuickJumper: true,
-                  showTotal: (total, range) =>
-                    `${range[0]}-${range[1]} của ${total} bản ghi`,
-                }}
-                locale={{
-                  emptyText: 'Chưa có lịch sử nộp form nào'
-                }}
-              />
-            </div>
+        <div className="history-content">
+          <div className="table-header">
+            <h3>Danh sách lần điền form</h3>
           </div>
-        </Spin>
+          
+          <Spin spinning={loading}>
+            <Table
+              columns={columns}
+              dataSource={historyData}
+              rowKey="userFillFormId"
+              pagination={{
+                pageSize: 10,
+                showSizeChanger: true,
+                showQuickJumper: true,
+                showTotal: (total) => `Tổng ${total} lần điền`,
+              }}
+              locale={{
+                emptyText: 'Chưa có lịch sử điền form',
+              }}
+            />
+          </Spin>
+        </div>
       </div>
     </AppLayout>
   );

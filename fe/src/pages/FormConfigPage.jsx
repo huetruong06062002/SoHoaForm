@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { Table, Button, Typography, message, Card, Row, Col, Tag, Checkbox, Space, Input, Collapse } from 'antd';
-import { CaretRightOutlined, CaretDownOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Table, Button, Typography, Card, Row, Col, Tag, Checkbox, Space, Input, Collapse, App, Form } from 'antd';
+import { CaretRightOutlined, CaretDownOutlined, InfoCircleOutlined, EyeOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import AppLayout from '../components/layout/AppLayout';
 import formService from '../services/formService';
@@ -13,13 +13,13 @@ const { TextArea } = Input;
 
 const FormConfigPage = () => {
   const { formId } = useParams();
+  const navigate = useNavigate();
+  const { message } = App.useApp();
+  const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState(null);
   const [fields, setFields] = useState([]);
   const [expandedRowKeys, setExpandedRowKeys] = useState([]);
-  const [formulaValues, setFormulaValues] = useState({});
-  const [selectOptions, setSelectOptions] = useState({});
-  const [dependentVariables, setDependentVariables] = useState({});
   const [configChanges, setConfigChanges] = useState({});
 
   const fetchFormConfig = async () => {
@@ -29,12 +29,27 @@ const FormConfigPage = () => {
       if (response.statusCode === 200) {
         setFormData(response.data);
         setFields(response.data.fields);
+        
+        // Set initial form values
+        const initialValues = {};
+        response.data.fields.forEach(field => {
+          initialValues[`formula_${field.formFieldId}`] = field.formula || '';
+          initialValues[`options_${field.formFieldId}`] = field.options || '';
+          initialValues[`dependentVariables_${field.formFieldId}`] = field.dependentVariables || '';
+          initialValues[`isRequired_${field.formFieldId}`] = field.isRequired;
+          initialValues[`isUpperCase_${field.formFieldId}`] = field.isUpperCase || false;
+        });
+        form.setFieldsValue(initialValues);
       } else {
         message.error('Không thể tải thông tin cấu hình form');
       }
     } catch (error) {
       console.error('Error fetching form config:', error);
-      message.error('Đã có lỗi xảy ra khi tải thông tin cấu hình form');
+      if (error.response?.data?.message) {
+        message.error(error.response.data.message);
+      } else {
+        message.error('Đã có lỗi xảy ra khi tải thông tin cấu hình form');
+      }
     } finally {
       setLoading(false);
     }
@@ -68,48 +83,6 @@ const FormConfigPage = () => {
 
   const handleExpand = (expanded, record) => {
     setExpandedRowKeys(expanded ? [record.formFieldId] : []);
-    // Initialize formula value if it's a formula field
-    if (expanded && record.fieldType === 'Formula' && !formulaValues[record.formFieldId]) {
-      setFormulaValues(prev => ({
-        ...prev,
-        [record.formFieldId]: record.formula || ''
-      }));
-    }
-    // Initialize select options if it's a select field
-    if (expanded && record.fieldType === 'Select' && !selectOptions[record.formFieldId]) {
-      setSelectOptions(prev => ({
-        ...prev,
-        [record.formFieldId]: record.options || ''
-      }));
-    }
-    // Initialize dependent variables if it's a boolean field
-    if (expanded && record.fieldType === 'Boolean' && !dependentVariables[record.formFieldId]) {
-      setDependentVariables(prev => ({
-        ...prev,
-        [record.formFieldId]: record.dependentVariables || ''
-      }));
-    }
-  };
-
-  const handleFormulaChange = (fieldId, value) => {
-    setFormulaValues(prev => ({
-      ...prev,
-      [fieldId]: value
-    }));
-  };
-
-  const handleSelectOptionsChange = (fieldId, value) => {
-    setSelectOptions(prev => ({
-      ...prev,
-      [fieldId]: value
-    }));
-  };
-
-  const handleDependentVariablesChange = (fieldId, value) => {
-    setDependentVariables(prev => ({
-      ...prev,
-      [fieldId]: value
-    }));
   };
 
   const handleConfigChange = (fieldId, configType, value) => {
@@ -124,7 +97,7 @@ const FormConfigPage = () => {
 
   const handleSaveFormula = async (record) => {
     try {
-      const formula = formulaValues[record.formFieldId];
+      const formula = form.getFieldValue(`formula_${record.formFieldId}`);
       if (!formula || formula.trim() === '') {
         message.warning('Vui lòng nhập công thức');
         return;
@@ -141,8 +114,9 @@ const FormConfigPage = () => {
         formula: formula.trim(),
         description: ""
       });
-      if (isApiSuccess(response)) {
-        // Message thành công sẽ được hiển thị tự động bởi axios interceptor
+      
+      if (response.statusCode === 200) {
+        message.success(response.message || 'Cập nhật formula thành công');
         console.log('Formula updated successfully:', response);
         
         // Cập nhật lại data trong state
@@ -153,22 +127,20 @@ const FormConfigPage = () => {
               : field
           )
         );
-        
-        // Cập nhật formulaValues để hiển thị giá trị mới
-        setFormulaValues(prev => ({
-          ...prev,
-          [record.formFieldId]: formula.trim()
-        }));
       }
     } catch (error) {
       console.error('Error updating formula:', error);
-      // Lỗi sẽ được hiển thị tự động bởi axios interceptor
+      if (error.response?.data?.message) {
+        message.error(error.response.data.message);
+      } else {
+        message.error('Đã có lỗi xảy ra khi cập nhật công thức');
+      }
     }
   };
 
   const handleSaveSelectOptions = async (record) => {
     try {
-      const options = selectOptions[record.formFieldId];
+      const options = form.getFieldValue(`options_${record.formFieldId}`);
       if (!options || options.trim() === '') {
         message.warning('Vui lòng nhập các lựa chọn');
         return;
@@ -185,8 +157,8 @@ const FormConfigPage = () => {
         options: options.trim(),
         description: ""
       });
-      if (isApiSuccess(response)) {
-        // Message thành công sẽ được hiển thị tự động bởi axios interceptor
+      if (response.statusCode === 200) {
+        message.success(response.message || 'Cập nhật danh sách lựa chọn thành công');
         console.log('Select options updated successfully:', response);
         
         // Cập nhật lại data trong state
@@ -197,22 +169,20 @@ const FormConfigPage = () => {
               : field
           )
         );
-        
-        // Cập nhật selectOptions để hiển thị giá trị mới
-        setSelectOptions(prev => ({
-          ...prev,
-          [record.formFieldId]: options.trim()
-        }));
       }
     } catch (error) {
       console.error('Error updating select options:', error);
-      // Lỗi sẽ được hiển thị tự động bởi axios interceptor
+      if (error.response?.data?.message) {
+        message.error(error.response.data.message);
+      } else {
+        message.error('Đã có lỗi xảy ra khi cập nhật danh sách lựa chọn');
+      }
     }
   };
 
   const handleSaveDependentVariables = async (record) => {
     try {
-      const depVars = dependentVariables[record.formFieldId];
+      const depVars = form.getFieldValue(`dependentVariables_${record.formFieldId}`);
       if (!depVars || depVars.trim() === '') {
         message.warning('Vui lòng nhập danh sách biến phụ thuộc');
         return;
@@ -229,8 +199,8 @@ const FormConfigPage = () => {
         dependentVariables: depVars.trim(),
         description: ""
       });
-      if (isApiSuccess(response)) {
-        // Message thành công sẽ được hiển thị tự động bởi axios interceptor
+      if (response.statusCode === 200) {
+        message.success(response.message || 'Cập nhật biến phụ thuộc thành công');
         console.log('Dependent variables updated successfully:', response);
         
         // Cập nhật lại data trong state
@@ -241,16 +211,14 @@ const FormConfigPage = () => {
               : field
           )
         );
-        
-        // Cập nhật dependentVariables để hiển thị giá trị mới
-        setDependentVariables(prev => ({
-          ...prev,
-          [record.formFieldId]: depVars.trim()
-        }));
       }
     } catch (error) {
       console.error('Error updating dependent variables:', error);
-      // Lỗi sẽ được hiển thị tự động bởi axios interceptor
+      if (error.response?.data?.message) {
+        message.error(error.response.data.message);
+      } else {
+        message.error('Đã có lỗi xảy ra khi cập nhật biến phụ thuộc');
+      }
     }
   };
 
@@ -258,15 +226,14 @@ const FormConfigPage = () => {
     try {
       console.log('Saving config for field:', record);
       
-      // Lấy giá trị config hiện tại (từ changes hoặc original)
-      const currentConfig = configChanges[record.formFieldId] || {};
-      const isRequired = currentConfig.isRequired ?? record.isRequired;
-      const isUpperCase = currentConfig.isUpperCase ?? (record.isUpperCase || false);
+      // Lấy giá trị config hiện tại từ form
+      const isRequired = form.getFieldValue(`isRequired_${record.formFieldId}`);
+      const isUpperCase = form.getFieldValue(`isUpperCase_${record.formFieldId}`);
       
       // Nếu là Formula field, cần có formula trong payload
       let payload;
       if (record.fieldType === 'Formula') {
-        const currentFormula = formulaValues[record.formFieldId] || record.formula || '';
+        const currentFormula = form.getFieldValue(`formula_${record.formFieldId}`) || '';
         payload = {
           formula: currentFormula,
           description: "",
@@ -285,8 +252,8 @@ const FormConfigPage = () => {
       console.log('Config payload:', payload);
       
       const response = await formService.updateFieldConfig(formId, record.fieldId, payload);
-      if (isApiSuccess(response)) {
-        // Message thành công sẽ được hiển thị tự động bởi axios interceptor
+      if (response.statusCode === 200) {
+        message.success(response.message || 'Cập nhật cấu hình thành công');
         console.log('Config updated successfully:', response);
         
         // Cập nhật lại data trong state
@@ -308,7 +275,11 @@ const FormConfigPage = () => {
       
     } catch (error) {
       console.error('Error saving config:', error);
-      // Lỗi sẽ được hiển thị tự động bởi axios interceptor
+      if (error.response?.data?.message) {
+        message.error(error.response.data.message);
+      } else {
+        message.error('Đã có lỗi xảy ra khi lưu cấu hình');
+      }
     }
   };
 
@@ -321,7 +292,11 @@ const FormConfigPage = () => {
           exit={{ opacity: 0, height: 0 }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
         >
-          <div style={{ padding: '12px' }}>
+          <Form
+            form={form}
+            layout="vertical"
+            style={{ padding: '12px' }}
+          >
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
               {(record.fieldType === 'Text' || record.fieldType === 'Textarea') && (
                 <motion.div
@@ -329,7 +304,13 @@ const FormConfigPage = () => {
                   animate={{ x: 0, opacity: 1 }}
                   transition={{ delay: 0.1 }}
                 >
-                  <Checkbox checked={record.isUpperCase}>Bắt buộc nhập chữ hoa</Checkbox>
+                  <Form.Item
+                    name={`isUpperCase_${record.formFieldId}`}
+                    valuePropName="checked"
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Checkbox>Bắt buộc nhập chữ hoa</Checkbox>
+                  </Form.Item>
                 </motion.div>
               )}
 
@@ -355,12 +336,14 @@ const FormConfigPage = () => {
                     }}>
                       Ví dụ: [bien1], [bien2], [bien3]
                     </div>
-                    <Input
-                      value={dependentVariables[record.formFieldId] || record.dependentVariables || ''}
-                      onChange={(e) => handleDependentVariablesChange(record.formFieldId, e.target.value)}
-                      placeholder="Nhập danh sách tên biến bị ảnh hưởng khi checkbox này được chọn. Sử dụng cú pháp [tên biến], ... các tên biến cách nhau bởi dấu phẩy."
+                    <Form.Item
+                      name={`dependentVariables_${record.formFieldId}`}
                       style={{ marginBottom: '8px' }}
-                    />
+                    >
+                      <Input
+                        placeholder="Nhập danh sách tên biến bị ảnh hưởng khi checkbox này được chọn. Sử dụng cú pháp [tên biến], ... các tên biến cách nhau bởi dấu phẩy."
+                      />
+                    </Form.Item>
                     <div style={{ 
                       fontSize: '12px', 
                       color: '#6b7280', 
@@ -396,13 +379,15 @@ const FormConfigPage = () => {
                     <label style={{ fontWeight: '500', marginBottom: '4px', display: 'block' }}>
                       Danh sách lựa chọn (mỗi dòng 1 lựa chọn):
                     </label>
-                    <TextArea
-                      value={selectOptions[record.formFieldId] || record.options || ''}
-                      onChange={(e) => handleSelectOptionsChange(record.formFieldId, e.target.value)}
-                      placeholder="Nhập các lựa chọn, mỗi dòng một lựa chọn&#10;Ví dụ:&#10;Lựa chọn 1&#10;Lựa chọn 2&#10;Lựa chọn 3"
-                      rows={4}
+                    <Form.Item
+                      name={`options_${record.formFieldId}`}
                       style={{ marginBottom: '8px' }}
-                    />
+                    >
+                      <TextArea
+                        placeholder="Nhập các lựa chọn, mỗi dòng một lựa chọn&#10;Ví dụ:&#10;Lựa chọn 1&#10;Lựa chọn 2&#10;Lựa chọn 3"
+                        rows={4}
+                      />
+                    </Form.Item>
                     <Button 
                       type="primary" 
                       size="small"
@@ -430,12 +415,14 @@ const FormConfigPage = () => {
                     <label style={{ fontWeight: '500', marginBottom: '4px', display: 'block' }}>
                       Công thức:
                     </label>
-                    <Input
-                      value={formulaValues[record.formFieldId] || record.formula || ''}
-                      onChange={(e) => handleFormulaChange(record.formFieldId, e.target.value)}
-                      placeholder="Nhập công thức (ví dụ: [so1] * [so2])"
+                    <Form.Item
+                      name={`formula_${record.formFieldId}`}
                       style={{ marginBottom: '8px' }}
-                    />
+                    >
+                      <Input
+                        placeholder="Nhập công thức (ví dụ: [so1] * [so2])"
+                      />
+                    </Form.Item>
                     <Button 
                       type="default" 
                       size="small" 
@@ -486,9 +473,9 @@ const FormConfigPage = () => {
                         <strong>Hàm toán học:</strong> Math.abs(), Math.max(), Math.min(), Math.floor(), Math.ceil()
                       </div>
                       
-                                             <div style={{ marginBottom: '8px' }}>
-                         <strong>Các toán tử so sánh:</strong> ==, ===, !=, !==, &gt;, &lt;, &gt;=, &lt;=
-                       </div>
+                      <div style={{ marginBottom: '8px' }}>
+                        <strong>Các toán tử so sánh:</strong> ==, ===, !=, !==, &gt;, &lt;, &gt;=, &lt;=
+                      </div>
                       
                       <div style={{ marginBottom: '8px' }}>
                         <strong>Các toán tử logic:</strong> && (VÀ), || (HOẶC), ! (PHỦ ĐỊNH)
@@ -503,40 +490,40 @@ const FormConfigPage = () => {
                         <ul style={{ margin: '4px 0', paddingLeft: '16px' }}>
                           <li>Tính tổng: <code style={{ backgroundColor: '#e9ecef', padding: '2px 4px' }}>[soLuong] * [donGia]</code></li>
                           <li>Làm tròn 2 chữ số: <code style={{ backgroundColor: '#e9ecef', padding: '2px 4px' }}>Math.round([tongTien] * 100) / 100</code></li>
-                                                     <li>Điều kiện đơn giản: <code style={{ backgroundColor: '#e9ecef', padding: '2px 4px' }}>[tuoi] &gt;= 18 ? "Đủ tuổi" : "Chưa đủ tuổi"</code></li>
-                           <li>Điều kiện lồng nhau: <code style={{ backgroundColor: '#e9ecef', padding: '2px 4px' }}>[diem] &gt;= 8 ? "Giỏi" : ([diem] &gt;= 6.5 ? "Khá" : "Trung bình")</code></li>
+                          <li>Điều kiện đơn giản: <code style={{ backgroundColor: '#e9ecef', padding: '2px 4px' }}>[tuoi] &gt;= 18 ? "Đủ tuổi" : "Chưa đủ tuổi"</code></li>
+                          <li>Điều kiện lồng nhau: <code style={{ backgroundColor: '#e9ecef', padding: '2px 4px' }}>[diem] &gt;= 8 ? "Giỏi" : ([diem] &gt;= 6.5 ? "Khá" : "Trung bình")</code></li>
                           <li>Cho phép người dùng tự nhập: <code style={{ backgroundColor: '#e9ecef', padding: '2px 4px' }}>$$tuNhap$$</code></li>
                         </ul>
                       </div>
                       
-                                             <div style={{ display: 'flex', gap: '8px' }}>
-                         <Button 
-                           type="primary" 
-                           size="small"
-                           onClick={() => handleSaveFormula(record)}
-                           style={{
-                             height: '28px',
-                             fontSize: '12px',
-                             padding: '4px 12px'
-                           }}
-                         >
-                           Lưu công thức
-                         </Button>
-                         <Button 
-                           type="default" 
-                           size="small"
-                           onClick={() => {
-                             document.getElementById(`formula-help-${record.formFieldId}`).style.display = 'none';
-                           }}
-                           style={{
-                             height: '28px',
-                             fontSize: '12px',
-                             padding: '4px 12px'
-                           }}
-                         >
-                           Ẩn hướng dẫn
-                         </Button>
-                       </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <Button 
+                          type="primary" 
+                          size="small"
+                          onClick={() => handleSaveFormula(record)}
+                          style={{
+                            height: '28px',
+                            fontSize: '12px',
+                            padding: '4px 12px'
+                          }}
+                        >
+                          Lưu công thức
+                        </Button>
+                        <Button 
+                          type="default" 
+                          size="small"
+                          onClick={() => {
+                            document.getElementById(`formula-help-${record.formFieldId}`).style.display = 'none';
+                          }}
+                          style={{
+                            height: '28px',
+                            fontSize: '12px',
+                            padding: '4px 12px'
+                          }}
+                        >
+                          Ẩn hướng dẫn
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -547,14 +534,13 @@ const FormConfigPage = () => {
                 animate={{ x: 0, opacity: 1 }}
                 transition={{ delay: 0.2 }}
               >
-                <Checkbox 
-                  checked={configChanges[record.formFieldId]?.isRequired ?? record.isRequired}
-                  onChange={(e) => {
-                    handleConfigChange(record.formFieldId, 'isRequired', e.target.checked);
-                  }}
+                <Form.Item
+                  name={`isRequired_${record.formFieldId}`}
+                  valuePropName="checked"
+                  style={{ marginBottom: 0 }}
                 >
-                  Bắt buộc nhập
-                </Checkbox>
+                  <Checkbox>Bắt buộc nhập</Checkbox>
+                </Form.Item>
               </motion.div>
               <motion.div
                 initial={{ x: -20, opacity: 0 }}
@@ -570,7 +556,7 @@ const FormConfigPage = () => {
                 </Button>
               </motion.div>
             </Space>
-          </div>
+          </Form>
         </motion.div>
       </AnimatePresence>
     );
@@ -702,6 +688,46 @@ const FormConfigPage = () => {
             </Card>
           </Col>
         </Row>
+
+        {/* Action buttons at bottom */}
+        <div style={{ 
+          marginTop: '24px', 
+          textAlign: 'center',
+          padding: '20px',
+          backgroundColor: '#fafafa',
+          borderRadius: '8px',
+          border: '1px solid #d9d9d9'
+        }}>
+          <Space size="large">
+            <Button 
+              type="primary" 
+              size="large"
+              icon={<EyeOutlined />}
+              onClick={() => navigate(`/preview-form/${formId}`)}
+              style={{
+                height: '40px',
+                fontSize: '14px',
+                padding: '0 24px',
+                backgroundColor: '#52c41a',
+                borderColor: '#52c41a'
+              }}
+            >
+              Xem trước form
+            </Button>
+            <Button 
+              size="large"
+              icon={<UnorderedListOutlined />}
+              onClick={() => navigate('/manage-form')}
+              style={{
+                height: '40px',
+                fontSize: '14px',
+                padding: '0 24px'
+              }}
+            >
+              Quay lại danh sách
+            </Button>
+          </Space>
+        </div>
       </div>
     </AppLayout>
   );
