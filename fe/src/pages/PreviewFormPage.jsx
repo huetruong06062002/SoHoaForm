@@ -117,6 +117,7 @@ const PreviewFormPage = () => {
         switch (input.dataset.fieldType?.toLowerCase()) {
           case 'c': // checkbox
             value = input.checked ? 1 : 0;
+            console.log(`Checkbox ${fieldName} value: ${input.checked} -> ${value}`);
             break;
           case 'd': // number hoặc date
             if (input.type === 'date') {
@@ -200,7 +201,13 @@ const PreviewFormPage = () => {
         
         switch (input.dataset.fieldType?.toLowerCase()) {
           case 'c': // checkbox
-            input.checked = savedField.value === 'true';
+            // Xử lý multiple formats cho boolean values
+            const boolValue = savedField.value === 'true' || 
+                            savedField.value === true || 
+                            savedField.value === '1' || 
+                            savedField.value === 1;
+            input.checked = boolValue;
+            console.log(`Checkbox ${fieldName}: ${savedField.value} -> ${boolValue}`);
             break;
           case 's': // select
             input.value = savedField.value;
@@ -224,9 +231,9 @@ const PreviewFormPage = () => {
     setTimeout(() => updateFormulaFields(), 200);
   };
 
-    const createInputElement = (fieldType, fieldName) => {
+  const createInputElement = (fieldType, fieldName, fieldInfo = null, formFieldsData = formFields) => {
     let element;
-    console.log('Creating input element:', { fieldType, fieldName }); // Debug log
+    console.log('Creating input element:', { fieldType, fieldName, formFieldsDataLength: formFieldsData.length }); // Debug log
     
     // Map field type từ API sang internal field type
     let internalFieldType = fieldType.toLowerCase();
@@ -252,20 +259,115 @@ const PreviewFormPage = () => {
         break;
         
       case 's': // select
+        // Tạo dropdown select
         element = document.createElement('select');
         element.className = 'form-input select-input';
+        
         // Thêm option mặc định
         const defaultOption = document.createElement('option');
         defaultOption.value = '';
         defaultOption.textContent = '-- Chọn --';
         element.appendChild(defaultOption);
-        // Có thể thêm các option khác dựa trên fieldName hoặc config
+        
+        // Tìm field info từ API để lấy formula
+        console.log(`Looking for field ${fieldName} in formFields array:`, {
+          formFieldsLength: formFieldsData.length,
+          availableFieldNames: formFieldsData.map(f => f.fieldName),
+          fieldInfoParam: fieldInfo
+        });
+        
+        const currentFieldInfo = fieldInfo || formFieldsData.find(f => f.fieldName === fieldName);
+        
+        console.log(`Processing select field ${fieldName}:`, {
+          currentFieldInfo: currentFieldInfo,
+          formula: currentFieldInfo?.formula,
+          fieldType: currentFieldInfo?.fieldType,
+          foundField: !!currentFieldInfo
+        });
+        
+        // Xử lý options dựa trên formula
+        if (currentFieldInfo && currentFieldInfo.formula && currentFieldInfo.fieldType?.toLowerCase() === 'select') {
+          console.log(`Found field info for ${fieldName}, processing options...`);
+          console.log(`Field info details:`, {
+            fieldName: currentFieldInfo.fieldName,
+            fieldType: currentFieldInfo.fieldType,
+            formula: currentFieldInfo.formula,
+            formulaLength: currentFieldInfo.formula.length
+          });
+          
+          // Kiểm tra nếu formula KHÔNG phải pattern {s_...} thì parse custom options
+          if (!currentFieldInfo.formula.match(/^\{s_.*\}$/)) {
+            console.log(`Select field ${fieldName} has custom formula: "${currentFieldInfo.formula}"`);
+            
+            // Parse options từ formula
+            let options = [];
+            
+            // Method 1: Split by comma hoặc newline
+            if (currentFieldInfo.formula.includes(',')) {
+              options = currentFieldInfo.formula.split(',').map(opt => opt.trim()).filter(opt => opt.length > 0);
+              console.log(`Method 1: Split by comma, found ${options.length} options:`, options);
+            } else if (currentFieldInfo.formula.includes('\n')) {
+              options = currentFieldInfo.formula.split('\n').map(opt => opt.trim()).filter(opt => opt.length > 0);
+              console.log(`Method 2: Split by newline, found ${options.length} options:`, options);
+            } else if (currentFieldInfo.formula.trim().length > 0 && !currentFieldInfo.formula.includes('{')) {
+              // Method 3: Single option (như "Lựa chọn 1")
+              options = [currentFieldInfo.formula.trim()];
+              console.log(`Method 3: Single option from formula: "${currentFieldInfo.formula}" -> options:`, options);
+            }
+            
+            console.log(`Final parsed ${options.length} custom options for ${fieldName}:`, options);
+            
+            // Thêm custom options vào select
+            options.forEach(optionText => {
+              const option = document.createElement('option');
+              option.value = optionText;
+              option.textContent = optionText;
+              element.appendChild(option);
+              console.log(`Added custom option: "${optionText}" to ${fieldName}`);
+            });
+            
+            // Debug final select state
+            console.log(`Final select for ${fieldName} has ${element.options.length} options:`, [...element.options].map(opt => opt.value));
+          } else {
+            console.log(`Select field ${fieldName} has {s_...} pattern, adding Pass/Fail/N/A options`);
+            // Chỉ thêm Pass/Fail/N/A cho pattern {s_...}
+            const defaultOptions = ['Pass', 'Fail', 'N/A'];
+            defaultOptions.forEach(optionText => {
+              const option = document.createElement('option');
+              option.value = optionText;
+              option.textContent = optionText;
+              element.appendChild(option);
+            });
+          }
+        } else {
+          console.log(`Select field ${fieldName} no custom info found - currentFieldInfo:`, currentFieldInfo);
+          // Nếu không có formFieldsData hoặc field info, thêm Pass/Fail/N/A mặc định cho tất cả select
+          if (formFieldsData.length === 0) {
+            console.log(`No formFieldsData available, adding default Pass/Fail/N/A options for ${fieldName}`);
+            const defaultOptions = ['Pass', 'Fail', 'N/A'];
+            defaultOptions.forEach(optionText => {
+              const option = document.createElement('option');
+              option.value = optionText;
+              option.textContent = optionText;
+              element.appendChild(option);
+            });
+          } else {
+            console.log(`FormFieldsData available but no field info found for ${fieldName}`);
+            // Không thêm gì cả, chỉ có option "-- Chọn --"
+          }
+        }
         break;
         
       case 'c': // checkbox
         element = document.createElement('input');
         element.type = 'checkbox';
         element.className = 'form-input checkbox-input';
+        // Thêm inline styles để đảm bảo hiển thị đúng
+        element.style.display = 'inline';
+        element.style.verticalAlign = 'middle';
+        element.style.margin = '0 4px';
+        element.style.width = '16px';
+        element.style.height = '16px';
         break;
         
       case 'd': // number hoặc date
@@ -329,62 +431,223 @@ const PreviewFormPage = () => {
     return element;
   };
 
-  const makeFieldsEditable = () => {
+  const fixInlineLayout = () => {
     if (!containerRef.current) return;
 
-    // Tìm tất cả text nodes có chứa placeholder
-    const walk = document.createTreeWalker(
-      containerRef.current,
-      NodeFilter.SHOW_TEXT,
-      {
-        acceptNode: (node) => {
-          return node.textContent.match(/\{[a-z]+_[^}]+\}/i)
-            ? NodeFilter.FILTER_ACCEPT
-            : NodeFilter.FILTER_SKIP;
-        }
+    console.log('Fixing inline layout...');
+    
+    // Method: Tìm các field cần ghép và restructure DOM
+    const content = containerRef.current;
+    
+    // Tìm tất cả elements chứa field labels
+    const allElements = content.querySelectorAll('*');
+    const fieldElements = [];
+    
+    allElements.forEach(el => {
+      const text = el.textContent || '';
+      if (text.includes('Name:') || text.includes('EID:') || 
+          text.includes('Date:') || text.includes('Duration') || 
+          text.includes('Venue:')) {
+        fieldElements.push(el);
       }
-    );
+    });
+    
+    console.log('Found field elements:', fieldElements.length);
+    
+    // Strategy: Gom các field cùng dòng vào container riêng
+    fieldElements.forEach(el => {
+      const text = el.textContent || '';
+      
+             // Nếu element chứa cả Name và EID -> đảm bảo inline nhưng responsive
+       if (text.includes('Name:') && text.includes('EID:')) {
+         el.style.display = 'block';
+         el.style.whiteSpace = 'normal'; // Cho phép wrap trên mobile
+         el.style.marginBottom = '12px';
+         el.style.overflow = 'visible';
+         console.log('Fixed Name+EID line');
+       }
+       // Nếu element chứa cả Date và Duration -> đảm bảo inline nhưng responsive  
+       else if (text.includes('Date:') && text.includes('Duration')) {
+         el.style.display = 'block';
+         el.style.whiteSpace = 'normal'; // Cho phép wrap trên mobile
+         el.style.marginBottom = '12px';
+         el.style.overflow = 'visible';
+         console.log('Fixed Date+Duration line');
+       }
+      // Venue riêng dòng
+      else if (text.includes('Venue:') && !text.includes('Duration')) {
+        el.style.display = 'block';
+        el.style.marginBottom = '12px';
+        console.log('Fixed Venue line');
+      }
+    });
+    
+    // Đảm bảo inputs trong các dòng này display inline - nhưng không override CSS
+    const inputs = content.querySelectorAll('.form-input');
+    inputs.forEach(input => {
+      // Chỉ set inline styles nếu chưa có từ CSS
+      if (!input.style.display) {
+        input.style.display = 'inline-block';
+      }
+      if (!input.style.verticalAlign) {
+        input.style.verticalAlign = 'middle';
+      }
+    });
+    
+    console.log('Fixed inline layout');
+  };
 
-    let node;
-    let placeholders = [];
-    while (node = walk.nextNode()) {
-      placeholders.push({
-        node,
-        text: node.textContent
+  const makeFieldsEditable = () => {
+    if (!containerRef.current) return;
+    
+    console.log('makeFieldsEditable called, current formFields:', formFields.length);
+
+    // Kiểm tra xem đã có input elements chưa
+    const existingInputs = containerRef.current.querySelectorAll('.form-input');
+    console.log('Existing inputs found:', existingInputs.length);
+    
+    if (existingInputs.length > 0 && formFields.length > 0) {
+      console.log('Found existing inputs AND formFields, updating select options...');
+      
+      // Update existing select elements với data từ formFields
+      const selectInputs = containerRef.current.querySelectorAll('select.form-input');
+      console.log('Found select inputs:', selectInputs.length);
+      
+      selectInputs.forEach(select => {
+        const fieldName = select.dataset.fieldName;
+        console.log(`Checking select field: ${fieldName}`);
+        const fieldInfo = formFields.find(f => f.fieldName === fieldName);
+        console.log(`Field info for ${fieldName}:`, fieldInfo);
+        
+        if (fieldInfo && fieldInfo.fieldType?.toLowerCase() === 'select' && fieldInfo.formula) {
+          console.log(`Updating select options for ${fieldName} with formula: "${fieldInfo.formula}"`);
+          
+          // Kiểm tra nếu formula KHÔNG phải pattern {s_...} thì thay thế options
+          if (!fieldInfo.formula.match(/^\{s_.*\}$/)) {
+            console.log(`Select field ${fieldName} has custom formula, replacing options...`);
+            
+            // Lưu giá trị hiện tại
+            const currentValue = select.value;
+            
+            // Xóa tất cả options
+            select.innerHTML = '';
+            
+            // Thêm lại option mặc định
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = '-- Chọn --';
+            select.appendChild(defaultOption);
+            
+            // Parse options từ formula
+            let options = [];
+            
+            if (fieldInfo.formula.includes(',')) {
+              options = fieldInfo.formula.split(',').map(opt => opt.trim()).filter(opt => opt.length > 0);
+            } else if (fieldInfo.formula.includes('\n')) {
+              options = fieldInfo.formula.split('\n').map(opt => opt.trim()).filter(opt => opt.length > 0);
+            } else if (fieldInfo.formula.trim().length > 0 && !fieldInfo.formula.includes('{')) {
+              options = [fieldInfo.formula.trim()];
+            }
+            
+            console.log(`Adding ${options.length} custom options for ${fieldName}:`, options);
+            
+            // Thêm custom options
+            options.forEach(optionText => {
+              const option = document.createElement('option');
+              option.value = optionText;
+              option.textContent = optionText;
+              select.appendChild(option);
+              console.log(`Added option "${optionText}" to ${fieldName}`);
+            });
+            
+            console.log(`Final options for ${fieldName}:`, [...select.options].map(opt => opt.value));
+            
+            // Khôi phục giá trị đã chọn nếu còn hợp lệ
+            if (currentValue && [...select.options].some(opt => opt.value === currentValue)) {
+              select.value = currentValue;
+            }
+          } else {
+            console.log(`Select field ${fieldName} has {s_...} pattern, adding Pass/Fail/N/A options if not already present`);
+            
+            // Kiểm tra xem đã có Pass/Fail/N/A chưa
+            const existingOptions = [...select.options].map(opt => opt.value);
+            const defaultOptions = ['Pass', 'Fail', 'N/A'];
+            
+            // Chỉ thêm nếu chưa có
+            if (!defaultOptions.some(opt => existingOptions.includes(opt))) {
+              defaultOptions.forEach(optionText => {
+                const option = document.createElement('option');
+                option.value = optionText;
+                option.textContent = optionText;
+                select.appendChild(option);
+              });
+            }
+          }
+        } else {
+          console.log(`No field info found for select ${fieldName} or not a select field`);
+        }
       });
+      
+      return; // Chỉ return khi đã có cả inputs và formFields
     }
+    
+    // Nếu chưa có inputs hoặc chưa có formFields, tiếp tục tạo inputs mới
+    console.log('Creating new inputs or waiting for formFields...');
 
-    // Thay thế các placeholder bằng input tương ứng
-    placeholders.forEach(({ node, text }) => {
-      const matches = text.match(/\{([a-z]+)_([^}]+)\}/i);
-      if (!matches) return;
+    // Đơn giản hóa: thay thế trực tiếp bằng regex trong innerHTML
+    let htmlContent = containerRef.current.innerHTML;
+    console.log('Original HTML length:', htmlContent.length);
 
-      const fieldType = matches[1];
-      const fieldName = matches[2];
-      console.log('Found field:', { fieldType, fieldName, text }); // Debug log
+    // Tìm tất cả placeholders
+    const placeholderPattern = /\{([a-z]+)_([^}]+)\}/gi;
+    let match;
+    const foundPlaceholders = new Set(); // Dùng Set để tránh duplicate
+    const replacements = [];
+
+    while ((match = placeholderPattern.exec(htmlContent)) !== null) {
+      const fullMatch = match[0];
+      const fieldType = match[1];
+      const fieldName = match[2];
+      
+      // Skip nếu đã process placeholder này rồi
+      if (foundPlaceholders.has(fullMatch)) {
+        console.log('Skipping duplicate placeholder:', fullMatch);
+        continue;
+      }
+      
+      foundPlaceholders.add(fullMatch);
+      console.log('Found field:', { fieldType, fieldName, fullMatch });
       
       // Tìm field info từ API để lấy field type chính xác
       const fieldInfo = formFields.find(f => f.fieldName === fieldName);
       const actualFieldType = fieldInfo ? fieldInfo.fieldType : fieldType;
       console.log('Field info from API:', fieldInfo);
       
-      const inputElement = createInputElement(actualFieldType, fieldName);
+      const inputElement = createInputElement(actualFieldType, fieldName, fieldInfo, formFields);
+      
+      replacements.push({
+        placeholder: fullMatch,
+        replacement: inputElement.outerHTML
+      });
+    }
 
-      // Nếu placeholder nằm trong text node có nhiều nội dung khác
-      if (text.length > matches[0].length) {
-        const span = document.createElement('span');
-        span.className = 'input-wrapper';
-        span.innerHTML = text.replace(matches[0], '');
-        span.appendChild(inputElement);
-        node.parentNode.replaceChild(span, node);
-      } else {
-        // Nếu text node chỉ chứa mỗi placeholder
-        const span = document.createElement('span');
-        span.className = 'input-wrapper';
-        span.appendChild(inputElement);
-        node.parentNode.replaceChild(span, node);
-      }
+    // Thực hiện tất cả replacements - sử dụng replaceAll để thay thế tất cả instances
+    replacements.forEach(({ placeholder, replacement }) => {
+      // Escape special regex characters trong placeholder
+      const escapedPlaceholder = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(escapedPlaceholder, 'g');
+      const beforeCount = (htmlContent.match(regex) || []).length;
+      htmlContent = htmlContent.replace(regex, replacement);
+      const afterCount = (htmlContent.match(regex) || []).length;
+      console.log(`Replaced ${beforeCount} instances of "${placeholder}" with input, ${afterCount} remaining`);
     });
+
+    // Cập nhật innerHTML
+    containerRef.current.innerHTML = htmlContent;
+    console.log('Updated HTML content');
+    
+    // Post-process để fix layout cho các fields cùng dòng
+    fixInlineLayout();
 
     // Lấy tất cả các cell có text cố định và thêm vào formFields
     const cells = containerRef.current.querySelectorAll('td');
@@ -431,7 +694,377 @@ const PreviewFormPage = () => {
           console.log('Loaded saved form data:', savedDataResponse.data);
         }
         
-        // Convert Word to HTML using mammoth
+        // Extract header từ file Word gốc và kết hợp với body
+        try {
+          let headerFromWord = '';
+          let bodyContent = '';
+          
+          // Method 1: Extract header từ JSZip
+          try {
+            const JSZip = (await import('https://cdn.skypack.dev/jszip')).default;
+            const zip = await JSZip.loadAsync(wordFile);
+            
+            // Đọc header files - thử tất cả các header có thể
+            const headerFiles = Object.keys(zip.files).filter(name => 
+              name.startsWith('word/header') || name.includes('header')
+            );
+            console.log('HEADER DEBUG: Found header files:', headerFiles);
+            
+            for (const headerFile of headerFiles) {
+              const xmlContent = await zip.file(headerFile)?.async('string');
+              if (xmlContent) {
+                console.log(`HEADER DEBUG: Raw XML from ${headerFile}:`, xmlContent.substring(0, 800) + '...');
+                
+                // Extract text từ header XML - cải thiện với nhiều pattern
+                const textMatches = xmlContent.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+                let extractedTexts = [];
+                
+                // Pattern 1: Standard w:t tags
+                extractedTexts = textMatches.map(match => {
+                  return match.replace(/<w:t[^>]*>/, '').replace(/<\/w:t>/, '')
+                    .replace(/&amp;/g, '&')
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .trim();
+                }).filter(text => text.length > 0);
+                
+                // Pattern 2: Thử extract từ instrText nếu có
+                const instrMatches = xmlContent.match(/<w:instrText[^>]*>([^<]*)<\/w:instrText>/g) || [];
+                instrMatches.forEach(match => {
+                  const text = match.replace(/<w:instrText[^>]*>/, '').replace(/<\/w:instrText>/, '').trim();
+                  if (text.length > 0) extractedTexts.push(text);
+                });
+                
+                // Pattern 3: Thử extract từ table cells nếu header trong table
+                const tableCells = xmlContent.match(/<w:tc[^>]*>.*?<\/w:tc>/gs) || [];
+                tableCells.forEach(cell => {
+                  const cellTexts = cell.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+                  cellTexts.forEach(cellText => {
+                    const text = cellText.replace(/<w:t[^>]*>/, '').replace(/<\/w:t>/, '')
+                      .replace(/&amp;/g, '&').trim();
+                    if (text.length > 0) extractedTexts.push(text);
+                  });
+                });
+                
+                const headerText = extractedTexts.join(' ').replace(/\s+/g, ' ').trim();
+                console.log('HEADER DEBUG: Extracted text parts:', extractedTexts);
+                console.log('HEADER DEBUG: Combined text:', headerText);
+                
+                if (headerText.length > 15) {
+                  headerFromWord = headerText;
+                  console.log('HEADER DEBUG: Using this header text');
+                  break;
+                }
+              }
+            }
+            
+            // Nếu không tìm thấy header, thử đọc từ document.xml
+            if (!headerFromWord) {
+              console.log('HEADER DEBUG: No header files found, trying document.xml...');
+              const docXml = await zip.file('word/document.xml')?.async('string');
+              if (docXml) {
+                // Tìm header reference trong document
+                const headerRef = docXml.match(/<w:headerReference[^>]*r:id="([^"]*)"[^>]*>/);
+                if (headerRef) {
+                  console.log('HEADER DEBUG: Found header reference:', headerRef[1]);
+                  
+                  // Đọc relationships để tìm header file
+                  const relsXml = await zip.file('word/_rels/document.xml.rels')?.async('string');
+                  if (relsXml) {
+                    const relMatch = relsXml.match(new RegExp(`Id="${headerRef[1]}"[^>]*Target="([^"]*header[^"]*\.xml)"`));
+                    if (relMatch) {
+                      const headerPath = 'word/' + relMatch[1];
+                      console.log('HEADER DEBUG: Found header path:', headerPath);
+                      
+                      const headerXml = await zip.file(headerPath)?.async('string');
+                      if (headerXml) {
+                        const textMatches = headerXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
+                        if (textMatches) {
+                          const extractedTexts = textMatches.map(match => {
+                            return match.replace(/<w:t[^>]*>/, '').replace(/<\/w:t>/, '').trim();
+                          }).filter(text => text.length > 0);
+                          
+                          headerFromWord = extractedTexts.join(' ').replace(/\s+/g, ' ').trim();
+                          console.log('HEADER DEBUG: Extracted from document reference:', headerFromWord);
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            
+          } catch (zipError) {
+            console.log('HEADER DEBUG: JSZip extraction failed:', zipError);
+          }
+          
+          // Method 2: Get body content từ mammoth và thử extract header nếu chưa có
+          try {
+            const result = await mammoth.convertToHtml({ arrayBuffer: wordFile }, {
+              includeDefaultStyleMap: true,
+              includeEmbeddedStyleMap: true
+            });
+            bodyContent = result.value;
+            
+            // Nếu chưa tìm thấy header từ JSZip, thử tìm trong body content
+            if (!headerFromWord) {
+              console.log('HEADER DEBUG: Trying to extract header from mammoth body content...');
+              
+              // Tìm table đầu tiên có thể chứa header
+              const firstTableMatch = bodyContent.match(/<table[^>]*>.*?<\/table>/is);
+              if (firstTableMatch) {
+                const tableContent = firstTableMatch[0];
+                console.log('HEADER DEBUG: Found first table:', tableContent.substring(0, 500) + '...');
+                
+                // Extract text từ table cells
+                const cellTexts = [];
+                const cellMatches = tableContent.match(/<td[^>]*>(.*?)<\/td>/gis) || [];
+                cellMatches.forEach(cellMatch => {
+                  const cellText = cellMatch.replace(/<td[^>]*>/, '')
+                                            .replace(/<\/td>/, '')
+                                            .replace(/<[^>]*>/g, '')
+                                            .replace(/&nbsp;/g, ' ')
+                                            .replace(/&amp;/g, '&')
+                                            .trim();
+                  if (cellText.length > 0) {
+                    cellTexts.push(cellText);
+                  }
+                });
+                
+                const headerFromTable = cellTexts.join(' ').replace(/\s+/g, ' ').trim();
+                console.log('HEADER DEBUG: Header from table cells:', headerFromTable);
+                
+                if (headerFromTable.length > 20) {
+                  headerFromWord = headerFromTable;
+                  console.log('HEADER DEBUG: Using header from table');
+                }
+              }
+              
+              // Nếu vẫn không có, thử tìm từ các thẻ h1, h2, h3, strong đầu tiên
+              if (!headerFromWord) {
+                const titlePatterns = [
+                  /<h[1-3][^>]*>(.*?)<\/h[1-3]>/is,
+                  /<p[^>]*style="[^"]*font-weight:\s*bold[^"]*"[^>]*>(.*?)<\/p>/is,
+                  /<div[^>]*style="[^"]*font-weight:\s*bold[^"]*"[^>]*>(.*?)<\/div>/is,
+                  /<strong[^>]*>(.*?)<\/strong>/is
+                ];
+                
+                for (const pattern of titlePatterns) {
+                  const match = bodyContent.match(pattern);
+                  if (match) {
+                    const titleText = match[1].replace(/<[^>]*>/g, '')
+                                            .replace(/&nbsp;/g, ' ')
+                                            .replace(/&amp;/g, '&')
+                                            .trim();
+                    
+                    if (titleText.length > 10 && titleText.toLowerCase().includes('assessment')) {
+                      headerFromWord = titleText;
+                      console.log('HEADER DEBUG: Using header from title element:', titleText);
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+            
+          } catch (mammothError) {
+            bodyContent = '<p>Error reading Word file body content</p>';
+          }
+          
+          // Method 3: Parse và format header
+          let fullContent = '';
+          if (headerFromWord) {
+            console.log('HEADER DEBUG: Full header text to parse:', headerFromWord);
+            
+            // Cải thiện parsing logic để đọc chính xác header từ Word
+            const headerParts = headerFromWord.trim();
+            console.log('HEADER DEBUG: Clean header text:', headerParts);
+            
+            // Extract title - tìm phần title từ các pattern thường gặp
+            let title = '';
+            let code = '';
+            let issue = '';
+            let date = '';
+            
+            // Thử parse theo nhiều pattern khác nhau
+            
+            // Cách 1: Tách theo khoảng trắng và vị trí
+            const words = headerParts.split(/\s+/);
+            console.log('HEADER DEBUG: All words in header:', words);
+            
+            // Tìm vị trí của VJC code để xác định boundaries
+            let vjcIndex = -1;
+            for (let i = 0; i < words.length; i++) {
+              if (words[i].match(/VJC/i)) {
+                vjcIndex = i;
+                break;
+              }
+            }
+            
+            // Sử dụng array words để parse chính xác
+            
+            // Pattern 1: Extract title (từ đầu đến trước VJC)
+            if (vjcIndex > 0) {
+              const titleWords = words.slice(0, vjcIndex);
+              title = titleWords.join(' ').replace(/&amp;/g, '&').trim();
+            } else {
+              // Fallback: lấy từ trước VJC trong text
+              const titleMatch = headerParts.match(/^(.*?)(?=VJC|$)/i);
+              if (titleMatch) {
+                title = titleMatch[1].replace(/&amp;/g, '&')
+                            .replace(/\s+/g, ' ')
+                            .replace(/^[\s\-\.]+|[\s\-\.]+$/g, '')
+                            .trim();
+              }
+            }
+            
+            // Pattern 2: Extract VJC code từ words array
+            if (vjcIndex >= 0) {
+              // Lấy từ VJC đến trước Iss (hoặc đến cuối nếu không có Iss)
+              let codeEndIndex = words.length;
+              for (let i = vjcIndex + 1; i < words.length; i++) {
+                if (words[i].toLowerCase().includes('iss')) {
+                  codeEndIndex = i;
+                  break;
+                }
+              }
+              
+              const codeWords = words.slice(vjcIndex, codeEndIndex);
+              code = codeWords.join(''); // Ghép tất cả words của code
+              console.log('HEADER DEBUG: Found code from words:', code);
+            }
+            
+            // Pattern 3: Extract Issue/Rev từ words array
+            let issueStartIndex = -1;
+            for (let i = 0; i < words.length; i++) {
+              if (words[i].toLowerCase().includes('iss')) {
+                issueStartIndex = i;
+                break;
+              }
+            }
+            
+            if (issueStartIndex >= 0) {
+              // Tìm Rev index
+              let revIndex = -1;
+              for (let i = issueStartIndex; i < words.length && i < issueStartIndex + 5; i++) {
+                if (words[i].toLowerCase().includes('rev')) {
+                  revIndex = i;
+                  break;
+                }
+              }
+              
+              if (revIndex >= 0) {
+                // Ghép Iss number và Rev number
+                const issWord = words[issueStartIndex];
+                const issNum = words[issueStartIndex + 1] || '01';
+                const revWord = words[revIndex];
+                const revNum = words[revIndex + 1] || '01';
+                
+                issue = `Iss${issNum.replace(/\D/g, '').padStart(2, '0')}/Rev${revNum.replace(/\D/g, '').padStart(2, '0')}`;
+                console.log('HEADER DEBUG: Found issue from words:', issue);
+              }
+            }
+            
+            // Pattern 4: Extract date từ words array
+            // Tìm các số có thể là ngày tháng năm (thường ở cuối)
+            const numberWords = [];
+            for (let i = Math.max(0, words.length - 10); i < words.length; i++) {
+              if (words[i].match(/^\d/) || words[i].includes('/')) {
+                numberWords.push(words[i]);
+              }
+            }
+            
+            if (numberWords.length >= 3) {
+              // Thử ghép thành date format
+              const dateStr = numberWords.join('').replace(/[^0-9\/]/g, '');
+              const dateMatch = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+              if (dateMatch) {
+                let day = dateMatch[1].padStart(2, '0');
+                let month = dateMatch[2].padStart(2, '0');
+                let year = dateMatch[3];
+                if (year.length === 2) {
+                  year = '20' + year;
+                }
+                date = `${day}/${month}/${year}`;
+                console.log('HEADER DEBUG: Found date from words:', date);
+              }
+            }
+            
+            // Fallbacks cho các trường bị thiếu
+            if (!title || title.length < 5) {
+              // Thử extract title từ body content nếu header không có
+              const bodyTitleMatch = bodyContent.match(/<h[1-3][^>]*>([^<]+)<\/h[1-3]>/i) ||
+                                    bodyContent.match(/<p[^>]*style="[^"]*text-align:\s*center[^"]*"[^>]*><strong>([^<]+)<\/strong><\/p>/i) ||
+                                    bodyContent.match(/<div[^>]*style="[^"]*text-align:\s*center[^"]*"[^>]*><strong>([^<]+)<\/strong><\/div>/i);
+              
+              if (bodyTitleMatch) {
+                title = bodyTitleMatch[1].trim().replace(/&amp;/g, '&');
+              } else {
+                title = 'PRACTICAL ASSESSMENT RESULT';
+              }
+            }
+            
+            if (!code) {
+              code = 'VJC-V';
+            }
+            
+            if (!issue) {
+              issue = 'Iss01/Rev01';
+            }
+            
+            if (!date) {
+              date = new Date().toLocaleDateString('en-GB');
+            }
+            
+            console.log('HEADER DEBUG: Final parsed values:', { title, code, date, issue });
+            
+            const formattedHeader = `
+              <div style="margin-bottom: 20px;">
+                <table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
+                  <tr>
+                    <td style="width: 25%; border-right: 1px solid #000; padding: 15px; text-align: center; vertical-align: middle;">
+                      <div style="color: #e31e24; font-weight: bold; font-size: 18px; font-family: Arial, sans-serif;">
+                        vietjetair.com
+                      </div>
+                    </td>
+                    <td style="width: 50%; border-right: 1px solid #000; padding: 15px; text-align: center; vertical-align: middle;">
+                      <div style="font-weight: bold; font-size: 16px; color: #333; line-height: 1.3; font-family: Arial, sans-serif;">
+                        ${title}
+                      </div>
+                    </td>
+                    <td style="width: 25%; padding: 10px; vertical-align: top;">
+                      <div style="font-size: 12px; line-height: 1.4; font-family: Arial, sans-serif;">
+                        <div style="margin-bottom: 8px; font-weight: bold;">${code}</div>
+                        <div style="margin-bottom: 8px;">${issue}</div>
+                        <div>${date}</div>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            `;
+            
+            fullContent = formattedHeader + bodyContent;
+          } else {
+            console.log('HEADER DEBUG: No header found, using body only');
+            fullContent = bodyContent;
+          }
+
+          setWordContent(fullContent);
+
+          if (containerRef.current) {
+            containerRef.current.innerHTML = fullContent;
+            makeFieldsEditable();
+
+            // Populate saved data nếu có
+            if (savedDataResponse && savedDataResponse.data) {
+              setTimeout(() => populateFormData(savedDataResponse.data), 500);
+            }
+          }
+
+        } catch (error) {
+          console.error('Error in enhanced Word processing:', error);
+          // Fallback to basic mammoth
         const result = await mammoth.convertToHtml({ arrayBuffer: wordFile });
         setWordContent(result.value);
         
@@ -442,6 +1075,7 @@ const PreviewFormPage = () => {
           // Populate saved data nếu có
           if (savedDataResponse && savedDataResponse.data) {
             setTimeout(() => populateFormData(savedDataResponse.data), 500);
+            }
           }
         }
       } catch (err) {
@@ -454,16 +1088,46 @@ const PreviewFormPage = () => {
     fetchData();
   }, [formId]);
 
-  // Separate useEffect để handle formula calculation khi formFields đã sẵn sàng
+  // Separate useEffect để handle makeFieldsEditable và formula calculation khi formFields đã sẵn sàng
   useEffect(() => {
-    if (formFields.length > 0 && containerRef.current) {
-      console.log('FormFields updated, running formula calculation...');
-      // Chạy nhiều lần để đảm bảo
-      setTimeout(() => updateFormulaFields(), 100);
+    console.log('useEffect triggered - formFields.length:', formFields.length, 'wordContent.length:', wordContent.length, 'containerRef.current:', !!containerRef.current);
+    
+    if (formFields.length > 0 && containerRef.current && wordContent) {
+      console.log('✅ FormFields loaded, updating select options with custom data...');
+      console.log('Available formFields:', formFields.map(f => ({ name: f.fieldName, type: f.fieldType, formula: f.formula })));
+      
+      // Debug specific field "1A"
+      const field1A = formFields.find(f => f.fieldName === '1A');
+      console.log('DEBUG: Field 1A info:', field1A);
+      
+      // Delay một chút để đảm bảo DOM đã stable
+      setTimeout(() => {
+        // Re-run makeFieldsEditable với formFields data để update custom options
+        makeFieldsEditable();
+        
+        // Kiểm tra lại select field "1A" sau khi makeFieldsEditable
+        setTimeout(() => {
+          const select1A = containerRef.current?.querySelector('select[data-field-name="1A"]');
+          if (select1A) {
+            console.log('DEBUG: Select 1A after makeFieldsEditable:', {
+              optionsCount: select1A.options.length,
+              options: [...select1A.options].map(opt => opt.value)
+            });
+          } else {
+            console.log('DEBUG: Select 1A not found after makeFieldsEditable');
+          }
+          
+          updateFormulaFields();
+        }, 100);
+      }, 100);
+      
+      // Chạy formula calculation nhiều lần để đảm bảo
       setTimeout(() => updateFormulaFields(), 500);
       setTimeout(() => updateFormulaFields(), 1000);
+    } else {
+      console.log('⏳ FormFields not loaded yet, basic selects already created...');
     }
-  }, [formFields]);
+  }, [formFields, wordContent]);
 
   // Thêm useEffect để setup event delegation cho dynamic content
   useEffect(() => {
@@ -497,6 +1161,7 @@ const PreviewFormPage = () => {
     try {
       const fieldValues = [];
       const inputs = containerRef.current.querySelectorAll('.form-input');
+      
       inputs.forEach((input) => {
         const fieldName = input.dataset.fieldName;
         const label = input.dataset.label || fieldName;
@@ -586,15 +1251,17 @@ const PreviewFormPage = () => {
       // Lấy tất cả dữ liệu từ form
       const formData = [];
       const inputs = containerRef.current.querySelectorAll('.form-input');
+      
       inputs.forEach((input) => {
-        const label = input.dataset.label || input.dataset.fieldName;
+        const fieldName = input.dataset.fieldName;
+        const label = input.dataset.label || fieldName;
         const fieldType = input.dataset.fieldType;
         let value = '';
         
         // Xử lý giá trị dựa trên loại field
         const isDateField = input.type === 'date' || 
-                           input.dataset.fieldName?.toLowerCase().includes('date') || 
-                           input.dataset.fieldName?.toLowerCase().includes('ngay');
+                           fieldName?.toLowerCase().includes('date') || 
+                           fieldName?.toLowerCase().includes('ngay');
         
         switch (fieldType?.toLowerCase()) {
           case 'c': // checkbox
@@ -623,42 +1290,123 @@ const PreviewFormPage = () => {
         }
         
         formData.push({
-          fieldName: input.dataset.fieldName,
+          fieldName: fieldName,
           fieldType: fieldType,
           label: label,
           value: value
         });
       });
 
-      // Tạo HTML content với dữ liệu đã điền
-      const printContent = containerRef.current.cloneNode(true);
-      
-      // Thay thế tất cả input bằng text hiển thị giá trị
-      const inputs_clone = printContent.querySelectorAll('.form-input');
-      inputs_clone.forEach((input, index) => {
-        const originalInput = inputs[index];
+      // Tạo HTML content với dữ liệu đã điền - đảm bảo có header VietJet
+      let printContentHTML = wordContent; // Bắt đầu với Word content gốc
+
+      // Thay thế patterns với giá trị đã điền
+      formData.forEach(field => {
+        const { fieldName, fieldType, value } = field;
+
+        // Tạo display value
         let displayValue = '';
-        
-        if (originalInput.type === 'checkbox') {
-          displayValue = originalInput.checked ? '☑ Có' : '☐ Không';
-        } else if (originalInput.type === 'date') {
-          if (originalInput.value) {
-            const date = new Date(originalInput.value);
+        switch (fieldType?.toLowerCase()) {
+          case 'c': // checkbox
+            displayValue = value === 'true' ? '☑ Có' : '☐ Không';
+            break;
+          case 'dt': // date
+            if (value) {
+              try {
+                const date = new Date(value);
             displayValue = date.toLocaleDateString('vi-VN');
-          }
-        } else {
-          displayValue = originalInput.value || '';
+              } catch {
+                displayValue = value;
+              }
+            }
+            break;
+          case 'f': // formula
+            displayValue = `<span style="color: #1890ff; font-weight: bold; background-color: #f0f9ff; padding: 2px 6px; border-radius: 3px;">${value || '0'}</span>`;
+            break;
+          default:
+            displayValue = value || '';
+            break;
         }
-        
-        const span = document.createElement('span');
-        span.textContent = displayValue;
-        span.style.borderBottom = '1px solid #000';
-        span.style.minWidth = '100px';
-        span.style.display = 'inline-block';
-        span.style.padding = '2px 4px';
-        span.style.fontWeight = 'bold';
-        input.parentNode.replaceChild(span, input);
+
+        // Thay thế patterns
+        const patterns = [
+          `{${fieldType?.toLowerCase()}_${fieldName}}`,
+          `{${fieldType?.toUpperCase()}_${fieldName}}`,
+          `{${fieldName}}`,
+          `{${fieldName.toUpperCase()}}`,
+          `[${fieldType?.toLowerCase()}_${fieldName}]`,
+          `[${fieldType?.toUpperCase()}_${fieldName}]`,
+          `[${fieldName}]`,
+          `[${fieldName.toUpperCase()}]`
+        ];
+
+        patterns.forEach(pattern => {
+          if (printContentHTML.includes(pattern)) {
+            const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(escapedPattern, 'g');
+            printContentHTML = printContentHTML.replace(regex, displayValue);
+          }
+        });
       });
+
+      // Kiểm tra xem có header không và thêm nếu cần
+      const hasVietJetContent = printContentHTML.toLowerCase().includes('vietjet') || 
+                               printContentHTML.includes('VJC-VJAA') ||
+                               printContentHTML.includes('CABIN HEALTH');
+      
+      if (!hasVietJetContent) {
+        console.log('No VietJet header found in Word content, adding fallback header...');
+        
+        // Lấy thông tin form để tạo header động
+        const formName = formInfo?.formName || 'FORM';
+        const formCode = formInfo?.formCode || 'VJC-VJAA-IF-XXX';
+        
+        const vietjetHeader = `
+          <div style="margin-bottom: 20px;">
+            <table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
+              <tr>
+                <td style="width: 30%; border-right: 1px solid #000; padding: 15px; text-align: center; vertical-align: middle;">
+                  <div style="color: #e31e24; font-weight: bold; font-size: 18px; font-family: Arial, sans-serif;">
+                    vietjetair.com
+                  </div>
+                </td>
+                <td style="width: 40%; border-right: 1px solid #000; padding: 15px; text-align: center; vertical-align: middle;">
+                  <div style="font-weight: bold; font-size: 16px; color: #333; line-height: 1.3; font-family: Arial, sans-serif;">
+                    ${formName.toUpperCase()}
+                  </div>
+                </td>
+                <td style="width: 30%; padding: 10px; vertical-align: top;">
+                  <div style="font-size: 11px; line-height: 1.4; font-family: Arial, sans-serif;">
+                    <div style="margin-bottom: 8px; font-weight: bold;">${formCode}</div>
+                    <div style="margin-bottom: 8px;">Iss01/Rev01</div>
+                    <div>${new Date().toLocaleDateString('en-GB').replace(/\//g, '/')}</div>
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </div>
+        `;
+        
+        printContentHTML = vietjetHeader + printContentHTML;
+        console.log('Added dynamic VietJet header based on form info');
+        } else {
+        console.log('VietJet header found in original content');
+      }
+      
+      console.log('Final content preview:', printContentHTML.substring(0, 500));
+
+      // Xử lý patterns chưa được thay thế
+      const remainingPatterns = printContentHTML.match(/\{[^}]+\}|\[[^\]]+\]/g);
+      if (remainingPatterns) {
+        remainingPatterns.forEach(pattern => {
+          const underlineField = `<span style="border-bottom: 1px solid #000; min-width: 100px; display: inline-block; padding: 2px 4px;">_____________</span>`;
+          const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(escapedPattern, 'g');
+          printContentHTML = printContentHTML.replace(regex, underlineField);
+        });
+      }
+
+      console.log('Final PDF content with VietJet header:', printContentHTML);
 
       // Tạo HTML hoàn chỉnh cho trang mới
       const htmlContent = `
@@ -798,15 +1546,7 @@ const PreviewFormPage = () => {
           </div>
           
           <div class="container" id="content">
-            <div class="header">
-              <div class="form-title">${formInfo?.formName || 'Form'}</div>
-              <div class="form-info">
-                <div>Danh mục: ${formInfo?.categoryName || ''}</div>
-                <div>Ngày tạo: ${formInfo?.createdAt ? new Date(formInfo.createdAt).toLocaleDateString('vi-VN') : ''}</div>
-                <div>Ngày xuất: ${new Date().toLocaleDateString('vi-VN')} ${new Date().toLocaleTimeString('vi-VN')}</div>
-              </div>
-            </div>
-            ${printContent.innerHTML}
+             ${printContentHTML}
           </div>
 
           <script>

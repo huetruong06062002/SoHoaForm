@@ -98,7 +98,7 @@ const AppLayout = ({ children }) => {
                 fontSize: '14px',
                 opacity: window.location.pathname === '/form' ? 1 : 0.85
               }}
-              onClick={() => navigate('/form')}
+              onClick={() => navigate('/allForm')}
             >
               Điền form
             </div>

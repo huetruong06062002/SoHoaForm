@@ -45,7 +45,7 @@ namespace SoHoaFormApi.Controllers
             return StatusCode(result.StatusCode, result);
         }
         [HttpGet("forms/{formId}/fields/")]
-        [AllowAnonymous] 
+        [AllowAnonymous]
         public async Task<IActionResult> GetFormFields(Guid formId)
         {
             var result = await _adminService.GetFormFieldsAsync(formId);
@@ -118,5 +118,39 @@ namespace SoHoaFormApi.Controllers
                 });
             }
         }
+
+
+        [HttpPut("form/{formId}/field/{fieldId}/select-options")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateSelectOptions(Guid formId, Guid fieldId, [FromBody] UpdateSelectOptionsRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                var result = await _adminService.UpdateSelectOptionsAsync(formId, fieldId, request);
+
+                if (result.StatusCode != 200)
+                {
+                    return StatusCode(result.StatusCode, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new HTTPResponseClient<object>
+                {
+                    StatusCode = 500,
+                    Message = $"Internal server error: {ex.Message}",
+                    Data = null,
+                    DateTime = DateTime.Now
+                });
+            }
+        }
+
     }
 }

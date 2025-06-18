@@ -34,7 +34,14 @@ const FormConfigPage = () => {
         const initialValues = {};
         response.data.fields.forEach(field => {
           initialValues[`formula_${field.formFieldId}`] = field.formula || '';
-          initialValues[`options_${field.formFieldId}`] = field.options || '';
+          
+          // Với Select fields, hiển thị formula (chứa options) vào options field
+          if (field.fieldType === 'Select') {
+            initialValues[`options_${field.formFieldId}`] = field.formula || '';
+          } else {
+            initialValues[`options_${field.formFieldId}`] = field.options || '';
+          }
+          
           initialValues[`dependentVariables_${field.formFieldId}`] = field.dependentVariables || '';
           initialValues[`isRequired_${field.formFieldId}`] = field.isRequired;
           initialValues[`isUpperCase_${field.formFieldId}`] = field.isUpperCase || false;
@@ -153,10 +160,7 @@ const FormConfigPage = () => {
         options: options
       });
       
-      const response = await formService.updateFieldConfig(formId, record.fieldId, {
-        options: options.trim(),
-        description: ""
-      });
+      const response = await formService.updateSelectOptions(formId, record.fieldId, options.trim());
       if (response.statusCode === 200) {
         message.success(response.message || 'Cập nhật danh sách lựa chọn thành công');
         console.log('Select options updated successfully:', response);
@@ -165,7 +169,7 @@ const FormConfigPage = () => {
         setFields(prevFields => 
           prevFields.map(field => 
             field.formFieldId === record.formFieldId 
-              ? { ...field, options: options.trim() }
+              ? { ...field, formula: options.trim(), options: options.trim() }
               : field
           )
         );
@@ -229,6 +233,31 @@ const FormConfigPage = () => {
       // Lấy giá trị config hiện tại từ form
       const isRequired = form.getFieldValue(`isRequired_${record.formFieldId}`);
       const isUpperCase = form.getFieldValue(`isUpperCase_${record.formFieldId}`);
+      
+      // Nếu là Select field, gọi API select-options
+      if (record.fieldType === 'Select') {
+        const options = form.getFieldValue(`options_${record.formFieldId}`);
+        if (!options || options.trim() === '') {
+          message.warning('Vui lòng nhập các lựa chọn cho field Select');
+          return;
+        }
+        
+        const response = await formService.updateSelectOptions(formId, record.fieldId, options.trim());
+        if (response.statusCode === 200) {
+          message.success(response.message || 'Cập nhật danh sách lựa chọn thành công');
+          console.log('Select options updated successfully:', response);
+          
+          // Cập nhật lại data trong state
+          setFields(prevFields => 
+            prevFields.map(field => 
+              field.formFieldId === record.formFieldId 
+                ? { ...field, formula: options.trim(), options: options.trim(), isRequired: isRequired, isUpperCase: isUpperCase }
+                : field
+            )
+          );
+        }
+        return;
+      }
       
       // Nếu là Formula field, cần có formula trong payload
       let payload;
@@ -384,7 +413,6 @@ const FormConfigPage = () => {
                       style={{ marginBottom: '8px' }}
                     >
                       <TextArea
-                        placeholder="Nhập các lựa chọn, mỗi dòng một lựa chọn&#10;Ví dụ:&#10;Lựa chọn 1&#10;Lựa chọn 2&#10;Lựa chọn 3"
                         rows={4}
                       />
                     </Form.Item>
@@ -713,6 +741,20 @@ const FormConfigPage = () => {
               }}
             >
               Xem trước form
+            </Button>
+            <Button 
+              type="primary" 
+              size="large"
+              onClick={() => navigate('/manage-form')}
+              style={{
+                height: '40px',
+                fontSize: '14px',
+                padding: '0 24px',
+                backgroundColor: '#1890ff',
+                borderColor: '#1890ff'
+              }}
+            >
+              Hoàn thành cấu hình biến
             </Button>
             <Button 
               size="large"

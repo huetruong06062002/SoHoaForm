@@ -55,6 +55,14 @@ const formService = {
     return response.data;
   },
 
+  // API để cập nhật select options
+  updateSelectOptions: async (formId, fieldId, options) => {
+    const response = await apiClient.put(`/Admin/form/${formId}/field/${fieldId}/select-options`, {
+      options: options
+    });
+    return response.data;
+  },
+
   // API để lưu dữ liệu form đã điền
   saveFormData: async (payload) => {
     const response = await apiClient.post('/User/fill-form/save', payload);

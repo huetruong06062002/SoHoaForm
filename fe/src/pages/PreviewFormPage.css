@@ -2,27 +2,143 @@
   padding: 16px;
   background: #fff;
   min-height: 100vh;
+  overflow-x: hidden; /* Không cho tràn màn hình */
+  max-width: 100vw; /* Giới hạn width */
 }
+
+
 
 /* Form Content */
 .form-content {
   background: white;
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+}
+
+/* Xử lý line breaks từ Word conversion */
+.form-content br {
+  display: none !important; /* Ẩn line breaks để giữ inline layout */
+}
+
+/* Alternative: thay line breaks bằng space */
+.form-content br:before {
+  content: " " !important;
+  white-space: pre;
+}
+
+/* Cho phép content trong cell xuống dòng */
+.form-content td *:not(.form-input) {
+  display: inline !important;
+  white-space: normal !important;
+  word-wrap: break-word !important;
+}
+
+/* Override bất kỳ inline styles nào cho inputs */
+.form-content .form-input[style] {
+  display: inline-block !important;
+  vertical-align: middle !important;
+  margin-left: 8px !important;
+  margin-right: 20px !important;
+  max-width: 150px !important;
+  min-width: 100px !important;
+}
+
+/* Xử lý Word paragraphs để hiển thị inline */
+.form-content > p,
+.form-content td > p {
+  display: inline-block !important;
+  margin-right: 20px !important;
+  margin-bottom: 0 !important;
+  vertical-align: top !important;
+}
+
+/* Đảm bảo các field labels và inputs hiển thị inline */
+.form-content td {
+  white-space: nowrap !important;
+}
+
+/* Cho phép wrap khi cần thiết nhưng giữ inline layout cho labels */
+.form-content td:has(.form-input) {
+  white-space: nowrap !important;
+  overflow: visible !important;
+}
+
+/* Inline layout cho text và input trong cùng một cell */
+.form-content td > *:not(br):not(.form-input) {
+  display: inline !important;
+  vertical-align: middle !important;
+  margin-right: 8px !important;
+}
+
+/* Specific cho dòng chứa Name/EID */
+.form-content p:contains("Name:"),
+.form-content p:contains("EID:") {
+  display: inline-block !important;
+  width: auto !important;
+  margin-right: 40px !important;
 }
 
 .form-content table {
   width: 100%;
+  max-width: 100%;
   border-collapse: collapse;
   margin-bottom: 1em;
+  table-layout: fixed; /* Fixed layout để fit màn hình */
+  word-wrap: break-word; /* Cho phép text wrap trong cells */
 }
 
 .form-content td,
 .form-content th {
   border: 1px solid #000;
-  padding: 8px;
+  padding: 6px;
   vertical-align: middle;
   min-height: 24px;
-  line-height: 1.5;
+  line-height: 1.4;
+  white-space: normal; /* Cho phép text wrap */
+  word-wrap: break-word; /* Cho phép break word */
+  overflow-wrap: break-word; /* Break long words */
+  font-size: 12px; /* Giảm font size để fit hơn */
+}
+
+/* Đặc biệt cho cell chứa checkbox */
+.form-content td:has(.checkbox-input) {
+  white-space: normal; /* Cho phép wrap trong cell có checkbox */
+}
+
+/* Layout đặc biệt cho cells có nhiều fields */
+.form-content td:has(.form-input) {
+  padding: 8px 12px !important;
+}
+
+/* Inline layout cho text nodes và input fields */
+.form-content td {
+  line-height: 1.6 !important;
+}
+
+/* Text labels trước input fields */
+.form-content td text,
+.form-content td textNode {
+  display: inline !important;
+  margin-right: 0 !important;
+}
+
+/* Đảm bảo text labels có spacing phù hợp và hiển thị inline */
+.form-content td:has(.form-input) {
+  font-size: 14px !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  min-width: 100% !important;
+}
+
+/* Text inline với checkbox */
+.form-content td .checkbox-input + * {
+  display: inline !important;
+  margin-left: 1px !important;
+  margin-right: 0 !important;
 }
 
 /* Input fields */
@@ -30,18 +146,93 @@
   display: inline-flex;
   align-items: center;
   min-width: 100px;
+  vertical-align: middle;
+}
+
+/* Đảm bảo form inputs luôn hiển thị inline với text labels */
+.form-content .form-input {
+  display: inline-block !important;
+  vertical-align: middle !important;
+  margin-left: 8px !important;
+  margin-right: 20px !important;
+  min-width: 120px !important;
+  width: auto !important;
+}
+
+/* Layout inline cho sequences of fields trong cùng cell */
+.form-content td:has(.form-input) > * {
+  display: inline !important;
+  white-space: nowrap !important;
+}
+
+/* Specific inline styles for text content trong cells */
+.form-content td span,
+.form-content td p,
+.form-content td div {
+  display: inline !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Đảm bảo paragraph elements hiển thị inline để giữ layout Word */
+.form-content p {
+  display: inline !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: inherit !important;
+}
+
+/* Force inline display cho tất cả child elements trong table cells */
+.form-content td > *:not(br):not(table):not(.form-input) {
+  display: inline !important;
+  vertical-align: baseline !important;
+}
+
+/* Riêng với br tags - convert thành space */
+.form-content td br {
+  display: none !important;
+}
+
+.form-content td br::before {
+  content: " " !important;
+  white-space: pre !important;
+}
+
+/* Các text elements trong cells table - allow wrap để tránh overflow */
+.form-content td,
+.form-content th {
+  white-space: normal !important; /* Cho phép wrap để fit màn hình */
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+/* Riêng với cell chứa nhiều field, cho phép wrap nhưng giữ inline */
+.form-content td:has(.form-input) {
+  white-space: normal !important;
+}
+
+/* Text labels và input fields cùng dòng */
+.form-content td .form-input {
+  display: inline !important;
+  vertical-align: baseline !important;
 }
 
 .form-input {
-  min-width: 100px;
-  height: 28px;
-  border: none;
-  border-bottom: 1px solid #d9d9d9;
-  padding: 4px 8px;
-  background: transparent;
-  font-family: inherit;
-  font-size: inherit;
-  transition: all 0.3s;
+  width: 150px !important;
+  max-width: 150px !important;
+  min-width: 100px !important;
+  height: 28px !important;
+  border: none !important;
+  border-bottom: 1px solid #d9d9d9 !important;
+  padding: 4px 8px !important;
+  background: transparent !important;
+  font-family: inherit !important;
+  font-size: inherit !important;
+  transition: all 0.3s !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  margin-left: 8px !important;
+  margin-right: 20px !important;
 }
 
 .form-input:focus {
@@ -145,6 +336,35 @@
     justify-content: center;
     font-size: 12px;
   }
+  
+  /* Mobile form responsive */
+  .preview-form {
+    padding: 10px;
+    overflow-x: auto;
+  }
+  
+  .form-content {
+    overflow-x: auto;
+    padding: 8px;
+  }
+  
+  .form-content table {
+    width: 100%; /* Fit màn hình mobile */
+    font-size: 11px;
+  }
+  
+  .form-content td {
+    padding: 3px;
+    font-size: 11px;
+    white-space: normal !important;
+    word-wrap: break-word !important;
+  }
+  
+  .form-input {
+    min-width: 60px !important;
+    max-width: 100px !important;
+    font-size: 11px;
+  }
 }
 
 /* Form Actions */
@@ -193,6 +413,8 @@
   padding: 20px;
   border: 1px solid #e8e8e8;
   border-radius: 4px;
+  max-width: 100%;
+  overflow-x: auto; /* Scroll horizontal cho form */
 }
 
 /* Print Styles */
@@ -476,11 +698,21 @@
 }
 
 .checkbox-input {
-  width: 16px;
-  height: 16px;
-  margin: 0 4px;
+  width: 16px !important;
+  height: 16px !important;
+  margin: 0 1px 0 0 !important;
   cursor: pointer;
   accent-color: #1890ff;
+  display: inline !important;
+  vertical-align: middle !important;
+  position: relative;
+  top: -1px; /* Căn chỉnh với text */
+  border: none !important; /* Override tất cả borders */
+  border-bottom: none !important; 
+  min-width: auto !important; 
+  padding: 0 !important; 
+  background: transparent !important;
+  outline: none !important;
 }
 
 .number-input {
@@ -582,4 +814,209 @@
     padding: 8px !important;
     font-size: 12px !important;
   }
+}
+
+/* Table wrapper để responsive */
+.form-content {
+  position: relative;
+}
+
+.form-content table {
+  min-width: 800px; /* Minimum width để đảm bảo đọc được */
+}
+
+/* CSS rules để làm cho text tự động xuống dòng */
+.form-content td {
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+/* Đặc biệt override cho cells chứa nhiều input fields */
+.form-content td:has(.form-input) {
+  white-space: normal !important;
+  display: table-cell !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+/* Đảm bảo text có thể xuống dòng */
+.form-content td span,
+.form-content td text {
+  display: inline !important;
+  white-space: normal !important;
+  word-wrap: break-word !important;
+}
+
+/* Override mạnh mẽ cho inputs để đảm bảo chúng hiển thị đúng */
+input.form-input {
+  display: inline-block !important;
+  vertical-align: middle !important;
+  margin-left: 8px !important;
+  margin-right: 20px !important;
+  width: 150px !important;
+  max-width: 150px !important;
+  min-width: 100px !important;
+}
+
+/* Đặc biệt cho table cells có width 100% */
+.form-content td[style*="width: 100%"] {
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+/* CSS có độ ưu tiên cao nhất để override tất cả inline styles */
+.preview-form .form-content input.form-input[style] {
+  max-width: 150px !important;
+  min-width: 100px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+/* CSS backup cho trường hợp cần thiết */
+.form-content td input[type="text"].form-input {
+  width: 150px !important;
+  max-width: 150px !important;
+}
+
+/* Override cho checkbox để sát với text */
+input[type="checkbox"].checkbox-input,
+.form-content input[type="checkbox"].checkbox-input,
+input[type="checkbox"].form-input.checkbox-input {
+  margin: 0 1px 0 0 !important;
+  padding: 0 !important;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: auto !important;
+  max-width: auto !important;
+  box-sizing: border-box !important;
+}
+
+/* Override cụ thể cho checkbox với inline styles */
+.form-content input[type="checkbox"][style] {
+  padding: 0 !important;
+  margin: 0 1px 0 0 !important;
+}
+
+/* Highest priority CSS to remove all padding from checkboxes */
+.preview-form .form-content input[type="checkbox"] {
+  padding: 0 !important;
+  margin: 0 1px 0 0 !important;
+}
+
+.preview-form .form-content input[type="checkbox"].checkbox-input {
+  padding: 0 !important;
+  margin: 0 1px 0 0 !important;
+  border: none !important;
+  outline: none !important;
+}
+
+/* Override tất cả CSS có thể cho checkbox */
+input[type="checkbox"] {
+  padding: 0 !important;
+}
+
+/* CSS có specificity cao nhất */
+.form-content td input[type="checkbox"].form-input.checkbox-input[style] {
+  padding: 0 !important;
+  margin: 0 1px 0 0 !important;
 } 
+
+
+/* Universal checkbox padding reset với độ ưu tiên cao nhất */
+input[type="checkbox"] {
+  padding: 0 !important;
+  margin: 0 1px 0 0 !important;
+  border: none !important;
+  outline: none !important;
+  box-sizing: border-box !important;
+}
+
+/* Override tất cả có thể cho checkbox */
+* input[type="checkbox"] {
+  padding: 0 !important;
+}
+
+/* CSS với specificity cực cao */
+html body * input[type="checkbox"].checkbox-input {
+  padding: 0 !important;
+  margin: 0 1px 0 0 !important;
+}
+
+/* Override inline styles */
+input[type="checkbox"][style*="padding"] {
+  padding: 0 !important;
+}
+
+/* CHECKBOX RESET - Chỉ remove padding/margin, giữ appearance */
+input[type="checkbox"] {
+  padding: 0 !important;
+  margin: 0 2px 0 0 !important;
+  width: 16px !important;
+  height: 16px !important;
+  accent-color: #1890ff !important;
+  vertical-align: middle !important;
+}
+
+/* Select Formula Display Styles */
+.select-formula-display {
+  display: inline-block !important;
+  padding: 4px 8px !important;
+  border: 1px solid #d9d9d9 !important;
+  border-radius: 4px !important;
+  background-color: #f5f5f5 !important;
+  color: #333 !important;
+  font-size: 14px !important;
+  min-width: 100px !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  font-weight: 500 !important;
+  max-width: 200px !important;
+  word-wrap: break-word !important;
+  white-space: normal !important;
+  margin-left: 8px !important;
+  margin-right: 20px !important;
+}
+
+/* Container cho select formula display */
+.form-content div:has(.select-formula-display) {
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+
+/* Select text input cho {s_...} patterns */
+.select-text-input {
+  display: inline-block !important;
+  padding: 4px 11px !important;
+  border: 1px solid #d9d9d9 !important;
+  border-radius: 4px !important;
+  font-size: 14px !important;
+  background-color: #fff !important;
+  max-width: 150px !important;
+  min-width: 100px !important;
+  vertical-align: middle !important;
+  margin-left: 8px !important;
+  margin-right: 20px !important;
+}
+
+.select-text-input:focus {
+  border-color: #1890ff !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+}
+
+/* Print styles cho select formula display */
+@media print {
+  .select-formula-display {
+    background-color: transparent !important;
+    border: 1px solid #000 !important;
+    padding: 2px 4px !important;
+  }
+  
+  .select-text-input {
+    border: none !important;
+    border-bottom: 1px solid #000 !important;
+    background: transparent !important;
+  }
+}
