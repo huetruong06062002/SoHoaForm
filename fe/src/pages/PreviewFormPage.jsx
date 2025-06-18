@@ -263,12 +263,6 @@ const PreviewFormPage = () => {
         element = document.createElement('select');
         element.className = 'form-input select-input';
         
-        // Thêm option mặc định
-        const defaultOption = document.createElement('option');
-        defaultOption.value = '';
-        defaultOption.textContent = '-- Chọn --';
-        element.appendChild(defaultOption);
-        
         // Tìm field info từ API để lấy formula
         console.log(`Looking for field ${fieldName} in formFields array:`, {
           formFieldsLength: formFieldsData.length,
@@ -317,14 +311,20 @@ const PreviewFormPage = () => {
             
             console.log(`Final parsed ${options.length} custom options for ${fieldName}:`, options);
             
-            // Thêm custom options vào select
-            options.forEach(optionText => {
+            // Thêm custom options vào select (không có option "-- Chọn --")
+            options.forEach((optionText, index) => {
               const option = document.createElement('option');
               option.value = optionText;
               option.textContent = optionText;
               element.appendChild(option);
               console.log(`Added custom option: "${optionText}" to ${fieldName}`);
             });
+            
+            // Mặc định chọn option đầu tiên
+            if (options.length > 0) {
+              element.value = options[0];
+              console.log(`Set default value for ${fieldName}: "${options[0]}"`);
+            }
             
             // Debug final select state
             console.log(`Final select for ${fieldName} has ${element.options.length} options:`, [...element.options].map(opt => opt.value));
@@ -341,20 +341,8 @@ const PreviewFormPage = () => {
           }
         } else {
           console.log(`Select field ${fieldName} no custom info found - currentFieldInfo:`, currentFieldInfo);
-          // Nếu không có formFieldsData hoặc field info, thêm Pass/Fail/N/A mặc định cho tất cả select
-          if (formFieldsData.length === 0) {
-            console.log(`No formFieldsData available, adding default Pass/Fail/N/A options for ${fieldName}`);
-            const defaultOptions = ['Pass', 'Fail', 'N/A'];
-            defaultOptions.forEach(optionText => {
-              const option = document.createElement('option');
-              option.value = optionText;
-              option.textContent = optionText;
-              element.appendChild(option);
-            });
-          } else {
-            console.log(`FormFieldsData available but no field info found for ${fieldName}`);
-            // Không thêm gì cả, chỉ có option "-- Chọn --"
-          }
+          // Nếu không có field info hoặc không có formula, chỉ để option "-- Chọn --" thôi
+          console.log(`Select field ${fieldName} will only have "-- Chọn --" option`);
         }
         break;
         
@@ -532,12 +520,6 @@ const PreviewFormPage = () => {
             // Xóa tất cả options
             select.innerHTML = '';
             
-            // Thêm lại option mặc định
-            const defaultOption = document.createElement('option');
-            defaultOption.value = '';
-            defaultOption.textContent = '-- Chọn --';
-            select.appendChild(defaultOption);
-            
             // Parse options từ formula
             let options = [];
             
@@ -551,7 +533,7 @@ const PreviewFormPage = () => {
             
             console.log(`Adding ${options.length} custom options for ${fieldName}:`, options);
             
-            // Thêm custom options
+            // Thêm custom options (không có option "-- Chọn --")
             options.forEach(optionText => {
               const option = document.createElement('option');
               option.value = optionText;
@@ -562,26 +544,16 @@ const PreviewFormPage = () => {
             
             console.log(`Final options for ${fieldName}:`, [...select.options].map(opt => opt.value));
             
-            // Khôi phục giá trị đã chọn nếu còn hợp lệ
+            // Khôi phục giá trị đã chọn nếu còn hợp lệ, không thì chọn option đầu tiên
             if (currentValue && [...select.options].some(opt => opt.value === currentValue)) {
               select.value = currentValue;
+            } else if (options.length > 0) {
+              select.value = options[0];
+              console.log(`Set default value for ${fieldName}: "${options[0]}"`);
             }
           } else {
-            console.log(`Select field ${fieldName} has {s_...} pattern, adding Pass/Fail/N/A options if not already present`);
-            
-            // Kiểm tra xem đã có Pass/Fail/N/A chưa
-            const existingOptions = [...select.options].map(opt => opt.value);
-            const defaultOptions = ['Pass', 'Fail', 'N/A'];
-            
-            // Chỉ thêm nếu chưa có
-            if (!defaultOptions.some(opt => existingOptions.includes(opt))) {
-              defaultOptions.forEach(optionText => {
-                const option = document.createElement('option');
-                option.value = optionText;
-                option.textContent = optionText;
-                select.appendChild(option);
-              });
-            }
+            console.log(`Select field ${fieldName} has {s_...} pattern, keeping only "-- Chọn --" option`);
+            // Không thêm Pass/Fail/N/A, chỉ giữ option "-- Chọn --"
           }
         } else {
           console.log(`No field info found for select ${fieldName} or not a select field`);

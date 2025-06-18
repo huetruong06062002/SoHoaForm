@@ -22,6 +22,8 @@ public interface IAdminService
   Task<HTTPResponseClient<DeleteFormResponse>> DeleteFormAsync(Guid formId);
 
   Task<HTTPResponseClient<UpdateSelectOptionsResponse>> UpdateSelectOptionsAsync(Guid formId, Guid fieldId, UpdateSelectOptionsRequest request);
+
+  Task<HTTPResponseClient<UpdateBooleanFormulaResponse>> UpdateBooleanFormulaAsync(Guid formId, Guid fieldId, UpdateBooleanFormulaRequest request);
 }
 
 public class AdminService : IAdminService
@@ -1184,6 +1186,91 @@ public class AdminService : IAdminService
       {
         StatusCode = 500,
         Message = $"Lỗi khi cập nhật select options: {ex.Message}",
+        Data = null,
+        DateTime = DateTime.Now
+      };
+    }
+  }
+
+  public async Task<HTTPResponseClient<UpdateBooleanFormulaResponse>> UpdateBooleanFormulaAsync(Guid formId, Guid fieldId, UpdateBooleanFormulaRequest request)
+  {
+    try
+    {
+      await _unitOfWork.BeginTransaction();
+
+      // Tìm FormField dựa trên formId và fieldId
+      var formField = await _context.FormFields
+          .Include(ff => ff.Field)
+          .Include(ff => ff.Form)
+          .FirstOrDefaultAsync(ff => ff.FormId == formId && ff.FieldId == fieldId);
+
+      if (formField == null)
+      {
+        await _unitOfWork.RollBack();
+        return new HTTPResponseClient<UpdateBooleanFormulaResponse>
+        {
+          StatusCode = 404,
+          Message = $"Không tìm thấy field với FormId '{formId}' và FieldId '{fieldId}'",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      // Kiểm tra field có phải là Boolean type không
+      if (formField.Field?.Type != "Boolean")
+      {
+        await _unitOfWork.RollBack();
+        return new HTTPResponseClient<UpdateBooleanFormulaResponse>
+        {
+          StatusCode = 400,
+          Message = $"Field '{formField.Field?.Name}' không phải là Boolean field (Type: {formField.Field?.Type})",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      // Lưu formula cũ
+      var oldFormula = formField.Formula ?? string.Empty;
+
+      // Cập nhật Formula với string từ request
+      formField.Formula = request.Formula;
+
+      // Update FormField
+      _context.FormFields.Update(formField);
+
+      // Commit transaction
+      await _context.SaveChangesAsync();
+      await _unitOfWork.CommitTransaction();
+
+      var response = new UpdateBooleanFormulaResponse
+      {
+        FormId = formId,
+        FieldId = fieldId,
+        FormFieldId = formField.Id,
+        FieldName = formField.Field?.Name ?? "Unknown",
+        FieldType = formField.Field?.Type ?? "Unknown",
+        NewFormula = request.Formula,
+        OldFormula = oldFormula,
+        IsUpdated = true,
+        Message = $"Cập nhật formula cho field '{formField.Field?.Name}' thành công",
+        UpdatedAt = DateTime.Now
+      };
+
+      return new HTTPResponseClient<UpdateBooleanFormulaResponse>
+      {
+        StatusCode = 200,
+        Message = "Cập nhật Boolean formula thành công",
+        Data = response,
+        DateTime = DateTime.Now
+      };
+    }
+    catch (Exception ex)
+    {
+      await _unitOfWork.RollBack();
+      return new HTTPResponseClient<UpdateBooleanFormulaResponse>
+      {
+        StatusCode = 500,
+        Message = $"Lỗi khi cập nhật Boolean formula: {ex.Message}",
         Data = null,
         DateTime = DateTime.Now
       };

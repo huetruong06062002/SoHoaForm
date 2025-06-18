@@ -868,8 +868,7 @@ input.form-input {
 
 /* CSS có độ ưu tiên cao nhất để override tất cả inline styles */
 .preview-form .form-content input.form-input[style] {
-  max-width: 150px !important;
-  min-width: 100px !important;
+
   display: inline-block !important;
   vertical-align: middle !important;
 }
@@ -1019,4 +1018,9 @@ input[type="checkbox"] {
     border-bottom: 1px solid #000 !important;
     background: transparent !important;
   }
+}
+
+#root > div > div > main > div > div > div > div.preview-form > div > table:nth-child(14) > tbody > tr:nth-child(3) > td:nth-child(1) > p:nth-child(2)
+{
+  display: block!important;
 }

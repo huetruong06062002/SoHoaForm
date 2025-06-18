@@ -152,5 +152,38 @@ namespace SoHoaFormApi.Controllers
             }
         }
 
+
+        [HttpPut("form/{formId}/field/{fieldId}/boolean-formula")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateBooleanFormula(Guid formId, Guid fieldId, [FromBody] UpdateBooleanFormulaRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                var result = await _adminService.UpdateBooleanFormulaAsync(formId, fieldId, request);
+
+                if (result.StatusCode != 200)
+                {
+                    return StatusCode(result.StatusCode, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new HTTPResponseClient<object>
+                {
+                    StatusCode = 500,
+                    Message = $"Internal server error: {ex.Message}",
+                    Data = null,
+                    DateTime = DateTime.Now
+                });
+            }
+        }
+
     }
 }

@@ -35,14 +35,41 @@ const FormConfigPage = () => {
         response.data.fields.forEach(field => {
           initialValues[`formula_${field.formFieldId}`] = field.formula || '';
           
-          // Với Select fields, hiển thị formula (chứa options) vào options field
+          // Với Select fields, nếu formula không phải pattern {s_...} thì hiển thị vào options field
           if (field.fieldType === 'Select') {
-            initialValues[`options_${field.formFieldId}`] = field.formula || '';
+            const formula = field.formula || '';
+            console.log(`Select field ${field.fieldName}: formula="${formula}", matches pattern: ${formula.match(/^\{.*\}$/)}`);
+            if (!formula.match(/^\{.*\}$/)) {
+              // Formula chứa custom options
+              console.log(`Setting custom options for ${field.fieldName}: "${formula}"`);
+              initialValues[`options_${field.formFieldId}`] = formula;
+            } else {
+              // Formula dạng {s_...} thì để trống
+              console.log(`Setting empty options for ${field.fieldName}`);
+              initialValues[`options_${field.formFieldId}`] = '';
+            }
           } else {
             initialValues[`options_${field.formFieldId}`] = field.options || '';
           }
           
-          initialValues[`dependentVariables_${field.formFieldId}`] = field.dependentVariables || '';
+          // Với Boolean fields, nếu formula không phải pattern {X_...} thì hiển thị vào dependentVariables
+          if (field.fieldType === 'Boolean') {
+            const formula = field.formula || '';
+            console.log(`Field ${field.fieldName}: formula="${formula}", matches pattern: ${formula.match(/^\{.*\}$/)}`);
+            if (!formula.match(/^\{.*\}$/)) {
+              // Loại bỏ dấu [ ] và chỉ lấy tên biến
+              const cleanedFormula = formula.replace(/[\[\]]/g, '');
+              console.log(`Setting dependentVariables for ${field.fieldName}: "${cleanedFormula}"`);
+              initialValues[`dependentVariables_${field.formFieldId}`] = cleanedFormula;
+            } else {
+              // Với formula dạng {X_...} thì để trống
+              console.log(`Setting empty dependentVariables for ${field.fieldName}`);
+              initialValues[`dependentVariables_${field.formFieldId}`] = '';
+            }
+          } else {
+            initialValues[`dependentVariables_${field.formFieldId}`] = field.dependentVariables || '';
+          }
+          
           initialValues[`isRequired_${field.formFieldId}`] = field.isRequired;
           initialValues[`isUpperCase_${field.formFieldId}`] = field.isUpperCase || false;
         });
@@ -199,9 +226,9 @@ const FormConfigPage = () => {
         dependentVariables: depVars
       });
       
-      const response = await formService.updateFieldConfig(formId, record.fieldId, {
-        dependentVariables: depVars.trim(),
-        description: ""
+      // Sử dụng API boolean-formula cho Boolean fields
+      const response = await formService.updateBooleanFormula(formId, record.fieldId, {
+        formula: `[${record.fieldName}], [${depVars.trim()}]`
       });
       if (response.statusCode === 200) {
         message.success(response.message || 'Cập nhật biến phụ thuộc thành công');
@@ -321,11 +348,7 @@ const FormConfigPage = () => {
           exit={{ opacity: 0, height: 0 }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
         >
-          <Form
-            form={form}
-            layout="vertical"
-            style={{ padding: '12px' }}
-          >
+          <div style={{ padding: '12px' }}>
             <Space direction="vertical" size="middle" style={{ width: '100%' }}>
               {(record.fieldType === 'Text' || record.fieldType === 'Textarea') && (
                 <motion.div
@@ -584,7 +607,7 @@ const FormConfigPage = () => {
                 </Button>
               </motion.div>
             </Space>
-          </Form>
+          </div>
         </motion.div>
       </AnimatePresence>
     );
@@ -654,12 +677,13 @@ const FormConfigPage = () => {
 
   return (
     <AppLayout>
-      <div style={{ padding: '24px' }}>
-        <div style={{ marginBottom: '24px' }}>
-          <Title level={3} style={{ margin: 0 }}>Danh mục: {formData?.formName}</Title>
-        </div>
+      <Form form={form} layout="vertical">
+        <div style={{ padding: '24px' }}>
+          <div style={{ marginBottom: '24px' }}>
+            <Title level={3} style={{ margin: 0 }}>Danh mục: {formData?.formName}</Title>
+          </div>
 
-        <Row gutter={16}>
+          <Row gutter={16}>
           <Col span={10}>
             <Card 
               title={
@@ -770,7 +794,8 @@ const FormConfigPage = () => {
             </Button>
           </Space>
         </div>
-      </div>
+        </div>
+      </Form>
     </AppLayout>
   );
 };
