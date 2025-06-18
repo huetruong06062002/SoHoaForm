@@ -220,67 +220,171 @@ const ManageFormPage = () => {
             form.resetFields();
           }}
           footer={null}
+          width={1200}
         >
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={handleCreateForm}
-            validateMessages={{
-              required: '${label} là bắt buộc'
-            }}
-          >
-            <Form.Item
-              name="name"
-              label="Tên form"
-              rules={[{ required: true }]}
-            >
-              <Input placeholder="Nhập tên form" />
-            </Form.Item>
-
-            <Form.Item
-              name="categoryName"
-              label="Tên danh mục"
-              rules={[{ required: true }]}
-            >
-              <Input placeholder="Nhập tên danh mục" />
-            </Form.Item>
-
-            <Form.Item
-              name="wordFile"
-              label="File Word"
-              rules={[{ required: true }]}
-              valuePropName="fileList"
-              getValueFromEvent={(e) => {
-                if (Array.isArray(e)) {
-                  return e;
-                }
-                return e?.fileList;
-              }}
-            >
-              <Upload
-                beforeUpload={() => false}
-                maxCount={1}
-                accept=".doc,.docx"
-                listType="text"
+          <div style={{ display: 'flex', gap: '24px' }}>
+            {/* Form bên trái */}
+            <div style={{ flex: 1 }}>
+              <Form
+                form={form}
+                layout="vertical"
+                onFinish={handleCreateForm}
+                validateMessages={{
+                  required: '${label} là bắt buộc'
+                }}
               >
-                <Button icon={<UploadOutlined />}>Chọn file</Button>
-              </Upload>
-            </Form.Item>
+                <Form.Item
+                  name="name"
+                  label="Tên form"
+                  rules={[{ required: true }]}
+                >
+                  <Input placeholder="Nhập tên form" />
+                </Form.Item>
 
-            <Form.Item>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                <Button onClick={() => {
-                  setIsModalVisible(false);
-                  form.resetFields();
-                }}>
-                  Hủy
-                </Button>
-                <Button type="primary" htmlType="submit" loading={submitting}>
-                  Tạo form
-                </Button>
+                <Form.Item
+                  name="categoryName"
+                  label="Tên danh mục"
+                  rules={[{ required: true }]}
+                >
+                  <Input placeholder="Nhập tên danh mục" />
+                </Form.Item>
+
+                <Form.Item
+                  name="wordFile"
+                  label="File Word"
+                  rules={[{ required: true }]}
+                  valuePropName="fileList"
+                  getValueFromEvent={(e) => {
+                    if (Array.isArray(e)) {
+                      return e;
+                    }
+                    return e?.fileList;
+                  }}
+                >
+                  <Upload
+                    beforeUpload={() => false}
+                    maxCount={1}
+                    accept=".doc,.docx"
+                    listType="text"
+                  >
+                    <Button icon={<UploadOutlined />}>Chọn file</Button>
+                  </Upload>
+                </Form.Item>
+
+                <Form.Item>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                    <Button onClick={() => {
+                      setIsModalVisible(false);
+                      form.resetFields();
+                    }}>
+                      Hủy
+                    </Button>
+                    <Button type="primary" htmlType="submit" loading={submitting}>
+                      Tạo form
+                    </Button>
+                  </div>
+                </Form.Item>
+              </Form>
+            </div>
+
+            {/* Hướng dẫn bên phải */}
+            <div style={{ 
+              flex: 1, 
+              backgroundColor: '#f8f9fa', 
+              padding: '30px', 
+              borderRadius: '8px',
+              border: '1px solid #e9ecef'
+            }}>
+              <div style={{ 
+                backgroundColor: '#007bff', 
+                color: 'white', 
+                padding: '8px 12px', 
+                marginBottom: '12px',
+                borderRadius: '4px',
+                fontWeight: 'bold'
+              }}>
+                Hướng dẫn
               </div>
-            </Form.Item>
-          </Form>
+              
+              <div style={{ marginBottom: '16px' }}>
+                <strong>Chuẩn bị file Word với các biến định nghĩa theo quy định:</strong>
+              </div>
+
+              <ul style={{ margin: 0, paddingLeft: '20px', lineHeight: '1.6' }}>
+                <li style={{ marginBottom: '4px' }}>
+                  <code style={{ 
+                    backgroundColor: '#e9ecef', 
+                    padding: '2px 4px', 
+                    borderRadius: '3px',
+                    color: '#d63384'
+                  }}>
+                    {'{t_tenbien}'}
+                  </code>: kiểu dữ liệu text
+                </li>
+                <li style={{ marginBottom: '4px' }}>
+                  <code style={{ 
+                    backgroundColor: '#e9ecef', 
+                    padding: '2px 4px', 
+                    borderRadius: '3px',
+                    color: '#d63384'
+                  }}>
+                    {'{n_tenbien}'}
+                  </code>: kiểu dữ liệu số
+                </li>
+                <li style={{ marginBottom: '4px' }}>
+                  <code style={{ 
+                    backgroundColor: '#e9ecef', 
+                    padding: '2px 4px', 
+                    borderRadius: '3px',
+                    color: '#d63384'
+                  }}>
+                    {'{c_tenbien}'}
+                  </code>: kiểu dữ liệu bool (checkbox)
+                </li>
+                <li style={{ marginBottom: '4px' }}>
+                  <code style={{ 
+                    backgroundColor: '#e9ecef', 
+                    padding: '2px 4px', 
+                    borderRadius: '3px',
+                    color: '#d63384'
+                  }}>
+                    {'{d_tenbien}'}
+                  </code>: kiểu dữ liệu ngày
+                </li>
+                <li style={{ marginBottom: '4px' }}>
+                  <code style={{ 
+                    backgroundColor: '#e9ecef', 
+                    padding: '2px 4px', 
+                    borderRadius: '3px',
+                    color: '#d63384'
+                  }}>
+                    {'{s_tenbien}'}
+                  </code>: dữ liệu từ combobox
+                </li>
+                <li style={{ marginBottom: '4px' }}>
+                  <code style={{ 
+                    backgroundColor: '#e9ecef', 
+                    padding: '2px 4px', 
+                    borderRadius: '3px',
+                    color: '#d63384'
+                  }}>
+                    {'{f_tenbien}'}
+                  </code>: biểu thức toán từ công thức
+                </li>
+              </ul>
+
+              <div style={{ 
+                marginTop: '16px', 
+                padding: '12px', 
+                backgroundColor: '#fff3cd',
+                border: '1px solid #ffeaa7',
+                borderRadius: '4px',
+                fontSize: '13px'
+              }}>
+                <strong>Lưu ý:</strong> Sau khi tải lên, hệ thống sẽ phân tích và cho phép bạn cấu hình chi tiết cho từng biến.
+              </div>
+            </div>
+          </div>
         </Modal>
 
         {/* Modal xác nhận xóa */}
