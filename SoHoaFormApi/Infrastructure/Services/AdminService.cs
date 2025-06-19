@@ -24,6 +24,10 @@ public interface IAdminService
   Task<HTTPResponseClient<UpdateSelectOptionsResponse>> UpdateSelectOptionsAsync(Guid formId, Guid fieldId, UpdateSelectOptionsRequest request);
 
   Task<HTTPResponseClient<UpdateBooleanFormulaResponse>> UpdateBooleanFormulaAsync(Guid formId, Guid fieldId, UpdateBooleanFormulaRequest request);
+
+  Task<HTTPResponseClient<UpdateFieldRequiredResponse>> ToggleFieldRequiredAsync(Guid formId, Guid fieldId);
+
+  Task<HTTPResponseClient<UpdateFieldUpperCaseResponse>> ToggleFieldUpperCaseAsync(Guid formId, Guid fieldId);
 }
 
 public class AdminService : IAdminService
@@ -1271,6 +1275,188 @@ public class AdminService : IAdminService
       {
         StatusCode = 500,
         Message = $"Lỗi khi cập nhật Boolean formula: {ex.Message}",
+        Data = null,
+        DateTime = DateTime.Now
+      };
+    }
+  }
+
+  public async Task<HTTPResponseClient<UpdateFieldRequiredResponse>> ToggleFieldRequiredAsync(Guid formId, Guid fieldId)
+  {
+    try
+    {
+      await _unitOfWork.BeginTransaction();
+
+      // Tìm FormField dựa trên formId và fieldId
+      var formField = await _context.FormFields
+          .Include(ff => ff.Field)
+          .Include(ff => ff.Form)
+          .FirstOrDefaultAsync(ff => ff.FormId == formId && ff.FieldId == fieldId);
+
+      if (formField == null)
+      {
+        await _unitOfWork.RollBack();
+        return new HTTPResponseClient<UpdateFieldRequiredResponse>
+        {
+          StatusCode = 404,
+          Message = $"Không tìm thấy field với FormId '{formId}' và FieldId '{fieldId}'",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      if (formField.Field == null)
+      {
+        await _unitOfWork.RollBack();
+        return new HTTPResponseClient<UpdateFieldRequiredResponse>
+        {
+          StatusCode = 404,
+          Message = "Không tìm thấy thông tin field",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      // Lưu giá trị cũ
+      var oldIsRequired = formField.Field.IsRequired ?? false;
+
+      // Toggle IsRequired: true -> false, false -> true
+      var newIsRequired = !oldIsRequired;
+      formField.Field.IsRequired = newIsRequired;
+
+      // Update Field
+      _unitOfWork._fieldRepository.Update(formField.Field);
+
+      // Commit transaction
+      await _unitOfWork.SaveChangesAsync();
+      await _unitOfWork.CommitTransaction();
+      var response = new UpdateFieldRequiredResponse
+      {
+        FormId = formId,
+        FieldId = fieldId,
+        FormFieldId = formField.Id,
+        FieldName = formField.Field.Name ?? "Unknown",
+        FieldType = formField.Field.Type ?? "Unknown",
+        NewIsRequired = newIsRequired,
+        OldIsRequired = oldIsRequired,
+        IsUpdated = true,
+        Message = $"Toggle IsRequired cho field '{formField.Field.Name}' thành công. Từ {oldIsRequired} thành {newIsRequired}",
+        UpdatedAt = DateTime.Now
+      };
+
+      return new HTTPResponseClient<UpdateFieldRequiredResponse>
+      {
+        StatusCode = 200,
+        Message = "Toggle IsRequired thành công",
+        Data = response,
+        DateTime = DateTime.Now
+      };
+    }
+    catch (System.Exception ex)
+    {
+      await _unitOfWork.RollBack();
+      return new HTTPResponseClient<UpdateFieldRequiredResponse>
+      {
+        StatusCode = 500,
+        Message = $"Lỗi khi toggle IsRequired: {ex.Message}",
+        Data = null,
+        DateTime = DateTime.Now
+      };
+    }
+  }
+
+  public async Task<HTTPResponseClient<UpdateFieldUpperCaseResponse>> ToggleFieldUpperCaseAsync(Guid formId, Guid fieldId)
+  {
+    try
+    {
+      await _unitOfWork.BeginTransaction();
+
+      // Tìm FormField dựa trên formId và fieldId
+      var formField = await _context.FormFields
+          .Include(ff => ff.Field)
+          .Include(ff => ff.Form)
+          .FirstOrDefaultAsync(ff => ff.FormId == formId && ff.FieldId == fieldId);
+
+      if (formField == null)
+      {
+        await _unitOfWork.RollBack();
+        return new HTTPResponseClient<UpdateFieldUpperCaseResponse>
+        {
+          StatusCode = 404,
+          Message = $"Không tìm thấy field với FormId '{formId}' và FieldId '{fieldId}'",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      if (formField.Field == null)
+      {
+        await _unitOfWork.RollBack();
+        return new HTTPResponseClient<UpdateFieldUpperCaseResponse>
+        {
+          StatusCode = 404,
+          Message = "Không tìm thấy thông tin field",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      // Kiểm tra field có phải là Text type không
+      if (formField.Field.Type != "Text")
+      {
+        await _unitOfWork.RollBack();
+        return new HTTPResponseClient<UpdateFieldUpperCaseResponse>
+        {
+          StatusCode = 400,
+          Message = $"Chỉ có thể toggle IsUpperCase cho field Text. Field '{formField.Field.Name}' có type '{formField.Field.Type}'",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      // Lưu giá trị cũ
+      var oldIsUpperCase = formField.Field.IsUpperCase ?? false;
+
+      // Toggle IsUpperCase: true -> false, false -> true
+      var newIsUpperCase = !oldIsUpperCase;
+      formField.Field.IsUpperCase = newIsUpperCase;
+
+      // Update Field
+      _unitOfWork._fieldRepository.Update(formField.Field);
+
+      // Commit transaction
+      await _unitOfWork.SaveChangesAsync();
+      await _unitOfWork.CommitTransaction();
+
+      var response = new UpdateFieldUpperCaseResponse
+      {
+        FormId = formId,
+        FieldId = fieldId,
+        FormFieldId = formField.Id,
+        FieldName = formField.Field.Name ?? "Unknown",
+        FieldType = formField.Field.Type ?? "Unknown",
+        NewIsUpperCase = newIsUpperCase,
+        OldIsUpperCase = oldIsUpperCase,
+        IsUpdated = true,
+        Message = $"Toggle IsUpperCase cho Text field '{formField.Field.Name}' thành công. Từ {oldIsUpperCase} thành {newIsUpperCase}",
+        UpdatedAt = DateTime.Now
+      };
+
+      return new HTTPResponseClient<UpdateFieldUpperCaseResponse>
+      {
+        StatusCode = 200,
+        Message = "Toggle IsUpperCase thành công",
+        Data = response,
+        DateTime = DateTime.Now
+      };
+    }
+    catch (Exception ex)
+    {
+      await _unitOfWork.RollBack();
+      return new HTTPResponseClient<UpdateFieldUpperCaseResponse>
+      {
+        StatusCode = 500,
+        Message = $"Lỗi khi toggle IsUpperCase: {ex.Message}",
         Data = null,
         DateTime = DateTime.Now
       };

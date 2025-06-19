@@ -482,5 +482,47 @@ namespace SoHoaFormApi.Controllers
                 });
             }
         }
+
+        // ...existing code...
+        [HttpPut("fill-form/{userFillFormId}/complete")]
+        [Authorize]
+        public async Task<IActionResult> CompleteUserFillForm(Guid userFillFormId)
+        {
+            try
+            {
+                // Lấy UserId từ token để verify ownership
+                var userIdClaim = User.FindFirst("UserId");
+                if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+                {
+                    return BadRequest(new HTTPResponseClient<object>
+                    {
+                        StatusCode = 400,
+                        Message = "Không thể xác định UserId",
+                        Data = null,
+                        DateTime = DateTime.Now
+                    });
+                }
+
+                var result = await _userService.CompleteUserFillFormAsync(userFillFormId, userId);
+
+                if (result.StatusCode != 200)
+                {
+                    return StatusCode(result.StatusCode, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new HTTPResponseClient<object>
+                {
+                    StatusCode = 500,
+                    Message = $"Internal server error: {ex.Message}",
+                    Data = null,
+                    DateTime = DateTime.Now
+                });
+            }
+        }
+
     }
 }

@@ -15,7 +15,7 @@ public interface IUnitOfWork : IAsyncDisposable
 
     public IUserFillFormRepository _userFillFormRepository { get; }
 
-    public IUserFillFormHistoryRepository _formFieldValueRepository { get; }
+    public IUserFillFormHistoryRepository _userFillFormHistoryRepository { get; }
 
     public Task BeginTransaction();
     public Task CommitTransaction();
@@ -42,7 +42,7 @@ public class UnitOfWork : IUnitOfWork
 
     public IUserFillFormRepository _userFillFormRepository { get; }
 
-    public IUserFillFormHistoryRepository _formFieldValueRepository { get; }
+    public IUserFillFormHistoryRepository _userFillFormHistoryRepository { get; }
 
     private readonly SoHoaFormContext _context;
 
@@ -55,7 +55,7 @@ public class UnitOfWork : IUnitOfWork
         , IFormCategoryRepository formCategoryRepository
         , IPdfRepository pdfRepository
         , IUserFillFormRepository userFillFormRepository
-        , IUserFillFormHistoryRepository formFieldValueRepository
+        , IUserFillFormHistoryRepository userFillFormHistoryRepository
     )
     {
         _context = context;
@@ -67,7 +67,7 @@ public class UnitOfWork : IUnitOfWork
         _formCategoryRepository = formCategoryRepository;
         _pdfRepository = pdfRepository;
         _userFillFormRepository = userFillFormRepository;
-        _formFieldValueRepository = formFieldValueRepository;
+        _userFillFormHistoryRepository = userFillFormHistoryRepository;
     }
 
     public async Task BeginTransaction()

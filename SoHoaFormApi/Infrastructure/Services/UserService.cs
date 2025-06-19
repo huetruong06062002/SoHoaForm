@@ -18,6 +18,8 @@ public interface IUserService
 
   Task<HTTPResponseClient<object>> GetJsonFieldValueByUserFillFormIdAsync(Guid userFillFormId);
   Task<HTTPResponseClient<string>> GetRawJsonFieldValueAsync(Guid userFillFormId);
+
+  Task<HTTPResponseClient<CompleteUserFillFormResponse>> CompleteUserFillFormAsync(Guid userFillFormId, Guid userId);
 }
 
 public class UserService : IUserService
@@ -213,6 +215,33 @@ public class UserService : IUserService
         {
           StatusCode = 404,
           Message = "Không tìm thấy user",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      // **KIỂM TRA TRẠNG THÁI COMPLETE - NGĂN KHÔNG CHO EDIT**
+      var existingUserFillForm = await _context.UserFillForms
+          .FirstOrDefaultAsync(uff => uff.FormId == request.FormId && uff.UserId == request.UserId);
+
+      if (existingUserFillForm != null && existingUserFillForm.Status?.ToLower() == "complete")
+      {
+        return new HTTPResponseClient<SaveUserFillFormResponse>
+        {
+          StatusCode = 400,
+          Message = "Form đã được hoàn thành và không thể chỉnh sửa. Sử dụng API Complete để hoàn thành form.",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      // **NGĂN KHÔNG CHO SET STATUS = COMPLETE TRỰC TIẾP**
+      if (request.Status?.ToLower() == "complete")
+      {
+        return new HTTPResponseClient<SaveUserFillFormResponse>
+        {
+          StatusCode = 400,
+          Message = "Không thể set status thành 'Complete' trực tiếp. Vui lòng sử dụng API Complete riêng biệt.",
           Data = null,
           DateTime = DateTime.Now
         };
@@ -582,4 +611,95 @@ public class UserService : IUserService
     }
   }
 
+
+  public async Task<HTTPResponseClient<CompleteUserFillFormResponse>> CompleteUserFillFormAsync(Guid userFillFormId, Guid userId)
+  {
+    try
+    {
+      // Tìm UserFillForm và verify ownership
+      var userFillForm = await _context.UserFillForms
+          .Include(uff => uff.Form)
+          .Include(uff => uff.User)
+          .FirstOrDefaultAsync(uff => uff.Id == userFillFormId && uff.UserId == userId);
+
+      if (userFillForm == null)
+      {
+        return new HTTPResponseClient<CompleteUserFillFormResponse>
+        {
+          StatusCode = 404,
+          Message = "Không tìm thấy UserFillForm hoặc bạn không có quyền truy cập",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      // Kiểm tra trạng thái hiện tại
+      var currentStatus = userFillForm.Status ?? "Draft";
+      if (currentStatus.ToLower() == "complete")
+      {
+        return new HTTPResponseClient<CompleteUserFillFormResponse>
+        {
+          StatusCode = 400,
+          Message = "Form đã được hoàn thành trước đó",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      // Update UserFillForm status
+      var oldStatus = userFillForm.Status ?? "Draft";
+      userFillForm.Status = "Complete";
+
+      _unitOfWork._userFillFormRepository.Update(userFillForm);
+
+      // Tạo UserFillFormHistory mới cho việc Complete
+      var completionHistory = new UserFillFormHistory
+      {
+        Id = Guid.NewGuid(),
+        UserFillFormId = userFillFormId,
+        DateWrite = DateTime.Now,
+        DateFill = DateTime.Now,
+        DateFinish = DateTime.Now, // Set DateFinish khi Complete
+        Status = "Complete"
+      };
+
+      await _unitOfWork._userFillFormHistoryRepository.AddAsync(completionHistory);
+
+      // Lưu changes
+      await _unitOfWork.SaveChangesAsync();
+
+      var response = new CompleteUserFillFormResponse
+      {
+        UserFillFormId = userFillFormId,
+        FormId = userFillForm.FormId ?? Guid.Empty,
+        FormName = userFillForm.Form?.Name ?? "Unknown",
+        UserId = userId,
+        UserName = userFillForm.User?.Name ?? "Unknown",
+        OldStatus = oldStatus,
+        NewStatus = "Complete",
+        HistoryId = completionHistory.Id,
+        CompletedAt = DateTime.Now,
+        IsCompleted = true,
+        Message = $"Form '{userFillForm.Form?.Name}' đã được hoàn thành thành công. Bạn không thể chỉnh sửa form này nữa."
+      };
+
+      return new HTTPResponseClient<CompleteUserFillFormResponse>
+      {
+        StatusCode = 200,
+        Message = "Hoàn thành form thành công",
+        Data = response,
+        DateTime = DateTime.Now
+      };
+    }
+    catch (Exception ex)
+    {
+      return new HTTPResponseClient<CompleteUserFillFormResponse>
+      {
+        StatusCode = 500,
+        Message = $"Lỗi khi hoàn thành form: {ex.Message}",
+        Data = null,
+        DateTime = DateTime.Now
+      };
+    }
+  }
 }

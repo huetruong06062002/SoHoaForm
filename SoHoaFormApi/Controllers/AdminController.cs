@@ -185,5 +185,59 @@ namespace SoHoaFormApi.Controllers
             }
         }
 
+
+        [HttpPut("form/{formId}/field/{fieldId}/toggle-required")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ToggleFieldRequired(Guid formId, Guid fieldId)
+        {
+            try
+            {
+                var result = await _adminService.ToggleFieldRequiredAsync(formId, fieldId);
+
+                if (result.StatusCode != 200)
+                {
+                    return StatusCode(result.StatusCode, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new HTTPResponseClient<object>
+                {
+                    StatusCode = 500,
+                    Message = $"Internal server error: {ex.Message}",
+                    Data = null,
+                    DateTime = DateTime.Now
+                });
+            }
+        }
+
+        [HttpPut("form/{formId}/field/{fieldId}/toggle-uppercase")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ToggleFieldUpperCase(Guid formId, Guid fieldId)
+        {
+            try
+            {
+                var result = await _adminService.ToggleFieldUpperCaseAsync(formId, fieldId);
+
+                if (result.StatusCode != 200)
+                {
+                    return StatusCode(result.StatusCode, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new HTTPResponseClient<object>
+                {
+                    StatusCode = 500,
+                    Message = $"Internal server error: {ex.Message}",
+                    Data = null,
+                    DateTime = DateTime.Now
+                });
+            }
+        }
     }
 }

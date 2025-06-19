@@ -32,7 +32,7 @@
 
 /* Cho phép content trong cell xuống dòng */
 .form-content td *:not(.form-input) {
-  display: inline !important;
+   /* display: inline !important; */ 
   white-space: normal !important;
   word-wrap: break-word !important;
 }
@@ -69,7 +69,7 @@
 
 /* Inline layout cho text và input trong cùng một cell */
 .form-content td > *:not(br):not(.form-input) {
-  display: inline !important;
+  /* display: inline !important; */
   vertical-align: middle !important;
   margin-right: 8px !important;
 }
@@ -122,7 +122,7 @@
 /* Text labels trước input fields */
 .form-content td text,
 .form-content td textNode {
-  display: inline !important;
+  /* display: inline !important; */
   margin-right: 0 !important;
 }
 
@@ -136,7 +136,7 @@
 
 /* Text inline với checkbox */
 .form-content td .checkbox-input + * {
-  display: inline !important;
+  /* display: inline !important; */
   margin-left: 1px !important;
   margin-right: 0 !important;
 }
@@ -161,7 +161,7 @@
 
 /* Layout inline cho sequences of fields trong cùng cell */
 .form-content td:has(.form-input) > * {
-  display: inline !important;
+  /* display: inline !important; */
   white-space: nowrap !important;
 }
 
@@ -169,14 +169,13 @@
 .form-content td span,
 .form-content td p,
 .form-content td div {
-  display: inline !important;
   margin: 0 !important;
   padding: 0 !important;
 }
 
 /* Đảm bảo paragraph elements hiển thị inline để giữ layout Word */
 .form-content p {
-  display: inline !important;
+  /* display: inline !important; */
   margin: 0 !important;
   padding: 0 !important;
   line-height: inherit !important;
@@ -184,8 +183,8 @@
 
 /* Force inline display cho tất cả child elements trong table cells */
 .form-content td > *:not(br):not(table):not(.form-input) {
-  display: inline !important;
-  vertical-align: baseline !important;
+  display: block !important;
+  /* vertical-align: baseline !important; */
 }
 
 /* Riêng với br tags - convert thành space */
@@ -213,7 +212,7 @@
 
 /* Text labels và input fields cùng dòng */
 .form-content td .form-input {
-  display: inline !important;
+  /* display: inline !important; */
   vertical-align: baseline !important;
 }
 
@@ -703,7 +702,7 @@
   margin: 0 1px 0 0 !important;
   cursor: pointer;
   accent-color: #1890ff;
-  display: inline !important;
+  /* display: inline !important; */
   vertical-align: middle !important;
   position: relative;
   top: -1px; /* Căn chỉnh với text */
@@ -843,7 +842,7 @@
 /* Đảm bảo text có thể xuống dòng */
 .form-content td span,
 .form-content td text {
-  display: inline !important;
+  /* display: inline !important; */
   white-space: normal !important;
   word-wrap: break-word !important;
 }
