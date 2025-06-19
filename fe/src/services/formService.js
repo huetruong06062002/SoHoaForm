@@ -69,6 +69,18 @@ const formService = {
     return response.data;
   },
 
+  // API để toggle required status
+  toggleRequired: async (formId, fieldId) => {
+    const response = await apiClient.put(`/Admin/form/${formId}/field/${fieldId}/toggle-required`);
+    return response.data;
+  },
+
+  // API để toggle uppercase status
+  toggleUppercase: async (formId, fieldId) => {
+    const response = await apiClient.put(`/Admin/form/${formId}/field/${fieldId}/toggle-uppercase`);
+    return response.data;
+  },
+
   // API để lưu dữ liệu form đã điền
   saveFormData: async (payload) => {
     const response = await apiClient.post('/User/fill-form/save', payload);

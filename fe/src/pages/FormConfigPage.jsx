@@ -261,73 +261,49 @@ const FormConfigPage = () => {
       const isRequired = form.getFieldValue(`isRequired_${record.formFieldId}`);
       const isUpperCase = form.getFieldValue(`isUpperCase_${record.formFieldId}`);
       
-      // Nếu là Select field, gọi API select-options
-      if (record.fieldType === 'Select') {
-        const options = form.getFieldValue(`options_${record.formFieldId}`);
-        if (!options || options.trim() === '') {
-          message.warning('Vui lòng nhập các lựa chọn cho field Select');
+      console.log('Current values:', { isRequired, isUpperCase });
+      console.log('Original values:', { originalRequired: record.isRequired, originalUpperCase: record.isUpperCase });
+      
+      // Gọi API toggle-required nếu giá trị isRequired thay đổi
+      if (isRequired !== record.isRequired) {
+        console.log('Toggling required status...');
+        const requiredResponse = await formService.toggleRequired(formId, record.fieldId);
+        if (requiredResponse.statusCode !== 200) {
+          message.error('Lỗi khi cập nhật trạng thái bắt buộc nhập');
           return;
         }
-        
-        const response = await formService.updateSelectOptions(formId, record.fieldId, options.trim());
-        if (response.statusCode === 200) {
-          message.success(response.message || 'Cập nhật danh sách lựa chọn thành công');
-          console.log('Select options updated successfully:', response);
-          
-          // Cập nhật lại data trong state
-          setFields(prevFields => 
-            prevFields.map(field => 
-              field.formFieldId === record.formFieldId 
-                ? { ...field, formula: options.trim(), options: options.trim(), isRequired: isRequired, isUpperCase: isUpperCase }
-                : field
-            )
-          );
+        console.log('Required status toggled successfully:', requiredResponse);
+      }
+      
+      // Gọi API toggle-uppercase nếu giá trị isUpperCase thay đổi và field hỗ trợ uppercase
+      if ((record.fieldType === 'Text' || record.fieldType === 'Textarea') && 
+          isUpperCase !== record.isUpperCase) {
+        console.log('Toggling uppercase status...');
+        const uppercaseResponse = await formService.toggleUppercase(formId, record.fieldId);
+        if (uppercaseResponse.statusCode !== 200) {
+          message.error('Lỗi khi cập nhật trạng thái bắt buộc nhập chữ hoa');
+          return;
         }
-        return;
+        console.log('Uppercase status toggled successfully:', uppercaseResponse);
       }
       
-      // Nếu là Formula field, cần có formula trong payload
-      let payload;
-      if (record.fieldType === 'Formula') {
-        const currentFormula = form.getFieldValue(`formula_${record.formFieldId}`) || '';
-        payload = {
-          formula: currentFormula,
-          description: "",
-          isRequired: isRequired,
-          isUpperCase: isUpperCase
-        };
-      } else {
-        // Cho các field khác, chỉ gửi config
-        payload = {
-          isRequired: isRequired,
-          isUpperCase: isUpperCase,
-          description: ""
-        };
-      }
+      message.success('Cập nhật cấu hình thành công');
       
-      console.log('Config payload:', payload);
+      // Cập nhật lại data trong state
+      setFields(prevFields => 
+        prevFields.map(field => 
+          field.formFieldId === record.formFieldId 
+            ? { ...field, isRequired: isRequired, isUpperCase: isUpperCase }
+            : field
+        )
+      );
       
-      const response = await formService.updateFieldConfig(formId, record.fieldId, payload);
-      if (response.statusCode === 200) {
-        message.success(response.message || 'Cập nhật cấu hình thành công');
-        console.log('Config updated successfully:', response);
-        
-        // Cập nhật lại data trong state
-        setFields(prevFields => 
-          prevFields.map(field => 
-            field.formFieldId === record.formFieldId 
-              ? { ...field, isRequired: isRequired, isUpperCase: isUpperCase }
-              : field
-          )
-        );
-        
-        // Clear config changes cho field này
-        setConfigChanges(prev => {
-          const newChanges = { ...prev };
-          delete newChanges[record.formFieldId];
-          return newChanges;
-        });
-      }
+      // Clear config changes cho field này
+      setConfigChanges(prev => {
+        const newChanges = { ...prev };
+        delete newChanges[record.formFieldId];
+        return newChanges;
+      });
       
     } catch (error) {
       console.error('Error saving config:', error);
