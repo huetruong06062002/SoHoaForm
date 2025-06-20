@@ -22,6 +22,24 @@ const FormConfigPage = () => {
   const [expandedRowKeys, setExpandedRowKeys] = useState([]);
   const [configChanges, setConfigChanges] = useState({});
 
+  const getRandomFieldsExample = (currentRecord) => {
+    // Lấy các field khác currentRecord để làm ví dụ
+    const otherFields = fields.filter(field => 
+      field.formFieldId !== currentRecord.formFieldId && 
+      field.fieldType !== 'Formula' // Loại bỏ Formula fields
+    );
+    
+    if (otherFields.length === 0) {
+      return 'TraineeName, TraineeID';
+    }
+    
+    // Random 2-3 fields để làm ví dụ
+    const shuffled = otherFields.sort(() => 0.5 - Math.random());
+    const selectedFields = shuffled.slice(0, Math.min(3, otherFields.length));
+    
+    return selectedFields.map(field => field.fieldName).join(', ');
+  };
+
   const fetchFormConfig = async () => {
     try {
       setLoading(true);
@@ -211,44 +229,71 @@ const FormConfigPage = () => {
     }
   };
 
-  const handleSaveDependentVariables = async (record) => {
+  const handleSaveBooleanConfig = async (record) => {
     try {
       const depVars = form.getFieldValue(`dependentVariables_${record.formFieldId}`);
-      if (!depVars || depVars.trim() === '') {
-        message.warning('Vui lòng nhập danh sách biến phụ thuộc');
-        return;
-      }
+      const isRequired = form.getFieldValue(`isRequired_${record.formFieldId}`);
       
-      console.log('Saving dependent variables:', {
+      console.log('Saving Boolean field config:', {
         formId: formId,
         fieldId: record.fieldId,
         formFieldId: record.formFieldId,
-        dependentVariables: depVars
+        dependentVariables: depVars,
+        isRequired: isRequired,
+        originalRequired: record.isRequired
       });
       
-      // Sử dụng API boolean-formula cho Boolean fields
-      const response = await formService.updateBooleanFormula(formId, record.fieldId, {
-        formula: `[${record.fieldName}], [${depVars.trim()}]`
-      });
-      if (response.statusCode === 200) {
-        message.success(response.message || 'Cập nhật biến phụ thuộc thành công');
-        console.log('Dependent variables updated successfully:', response);
+      // 1. Cập nhật formula nếu có dependent variables
+      if (depVars && depVars.trim() !== '') {
+        // Truyền formula đúng như user nhập, không tự động format
+        const formula = depVars.trim();
         
-        // Cập nhật lại data trong state
-        setFields(prevFields => 
-          prevFields.map(field => 
-            field.formFieldId === record.formFieldId 
-              ? { ...field, dependentVariables: depVars.trim() }
-              : field
-          )
-        );
+        console.log('Updating boolean formula (raw input):', formula);
+        const formulaResponse = await formService.updateBooleanFormula(formId, record.fieldId, {
+          formula: formula
+        });
+        if (formulaResponse.statusCode !== 200) {
+          message.error('Lỗi khi cập nhật biến phụ thuộc');
+          return;
+        }
+        console.log('Boolean formula updated successfully:', formulaResponse);
       }
+      
+      // 2. Cập nhật isRequired nếu có thay đổi
+      if (isRequired !== record.isRequired) {
+        console.log('Toggling required status...');
+        const requiredResponse = await formService.toggleRequired(formId, record.fieldId);
+        if (requiredResponse.statusCode !== 200) {
+          message.error('Lỗi khi cập nhật trạng thái bắt buộc nhập');
+          return;
+        }
+        console.log('Required status toggled successfully:', requiredResponse);
+      }
+      
+      message.success('Cập nhật cấu hình Boolean field thành công');
+      
+      // Cập nhật lại data trong state
+      setFields(prevFields => 
+        prevFields.map(field => 
+          field.formFieldId === record.formFieldId 
+            ? { 
+                ...field, 
+                dependentVariables: depVars?.trim() || '',
+                isRequired: isRequired,
+                formula: depVars && depVars.trim() !== '' 
+                  ? depVars.trim()  // Lưu đúng như user nhập
+                  : field.formula
+              }
+            : field
+        )
+      );
+      
     } catch (error) {
-      console.error('Error updating dependent variables:', error);
+      console.error('Error updating Boolean field config:', error);
       if (error.response?.data?.message) {
         message.error(error.response.data.message);
       } else {
-        message.error('Đã có lỗi xảy ra khi cập nhật biến phụ thuộc');
+        message.error('Đã có lỗi xảy ra khi cập nhật cấu hình Boolean field');
       }
     }
   };
@@ -362,28 +407,38 @@ const FormConfigPage = () => {
                       fontSize: '12px',
                       color: '#1e40af'
                     }}>
-                      Ví dụ: [bien1], [bien2], [bien3]
+                      Ví dụ: {getRandomFieldsExample(record)}
                     </div>
                     <Form.Item
                       name={`dependentVariables_${record.formFieldId}`}
                       style={{ marginBottom: '8px' }}
                     >
                       <Input
-                        placeholder="Nhập danh sách tên biến bị ảnh hưởng khi checkbox này được chọn. Sử dụng cú pháp [tên biến], ... các tên biến cách nhau bởi dấu phẩy."
+                        placeholder={`Ví dụ: ${getRandomFieldsExample(record)}`}
                       />
                     </Form.Item>
                     <div style={{ 
                       fontSize: '12px', 
                       color: '#6b7280', 
-                      marginBottom: '8px',
+                      marginBottom: '12px',
                       lineHeight: '1.4'
                     }}>
-                      Nhập danh sách tên biến bị ảnh hưởng khi checkbox này được chọn. Sử dụng cú pháp [tên biến], ... các tên biến cách nhau bởi dấu phẩy.
+                      Nhập danh sách tên biến bị ảnh hưởng khi checkbox này được chọn. Hệ thống sẽ truyền lên API đúng như bạn nhập.
                     </div>
+
+                    {/* Checkbox bắt buộc nhập cho Boolean field */}
+                    <Form.Item
+                      name={`isRequired_${record.formFieldId}`}
+                      valuePropName="checked"
+                      style={{ marginBottom: '12px' }}
+                    >
+                      <Checkbox>Bắt buộc nhập</Checkbox>
+                    </Form.Item>
+
                     <Button 
                       type="primary" 
                       size="small"
-                      onClick={() => handleSaveDependentVariables(record)}
+                      onClick={() => handleSaveBooleanConfig(record)}
                       style={{
                         height: '28px',
                         fontSize: '12px',
@@ -556,32 +611,37 @@ const FormConfigPage = () => {
                 </motion.div>
               )}
               
-              <motion.div
-                initial={{ x: -20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: 0.2 }}
-              >
-                <Form.Item
-                  name={`isRequired_${record.formFieldId}`}
-                  valuePropName="checked"
-                  style={{ marginBottom: 0 }}
-                >
-                  <Checkbox>Bắt buộc nhập</Checkbox>
-                </Form.Item>
-              </motion.div>
-              <motion.div
-                initial={{ x: -20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: 0.3 }}
-              >
-                <Button 
-                  type="primary" 
-                  size="small"
-                  onClick={() => handleSaveConfig(record)}
-                >
-                  Lưu cấu hình
-                </Button>
-              </motion.div>
+              {/* Chỉ hiển thị checkbox và nút lưu cho fields không phải Boolean */}
+              {record.fieldType !== 'Boolean' && (
+                <>
+                  <motion.div
+                    initial={{ x: -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: 0.2 }}
+                  >
+                    <Form.Item
+                      name={`isRequired_${record.formFieldId}`}
+                      valuePropName="checked"
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Checkbox>Bắt buộc nhập</Checkbox>
+                    </Form.Item>
+                  </motion.div>
+                  <motion.div
+                    initial={{ x: -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    <Button 
+                      type="primary" 
+                      size="small"
+                      onClick={() => handleSaveConfig(record)}
+                    >
+                      Lưu cấu hình
+                    </Button>
+                  </motion.div>
+                </>
+              )}
             </Space>
           </div>
         </motion.div>

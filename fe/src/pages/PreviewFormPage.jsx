@@ -9,7 +9,7 @@ import './PreviewFormPage.css';
 
 const PreviewFormPage = () => {
   const { formId } = useParams();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [loading, setLoading] = useState(true);
   const [isWordMode, setIsWordMode] = useState(false);
   const [wordContent, setWordContent] = useState('');
@@ -1129,8 +1129,495 @@ const PreviewFormPage = () => {
     };
   }, [wordContent]); // Re-setup khi wordContent thay đổi
 
+  // Function chuyển đổi fieldName thành tên hiển thị dễ hiểu từ Word content
+  const getDisplayFieldName = (fieldName) => {
+    // Tìm label từ Word content dựa trên pattern TRƯỚC (ưu tiên cao hơn)
+    if (wordContent && fieldName) {
+      const labelFromWord = extractLabelFromWordContent(fieldName);
+      if (labelFromWord) {
+        return `${labelFromWord} (${fieldName})`;
+      }
+    }
+    
+    // Tìm field info từ API data sau
+    const fieldInfo = formFields.find(f => f.fieldName === fieldName);
+    
+    if (fieldInfo && fieldInfo.fieldDescription && fieldInfo.fieldDescription.trim() !== '') {
+      // Sử dụng fieldDescription từ API làm display name chính
+      return `${fieldInfo.fieldDescription} (${fieldName})`;
+    }
+    
+    // Fallback: Tự động tạo tên đẹp từ fieldName
+    let displayName = fieldName;
+    
+    // Pattern: {type_FieldName} -> Field Name
+    const typeMatch = fieldName.match(/^\{[a-z]_(.+)\}$/);
+    if (typeMatch) {
+      displayName = typeMatch[1];
+    }
+    
+    // Convert camelCase/PascalCase to readable
+    displayName = displayName
+      .replace(/([A-Z])/g, ' $1') // Add space before capitals
+      .replace(/^./, str => str.toUpperCase()) // Capitalize first letter
+      .trim();
+    
+
+    return `${displayName} (${fieldName})`;
+  };
+
+  // Function extract label từ Word content
+  const extractLabelFromWordContent = (fieldName) => {
+    if (!wordContent || !fieldName) return null;
+    
+    // Map fieldName với field pattern trong Word
+    const fieldInfo = formFields.find(f => f.fieldName === fieldName);
+    if (!fieldInfo || !fieldInfo.formula) return null;
+    
+    // Extract pattern từ formula 
+    const patternMatch = fieldInfo.formula.match(/^\{([a-z]_.*)\}$/);
+    if (!patternMatch) return null;
+    
+    const fullPattern = patternMatch[1]; // "t_TraineeName"
+    
+    // Escape pattern cho regex
+    const escapedPattern = fullPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
+         // Tìm pattern trong wordContent và extract text xung quanh
+     const regex = new RegExp(`([^{]*?)\\{${escapedPattern}\\}`, 'i');
+     const match = wordContent.match(regex);
+     
+     if (match && match[1]) {
+       let rawText = match[1];
+       
+       // Extract text từ HTML, ưu tiên text trong <strong> tags
+       let label = '';
+       
+       // Đặc biệt xử lý cho các field trong table (1S, 1W, 2A, etc.)
+       if (/^[0-9][A-Z]+$/.test(fieldName)) {
+         // Tìm table header hoặc column title cho field này
+         label = extractTableColumnLabel(fieldName, wordContent);
+         if (label) {
+           return label;
+         }
+       }
+       
+        // Tìm tất cả text trong <strong> tags
+        const strongMatches = rawText.match(/<strong[^>]*>([^<]+)<\/strong>/gi);
+        if (strongMatches && strongMatches.length > 0) {
+          // Lấy <strong> tag cuối cùng (gần với pattern nhất)
+          const lastStrong = strongMatches[strongMatches.length - 1];
+          const match = lastStrong.match(/<strong[^>]*>([^<]+)<\/strong>/i);
+          if (match && match[1]) {
+            label = match[1].trim();
+            
+            // Xử lý trường hợp có nhiều từ trong <strong>, chỉ lấy từ chính
+            if (label.includes(' ')) {
+              // Nếu có "Name BLOCK LETTER" → lấy "Name"
+              // Nếu có "Duration hrs" → lấy "Duration"
+              const words = label.split(' ');
+              label = words[0]; // Lấy từ đầu tiên
+            }
+          }
+        } else {
+          // Fallback: lấy text cuối cùng, bỏ HTML tags
+          const plainText = rawText.replace(/<[^>]*>/g, ' ')
+                                  .replace(/\s+/g, ' ')
+                                  .trim();
+          const words = plainText.split(' ').filter(w => w.length > 0);
+          
+          // Tìm từ có nghĩa cuối cùng (bỏ qua các từ ngắn như "You", "of", etc.)
+          for (let i = words.length - 1; i >= 0; i--) {
+            const word = words[i];
+            if (word.length >= 3 && 
+                !/^(You|The|And|Of|In|On|At|To|For|With|By)$/i.test(word)) {
+              label = word;
+              break;
+            }
+          }
+          
+          // Nếu không tìm thấy, lấy từ cuối cùng
+          if (!label && words.length > 0) {
+            label = words[words.length - 1];
+          }
+        }
+      
+      // Clean up label
+      if (label.endsWith(':')) {
+        label = label.slice(0, -1).trim();
+      }
+      
+      // Validate label
+      if (label && 
+          label.length > 0 && 
+          label.length < 30 && 
+          !label.includes('{') && 
+          !label.includes('}') &&
+          !label.includes('<') &&
+          !label.includes('>') &&
+          !/^\d+$/.test(label) &&
+          !/^[^\w\s]*$/.test(label)) {
+        
+        return label;
+      }
+    }
+    
+    return null;
+  };
+
+  // Function extract table column label cho các field trong table
+  const extractTableColumnLabel = (fieldName, content) => {
+    if (!content || !fieldName) return null;
+    
+    console.log('Extracting table column for:', fieldName);
+    
+    // Tìm field pattern trong content
+    const fieldInfo = formFields.find(f => f.fieldName === fieldName);
+    if (!fieldInfo || !fieldInfo.formula) {
+      console.log('No field info found for:', fieldName);
+      return null;
+    }
+    
+    const patternMatch = fieldInfo.formula.match(/^\{([a-z]_.*)\}$/);
+    if (!patternMatch) {
+      console.log('No pattern match for formula:', fieldInfo.formula);
+      return null;
+    }
+    
+    const fullPattern = patternMatch[1]; // "s_1A", "s_2C", etc.
+    console.log('Looking for pattern:', fullPattern);
+    
+    const escapedPattern = fullPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
+    // Tìm vị trí của field trong content
+    const fieldRegex = new RegExp(`\\{${escapedPattern}\\}`, 'i');
+    const fieldMatch = content.search(fieldRegex);
+    
+    if (fieldMatch === -1) {
+      console.log('Pattern not found in content');
+      return null;
+    }
+    
+    console.log('Found pattern at position:', fieldMatch);
+    
+    // Lấy phần content từ đầu đến field
+    const beforeField = content.substring(0, fieldMatch);
+    
+    // Tìm table gần nhất chứa field này
+    const tableStart = beforeField.lastIndexOf('<table');
+    if (tableStart === -1) {
+      console.log('No table found before field');
+      return null;
+    }
+    
+    console.log('Table starts at:', tableStart);
+    
+    // Lấy table content rộng hơn để có đủ headers
+    const tableEnd = content.indexOf('</table>', tableStart);
+    const tableContent = tableEnd !== -1 ? 
+      content.substring(tableStart, tableEnd + 8) : 
+      content.substring(tableStart, fieldMatch + 500);
+    
+    console.log('Table content length:', tableContent.length);
+    
+         // Đếm số <td> tags trước field để xác định column index
+     const beforeFieldInTable = beforeField.substring(tableStart);
+     const tdMatches = beforeFieldInTable.match(/<td[^>]*>/gi) || [];
+     
+     // Tìm row hiện tại chứa field
+     const fieldContext = content.substring(fieldMatch - 200, fieldMatch + 50);
+     const currentRowStart = fieldContext.lastIndexOf('<tr');
+     let columnIndexInRow = 0;
+     
+     if (currentRowStart !== -1) {
+       // Đếm <td> trong row hiện tại
+       const currentRowContent = fieldContext.substring(currentRowStart, fieldContext.length);
+       const tdInCurrentRow = currentRowContent.substring(0, currentRowContent.indexOf(fullPattern)).match(/<td[^>]*>/gi) || [];
+       columnIndexInRow = tdInCurrentRow.length;
+       console.log('Column index in current row:', columnIndexInRow);
+     }
+     
+     const columnIndex = columnIndexInRow > 0 ? columnIndexInRow : tdMatches.length;
+     
+     console.log('Total TD count:', tdMatches.length, 'Column index used:', columnIndex);
+    
+         // Tìm tất cả table headers - thử nhiều cách khác nhau
+     let headerMatches = tableContent.match(/<th[^>]*>.*?<\/th>/gi);
+     
+     // Nếu không có <th>, thử tìm <td> trong row đầu tiên (có thể là header row)
+     if (!headerMatches) {
+       console.log('No <th> tags found, trying first row <td> tags');
+       
+       // Tìm row đầu tiên trong table
+       const firstRowMatch = tableContent.match(/<tr[^>]*>(.*?)<\/tr>/i);
+       if (firstRowMatch && firstRowMatch[1]) {
+         headerMatches = firstRowMatch[1].match(/<td[^>]*>.*?<\/td>/gi);
+         console.log('Found first row cells:', headerMatches ? headerMatches.length : 0);
+       }
+     }
+     
+     // Nếu vẫn không có, thử tìm tất cả <td> có text trong table
+     if (!headerMatches) {
+       console.log('Trying all <td> tags with meaningful text');
+       const allCells = tableContent.match(/<td[^>]*>.*?<\/td>/gi) || [];
+       
+       // Lọc những cell có text có nghĩa (không chỉ là pattern hoặc rỗng)
+       headerMatches = allCells.filter(cell => {
+         const text = cell.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+         return text && 
+                text.length > 3 && 
+                text.length < 100 &&
+                !text.includes('{') && 
+                !text.includes('}') &&
+                !/^[A-Z]\}$/.test(text); // Không phải pattern như "A}", "C}"
+       }).slice(0, 15); // Lấy tối đa 15 cells đầu làm headers
+       
+       console.log('Found meaningful cells:', headerMatches ? headerMatches.length : 0);
+     }
+     
+     if (!headerMatches || headerMatches.length === 0) {
+       console.log('No headers found in table at all');
+       return null;
+     }
+     
+     console.log('Found headers:', headerMatches.length);
+     
+     // Extract text từ headers
+     const headers = headerMatches.map((header, index) => {
+       // Bỏ HTML tags và lấy text
+       const text = header.replace(/<[^>]*>/g, ' ')
+                         .replace(/\s+/g, ' ')
+                         .trim();
+       console.log(`Header ${index}:`, text);
+       return text;
+     });
+    
+    console.log('All headers:', headers);
+    console.log('Target header at index', columnIndex, ':', headers[columnIndex]);
+    
+    // Lấy header tương ứng với column index
+    if (headers[columnIndex]) {
+      let columnTitle = headers[columnIndex];
+      
+      // Clean up column title
+      columnTitle = columnTitle
+        .replace(/^\W+|\W+$/g, '') // Remove leading/trailing punctuation
+        .trim();
+      
+      console.log('Cleaned column title:', columnTitle);
+      
+      // Validate và return
+      if (columnTitle && 
+          columnTitle.length > 2 && 
+          columnTitle.length < 100 &&
+          !columnTitle.includes('{') &&
+          !columnTitle.includes('}')) {
+        console.log('Returning column title:', columnTitle);
+        return columnTitle;
+      }
+    }
+    
+    console.log('No valid column title found');
+    return null;
+  };
+
+  // Function hiển thị lỗi validation 
+  const showValidationErrors = (errors) => {
+    modal.error({
+      title: '⚠️ Vui lòng kiểm tra lại thông tin',
+      width: 600,
+      content: (
+        <div style={{ marginTop: '16px' }}>
+          <p style={{ marginBottom: '12px', color: '#666' }}>
+            Có <strong>{errors.length}</strong> lỗi cần được sửa:
+          </p>
+          <ul style={{ 
+            listStyle: 'none', 
+            padding: 0, 
+            margin: 0,
+            maxHeight: '300px',
+            overflowY: 'auto'
+          }}>
+            {errors.map((error, index) => (
+              <li key={index} style={{
+                padding: '8px 12px',
+                margin: '4px 0',
+                backgroundColor: '#fff2f0',
+                border: '1px solid #ffccc7',
+                borderRadius: '4px',
+                color: '#a8071a',
+                fontSize: '14px',
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                <span style={{ 
+                  marginRight: '8px', 
+                  fontSize: '16px',
+                  color: '#ff4d4f'
+                }}>
+                  ❌
+                </span>
+                {error}
+              </li>
+            ))}
+          </ul>
+          <div style={{ 
+            marginTop: '16px', 
+            padding: '12px', 
+            backgroundColor: '#f6ffed', 
+            border: '1px solid #b7eb8f', 
+            borderRadius: '4px' 
+          }}>
+            <p style={{ margin: 0, color: '#389e0d', fontSize: '13px' }}>
+              💡 <strong>Gợi ý:</strong> Hãy điền đầy đủ thông tin bắt buộc và kiểm tra định dạng trước khi lưu.
+            </p>
+          </div>
+        </div>
+      ),
+      okText: 'Đã hiểu',
+      okButtonProps: {
+        size: 'large',
+        style: {
+          backgroundColor: '#1890ff',
+          borderColor: '#1890ff'
+        }
+      }
+          });
+  };
+
+  // Function validate form trước khi lưu
+  const validateForm = () => {
+    const errors = [];
+    const inputs = containerRef.current.querySelectorAll('.form-input');
+    
+    console.log('=== VALIDATION START ===');
+    console.log('Total inputs found:', inputs.length);
+    
+    // Tạo map để dễ tra cứu giá trị
+    const fieldValueMap = new Map();
+    inputs.forEach(input => {
+      const fieldName = input.dataset.fieldName;
+      let value = '';
+      
+      switch (input.dataset.fieldType?.toLowerCase()) {
+        case 'c': // checkbox
+          value = input.checked;
+          break;
+        case 's': // select
+          value = input.value;
+          break;
+        case 'dt': // date
+        case 'd': // number
+        case 't': // text
+        case 'f': // formula
+        default:
+          value = input.value?.trim() || '';
+          break;
+      }
+      
+      fieldValueMap.set(fieldName, value);
+      console.log(`Field ${fieldName} (${input.dataset.fieldType}): "${value}"`);
+    });
+
+    console.log('fieldValueMap:', fieldValueMap);
+
+    // Validate từng field
+    formFields.forEach(fieldInfo => {
+      const fieldName = fieldInfo.fieldName;
+      const fieldValue = fieldValueMap.get(fieldName);
+
+      console.log(`Validating field ${fieldName}:`, {
+        fieldType: fieldInfo.fieldType,
+        isRequired: fieldInfo.isRequired,
+        fieldValue: fieldValue,
+        formula: fieldInfo.formula
+      });
+
+      // 1. Validate isRequired
+      if (fieldInfo.isRequired) {
+        let isEmpty = false;
+        
+        if (fieldInfo.fieldType?.toLowerCase() === 'boolean') {
+          // Boolean field required nghĩa là phải được check (true)
+          isEmpty = !fieldValue; // false = empty, true = not empty
+          console.log(`Boolean field ${fieldName} required check - checked: ${fieldValue}, isEmpty: ${isEmpty}`);
+        } else {
+          isEmpty = !fieldValue || fieldValue === '';
+          console.log(`Non-boolean field ${fieldName} required check - value: "${fieldValue}", isEmpty: ${isEmpty}`);
+        }
+        
+        if (isEmpty) {
+          const errorMsg = `${getDisplayFieldName(fieldName)} là bắt buộc`;
+          console.log(`Adding required error: ${errorMsg}`);
+          errors.push(errorMsg);
+        }
+      }
+
+      // 2. Validate isUpperCase cho Text fields
+      if (fieldInfo.isUpperCase && 
+          (fieldInfo.fieldType?.toLowerCase() === 'text') && 
+          fieldValue && fieldValue !== '') {
+        if (fieldValue !== fieldValue.toUpperCase()) {
+          errors.push(`${getDisplayFieldName(fieldName)} phải viết HOA`);
+        }
+      }
+
+      // 3. Validate dependencies cho Boolean fields có formula phụ thuộc
+      if (fieldInfo.fieldType?.toLowerCase() === 'boolean' && 
+          fieldInfo.formula && 
+          !fieldInfo.formula.match(/^\{c_.*\}$/)) {
+        
+        console.log(`Processing Boolean dependency for ${fieldName}:`, {
+          formula: fieldInfo.formula,
+          fieldValue: fieldValue,
+          isChecked: !!fieldValue
+        });
+        
+        // CHỈ kiểm tra dependencies khi Boolean field được check (true)
+        if (fieldValue) {
+          console.log(`${fieldName} is checked, validating dependencies...`);
+          
+          // Parse dependencies từ formula đơn giản: "TraineeName, TraineeID"
+          const dependencies = fieldInfo.formula.split(',').map(f => f.trim()).filter(f => f.length > 0);
+          console.log(`Dependencies for ${fieldName}:`, dependencies);
+          
+          // Kiểm tra từng dependency
+          dependencies.forEach(depFieldName => {
+            const depValue = fieldValueMap.get(depFieldName);
+            console.log(`Checking dependency ${depFieldName}: value = "${depValue}"`);
+            
+            if (!depValue || depValue === '') {
+              const errorMsg = `${getDisplayFieldName(depFieldName)} phải có giá trị vì liên quan đến ${getDisplayFieldName(fieldName)}`;
+              console.log(`Adding dependency error: ${errorMsg}`);
+              errors.push(errorMsg);
+            }
+          });
+        } else {
+          console.log(`${fieldName} is not checked, skipping dependency validation`);
+        }
+      }
+    });
+    
+    console.log('=== VALIDATION END ===');
+    console.log('Total errors:', errors.length);
+    console.log('Errors:', errors);
+    
+    return {
+      isValid: errors.length === 0,
+      errors: errors
+    };
+  };
+
   const handleSave = async () => {
     try {
+      // Validate form trước khi lưu
+      const validationResult = validateForm();
+      
+      if (!validationResult.isValid) {
+        showValidationErrors(validationResult.errors);
+        return;
+      }
+
       const fieldValues = [];
       const inputs = containerRef.current.querySelectorAll('.form-input');
 
@@ -1220,106 +1707,153 @@ const PreviewFormPage = () => {
 
   const handleExportPDF = async () => {
     try {
-      // Lấy tất cả dữ liệu từ form
-      const formData = [];
-      const inputs = containerRef.current.querySelectorAll('.form-input');
+      console.log('Creating PDF from current DOM state...');
 
-      inputs.forEach((input) => {
+      // Lấy tất cả giá trị hiện tại từ DOM gốc trước
+      const originalInputs = containerRef.current.querySelectorAll('.form-input');
+      const inputValues = new Map();
+      
+      originalInputs.forEach((input, index) => {
         const fieldName = input.dataset.fieldName;
-        const label = input.dataset.label || fieldName;
         const fieldType = input.dataset.fieldType;
+        
         let value = '';
-
-        // Xử lý giá trị dựa trên loại field
-        const isDateField = input.type === 'date' ||
-          fieldName?.toLowerCase().includes('date') ||
-          fieldName?.toLowerCase().includes('ngay');
-
+        let isChecked = false;
+        let selectedText = '';
+        
         switch (fieldType?.toLowerCase()) {
           case 'c': // checkbox
-            value = input.checked ? 'true' : 'false';
+            isChecked = input.checked;
+            value = isChecked ? 'checked' : 'unchecked';
             break;
           case 's': // select
+            value = input.value;
+            selectedText = input.options[input.selectedIndex]?.text || '';
+            break;
+          case 'dt': // date
             value = input.value || '';
             break;
           case 'd': // number hoặc date
-            if (isDateField) {
-              value = input.value || '';
-            } else {
-              value = input.value || '0';
+            value = input.value || '';
+            // Kiểm tra nếu là date field
+            if (input.type === 'date' || fieldName?.toLowerCase().includes('date')) {
+              // Đánh dấu là date field
+              inputValues.set(index, { 
+                fieldName, 
+                fieldType: 'dt', // Override thành dt để xử lý như date
+                value, 
+                isChecked, 
+                selectedText 
+              });
+              return; // Skip phần set bên dưới
             }
             break;
-          case 'dt': // date
+          case 't': // text
+          case 'f': // formula
+          default:
             value = input.value || '';
             break;
+        }
+        
+        inputValues.set(index, {
+          fieldName,
+          fieldType,
+          value,
+          isChecked,
+          selectedText
+        });
+        
+        console.log(`Stored input ${index}: ${fieldName} (${fieldType}) = ${value}`, { isChecked, selectedText });
+      });
+
+      // Tạo HTML content từ DOM hiện tại
+      let printContentHTML = containerRef.current.innerHTML;
+      
+      // Xử lý để làm sạch content cho PDF
+      printContentHTML = printContentHTML.replace(/style="[^"]*"/g, '');
+      
+      // Thay thế input elements bằng giá trị đã lưu
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = printContentHTML;
+      
+      const tempInputs = tempDiv.querySelectorAll('.form-input');
+      tempInputs.forEach((input, index) => {
+        const inputData = inputValues.get(index);
+        if (!inputData) return;
+        
+        const { fieldType, value, isChecked, selectedText } = inputData;
+        let replacement = '';
+        
+        console.log(`Processing input ${index}: ${inputData.fieldName} (${fieldType})`, { value, isChecked, selectedText });
+        
+        switch (fieldType?.toLowerCase()) {
+          case 'c': // checkbox
+            if (isChecked) {
+              replacement = '<span style="font-size: 16px; color: #000; font-weight: bold;">☑</span>';
+            } else {
+              replacement = '<span style="font-size: 16px; color: #000;">☐</span>';
+            }
+            console.log(`Checkbox replacement: ${replacement}`);
+            break;
+          case 's': // select
+            replacement = `<span style="border-bottom: 1px solid #000; min-width: 100px; display: inline-block; padding: 2px 4px; font-weight: bold;">${selectedText || value || '_____________'}</span>`;
+            break;
+          case 'dt': // date
+            let dateValue = value;
+            if (dateValue) {
+              try {
+                // Parse date và format thành dd/mm/yyyy
+                const date = new Date(dateValue + 'T00:00:00'); // Thêm time để tránh timezone issues
+                const day = date.getDate().toString().padStart(2, '0');
+                const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                const year = date.getFullYear();
+                dateValue = `${day}/${month}/${year}`;
+                console.log(`Date conversion: ${value} -> ${dateValue}`);
+              } catch (e) {
+                console.log('Date parse error:', e);
+                // Keep original value if parse fails
+              }
+            }
+            replacement = `<span style="border-bottom: 1px solid #000; min-width: 120px; display: inline-block; padding: 2px 4px; font-weight: bold;">${dateValue || '_____________'}</span>`;
+            break;
           case 'f': // formula
-            value = input.value || input.placeholder || '';
+            replacement = `<span style="color: #1890ff; font-weight: bold; background-color: #f0f9ff; padding: 2px 6px; border-radius: 3px; border-bottom: 1px solid #000; min-width: 80px; display: inline-block; text-align: center;">${value || '0'}</span>`;
+            break;
+          case 'd': // number
+            // Kiểm tra nếu fieldName chứa "date" thì xử lý như date
+            if (inputData.fieldName?.toLowerCase().includes('date')) {
+              let dateValue = value;
+              if (dateValue) {
+                try {
+                  const date = new Date(dateValue + 'T00:00:00');
+                  const day = date.getDate().toString().padStart(2, '0');
+                  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                  const year = date.getFullYear();
+                  dateValue = `${day}/${month}/${year}`;
+                  console.log(`Date field (type d) conversion: ${value} -> ${dateValue}`);
+                } catch (e) {
+                  console.log('Date parse error for field type d:', e);
+                }
+              }
+              replacement = `<span style="border-bottom: 1px solid #000; min-width: 120px; display: inline-block; padding: 2px 4px; font-weight: bold;">${dateValue || '_____________'}</span>`;
+            } else {
+              replacement = `<span style="border-bottom: 1px solid #000; min-width: 100px; display: inline-block; padding: 2px 4px; font-weight: bold;">${value || '_____________'}</span>`;
+            }
             break;
           case 't': // text
           default:
-            value = input.value || '';
+            replacement = `<span style="border-bottom: 1px solid #000; min-width: 100px; display: inline-block; padding: 2px 4px; font-weight: bold;">${value || '_____________'}</span>`;
             break;
         }
-
-        formData.push({
-          fieldName: fieldName,
-          fieldType: fieldType,
-          label: label,
-          value: value
-        });
+        
+        // Thay thế input bằng span
+        const span = document.createElement('span');
+        span.innerHTML = replacement;
+        input.parentNode.replaceChild(span, input);
       });
-
-      // Tạo HTML content với dữ liệu đã điền - đảm bảo có header VietJet
-      let printContentHTML = wordContent; // Bắt đầu với Word content gốc
-
-      // Thay thế patterns với giá trị đã điền
-      formData.forEach(field => {
-        const { fieldName, fieldType, value } = field;
-
-        // Tạo display value
-        let displayValue = '';
-        switch (fieldType?.toLowerCase()) {
-          case 'c': // checkbox
-            displayValue = value === 'true' ? '☑ Có' : '☐ Không';
-            break;
-          case 'dt': // date
-            if (value) {
-              try {
-                const date = new Date(value);
-                displayValue = date.toLocaleDateString('vi-VN');
-              } catch {
-                displayValue = value;
-              }
-            }
-            break;
-          case 'f': // formula
-            displayValue = `<span style="color: #1890ff; font-weight: bold; background-color: #f0f9ff; padding: 2px 6px; border-radius: 3px;">${value || '0'}</span>`;
-            break;
-          default:
-            displayValue = value || '';
-            break;
-        }
-
-        // Thay thế patterns
-        const patterns = [
-          `{${fieldType?.toLowerCase()}_${fieldName}}`,
-          `{${fieldType?.toUpperCase()}_${fieldName}}`,
-          `{${fieldName}}`,
-          `{${fieldName.toUpperCase()}}`,
-          `[${fieldType?.toLowerCase()}_${fieldName}]`,
-          `[${fieldType?.toUpperCase()}_${fieldName}]`,
-          `[${fieldName}]`,
-          `[${fieldName.toUpperCase()}]`
-        ];
-
-        patterns.forEach(pattern => {
-          if (printContentHTML.includes(pattern)) {
-            const escapedPattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const regex = new RegExp(escapedPattern, 'g');
-            printContentHTML = printContentHTML.replace(regex, displayValue);
-          }
-        });
-      });
+      
+      // Lấy HTML đã xử lý
+      printContentHTML = tempDiv.innerHTML;
 
       // Kiểm tra xem có header không và thêm nếu cần
       const hasVietJetContent = printContentHTML.toLowerCase().includes('vietjet') ||
