@@ -772,15 +772,42 @@
 .date-input {
   min-width: 140px;
   cursor: pointer;
+  display: inline-block !important;
+  vertical-align: middle !important;
 }
 
 .date-input::-webkit-calendar-picker-indicator {
   cursor: pointer;
   opacity: 0.7;
+  display: block !important;
+  visibility: visible !important;
 }
 
 .date-input::-webkit-calendar-picker-indicator:hover {
   opacity: 1;
+}
+
+/* Force date inputs to show properly */
+input[type="date"].form-input,
+input[type="date"].date-input {
+  -webkit-appearance: textfield !important;
+  appearance: textfield !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  min-width: 120px !important;
+  padding: 4px 8px !important;
+  border: 1px solid #d9d9d9 !important;
+  border-radius: 4px !important;
+}
+
+input[type="date"].form-input::-webkit-calendar-picker-indicator,
+input[type="date"].date-input::-webkit-calendar-picker-indicator {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 16px !important;
+  height: 16px !important;
+  cursor: pointer !important;
 }
 
 .formula-input {

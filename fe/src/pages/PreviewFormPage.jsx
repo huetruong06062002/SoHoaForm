@@ -119,13 +119,9 @@ const PreviewFormPage = () => {
             value = input.checked ? 1 : 0;
             console.log(`Checkbox ${fieldName} value: ${input.checked} -> ${value}`);
             break;
-          case 'd': // number hoặc date
-            if (input.type === 'date') {
-              value = input.value || '';
-            } else {
-              const numValue = parseFloat(input.value);
-              value = isNaN(numValue) ? 0 : numValue;
-            }
+          case 'n': // number
+            const numberValue = parseFloat(input.value);
+            value = isNaN(numberValue) ? 0 : numberValue;
             break;
           case 'dt': // date
             value = input.value || '';
@@ -137,9 +133,9 @@ const PreviewFormPage = () => {
           default:
             value = input.value || '';
             // Thử parse thành số nếu có thể
-            const numValue = parseFloat(value);
-            if (!isNaN(numValue) && value.trim() !== '') {
-              value = numValue;
+            const textNumValue = parseFloat(value);
+            if (!isNaN(textNumValue) && value.trim() !== '') {
+              value = textNumValue;
             }
             break;
         }
@@ -212,7 +208,7 @@ const PreviewFormPage = () => {
           case 's': // select
             input.value = savedField.value;
             break;
-          case 'd': // number
+          case 'n': // number
           case 'dt': // date
           case 't': // text
           case 'f': // formula
@@ -237,12 +233,43 @@ const PreviewFormPage = () => {
 
     // Map field type từ API sang internal field type
     let internalFieldType = fieldType.toLowerCase();
-    if (fieldType === 'Number' || fieldType === 'number') internalFieldType = 'd';
+    if (fieldType === 'Number' || fieldType === 'number') internalFieldType = 'n';
     if (fieldType === 'Formula' || fieldType === 'formula') internalFieldType = 'f';
     if (fieldType === 'Text' || fieldType === 'text') internalFieldType = 't';
     if (fieldType === 'Boolean' || fieldType === 'boolean') internalFieldType = 'c';
     if (fieldType === 'Date' || fieldType === 'date') internalFieldType = 'dt';
     if (fieldType === 'Select' || fieldType === 'select') internalFieldType = 's';
+
+    // Xử lý pattern từ placeholder {type_field}
+    if (typeof fieldType === 'string' && fieldType.length === 1) {
+      // Đây là pattern từ placeholder như d_, t_, c_, etc.
+      if (fieldType === 'd') {
+        // Kiểm tra xem có phải Date field không dựa trên fieldInfo từ API
+        const apiFieldInfo = fieldInfo || formFieldsData.find(f => f.fieldName === fieldName);
+        console.log(`DEBUG d_ field processing - fieldName: ${fieldName}`, {
+          apiFieldInfo: apiFieldInfo,
+          apiFieldType: apiFieldInfo?.fieldType,
+          formFieldsDataLength: formFieldsData.length
+        });
+        
+        if (apiFieldInfo && apiFieldInfo.fieldType === 'Date') {
+          internalFieldType = 'dt'; // Date
+          console.log(`Setting ${fieldName} as date field (dt)`);
+        } else {
+          // Fallback: check nếu fieldName chứa "date"
+          if (fieldName.toLowerCase().includes('date') || 
+              fieldName.toLowerCase().includes('ngay')) {
+            internalFieldType = 'dt'; // Date
+            console.log(`Setting ${fieldName} as date field (dt) based on name`);
+          } else {
+            internalFieldType = 'n'; // Number
+            console.log(`Setting ${fieldName} as number field (n)`);
+          }
+        }
+      } else {
+        internalFieldType = fieldType;
+      }
+    }
 
     console.log(`Mapping fieldType ${fieldType} to internalFieldType ${internalFieldType} for field ${fieldName}`);
 
@@ -358,16 +385,10 @@ const PreviewFormPage = () => {
         element.style.height = '16px';
         break;
 
-      case 'd': // number hoặc date
+      case 'n': // number
         element = document.createElement('input');
-        if (isDateField) {
-          element.type = 'date';
-          element.className = 'form-input date-input';
-          console.log('Creating date input for field:', fieldName);
-        } else {
-          element.type = 'number';
-          element.className = 'form-input number-input';
-        }
+        element.type = 'number';
+        element.className = 'form-input number-input';
         break;
 
       case 'dt': // date
@@ -400,7 +421,12 @@ const PreviewFormPage = () => {
 
     element.dataset.fieldType = internalFieldType;
     element.dataset.fieldName = fieldName;
-    element.dataset.originalFieldType = fieldType; // Lưu field type gốc từ API
+    element.dataset.originalFieldType = fieldType; // Lưu field type gốc từ placeholder pattern
+    
+    // Nếu có fieldInfo từ API, lưu luôn API field type
+    if (fieldInfo && fieldInfo.fieldType) {
+      element.dataset.apiFieldType = fieldInfo.fieldType;
+    }
 
     // Thêm event listener để tự động tính toán formula khi có thay đổi
     if (internalFieldType !== 'f') {
@@ -592,10 +618,23 @@ const PreviewFormPage = () => {
 
       // Tìm field info từ API để lấy field type chính xác
       const fieldInfo = formFields.find(f => f.fieldName === fieldName);
-      const actualFieldType = fieldInfo ? fieldInfo.fieldType : fieldType;
       console.log('Field info from API:', fieldInfo);
+      console.log('DEBUG - About to create input:', {
+        placeholderFieldType: fieldType,
+        apiFieldType: fieldInfo?.fieldType,
+        fieldName: fieldName,
+        shouldBeDate: fieldInfo?.fieldType === 'Date'
+      });
 
-      const inputElement = createInputElement(actualFieldType, fieldName, fieldInfo, formFields);
+      // Pass fieldType từ placeholder (d, t, c, etc.) để logic trong createInputElement xử lý đúng
+      const inputElement = createInputElement(fieldType, fieldName, fieldInfo, formFields);
+      
+      console.log('DEBUG - Created input element:', {
+        tagName: inputElement.tagName,
+        type: inputElement.type,
+        className: inputElement.className,
+        fieldType: inputElement.dataset.fieldType
+      });
 
       replacements.push({
         placeholder: fullMatch,
@@ -618,8 +657,165 @@ const PreviewFormPage = () => {
     containerRef.current.innerHTML = htmlContent;
     console.log('Updated HTML content');
 
+    // Post-process: Force convert Date fields to date inputs
+    setTimeout(() => {
+      if (containerRef.current && formFields.length > 0) {
+        console.log('POST-PROCESS: Converting Date fields to date inputs...');
+        console.log('POST-PROCESS: Available formFields:', formFields.map(f => ({name: f.fieldName, type: f.fieldType})));
+        
+        // Tìm tất cả input elements hiện có
+        const allInputs = containerRef.current.querySelectorAll('input[data-field-name]');
+        console.log('POST-PROCESS: Found inputs:', Array.from(allInputs).map(input => ({
+          name: input.dataset.fieldName,
+          type: input.type,
+          currentClass: input.className
+        })));
+        
+        formFields.forEach(field => {
+          if (field.fieldType === 'Date') {
+            console.log(`POST-PROCESS: Processing Date field: ${field.fieldName}`);
+            
+            // Tìm input element cho field này - thử nhiều cách
+            let inputs = containerRef.current.querySelectorAll(`input[data-field-name="${field.fieldName}"]`);
+            
+            // Nếu không tìm thấy chính xác, thử tìm bằng partial match
+            if (inputs.length === 0) {
+              inputs = containerRef.current.querySelectorAll(`input[data-field-name*="${field.fieldName}"]`);
+              console.log(`POST-PROCESS: Used partial match for ${field.fieldName}, found ${inputs.length} inputs`);
+            }
+            
+            // Nếu vẫn không có, thử tìm bằng field name variations
+            if (inputs.length === 0) {
+              const variations = [
+                field.fieldName.toLowerCase(),
+                field.fieldName.replace(/\s+/g, ''),
+                field.fieldName.replace(/\s+/g, '').toLowerCase(),
+              ];
+              
+              for (const variation of variations) {
+                inputs = containerRef.current.querySelectorAll(`input[data-field-name="${variation}"]`);
+                if (inputs.length > 0) {
+                  console.log(`POST-PROCESS: Found ${field.fieldName} using variation: ${variation}`);
+                  break;
+                }
+              }
+            }
+            
+            console.log(`POST-PROCESS: Found ${inputs.length} inputs for ${field.fieldName}`);
+            
+            inputs.forEach((input, index) => {
+              console.log(`POST-PROCESS: Processing input ${index} for ${field.fieldName}:`, {
+                currentType: input.type,
+                currentValue: input.value,
+                currentClass: input.className
+              });
+              
+              if (input.type !== 'date') {
+                console.log(`POST-PROCESS: Converting ${field.fieldName} from ${input.type} to date`);
+                const currentValue = input.value;
+                input.type = 'date';
+                input.className = 'form-input date-input';
+                input.dataset.fieldType = 'dt';
+                
+                // Clear invalid values (như chữ "d")
+                if (currentValue === 'd' || currentValue === '0' || !currentValue || currentValue.length < 3) {
+                  input.value = '';
+                  console.log(`POST-PROCESS: Cleared invalid value "${currentValue}" for ${field.fieldName}`);
+                } else {
+                  // Nếu có giá trị và là định dạng ngày, convert sang YYYY-MM-DD
+                  try {
+                    const date = new Date(currentValue);
+                    if (!isNaN(date.getTime())) {
+                      input.value = date.toISOString().split('T')[0];
+                      console.log(`POST-PROCESS: Converted date value for ${field.fieldName}: ${currentValue} -> ${input.value}`);
+                    }
+                  } catch (e) {
+                    console.log('Could not convert date value:', currentValue);
+                    input.value = ''; // Clear invalid date
+                  }
+                }
+                
+                console.log(`POST-PROCESS: Successfully converted ${field.fieldName} to date input`);
+              } else {
+                console.log(`POST-PROCESS: ${field.fieldName} already is date input`);
+              }
+            });
+          }
+        });
+        
+        // Thêm fallback: tìm tất cả inputs có value="d" hoặc "0" và convert thành date nếu tên field chứa "date"
+        const suspiciousInputs = containerRef.current.querySelectorAll('input[type="text"], input[type="number"]');
+        suspiciousInputs.forEach(input => {
+          const fieldName = input.dataset.fieldName || '';
+          const value = input.value || '';
+          
+          if ((fieldName.toLowerCase().includes('date') || fieldName.toLowerCase().includes('ngay')) && 
+              (value === 'd' || value === '0' || value === '' || input.type === 'number')) {
+            console.log(`POST-PROCESS: FALLBACK - Converting suspicious input to date:`, {
+              fieldName: fieldName,
+              currentType: input.type,
+              currentValue: value
+            });
+            
+            input.type = 'date';
+            input.className = 'form-input date-input';
+            input.dataset.fieldType = 'dt';
+            input.value = '';
+          }
+        });
+      }
+    }, 200); // Tăng timeout để chắc chắn form đã render xong
+
     // Post-process để fix layout cho các fields cùng dòng
     fixInlineLayout();
+
+    // Thêm một cơ chế fallback mạnh mẽ hơn
+    setTimeout(() => {
+      console.log('FINAL FALLBACK: Checking for date fields...');
+      
+      // Tìm tất cả inputs hiện tại
+      const allInputs = containerRef.current?.querySelectorAll('input') || [];
+      console.log('FINAL FALLBACK: Total inputs found:', allInputs.length);
+      
+      allInputs.forEach((input, index) => {
+        const fieldName = input.dataset.fieldName || input.name || `input-${index}`;
+        const currentType = input.type;
+        const currentValue = input.value;
+        
+        console.log(`FINAL FALLBACK: Input ${index}:`, {
+          fieldName,
+          type: currentType,
+          value: currentValue,
+          hasDateInName: fieldName.toLowerCase().includes('date'),
+          isFromDPattern: input.dataset.originalFieldType === 'd'
+        });
+        
+        // Conditions để convert thành date input:
+        // 1. Field name chứa "date" 
+        // 2. Hoặc data-field-type là từ 'd' pattern
+        // 3. Hoặc có API field type là "Date"
+        // 4. Hoặc có trong formFields với fieldType="Date"
+        const shouldBeDate = fieldName.toLowerCase().includes('date') || 
+                           fieldName.toLowerCase().includes('ngay') ||
+                           input.dataset.originalFieldType === 'd' ||
+                           input.dataset.apiFieldType === 'Date' ||
+                           formFields.some(f => f.fieldName === fieldName && f.fieldType === 'Date');
+        
+        if (shouldBeDate && currentType !== 'date') {
+          console.log(`FINAL FALLBACK: Converting ${fieldName} to date input`);
+          input.type = 'date';
+          input.className = 'form-input date-input';
+          input.dataset.fieldType = 'dt';
+          
+          // Clear invalid values
+          if (currentValue === 'd' || currentValue === '0' || currentValue === '1' || 
+              !currentValue || currentValue.length < 3) {
+            input.value = '';
+            console.log(`FINAL FALLBACK: Cleared invalid value "${currentValue}"`);
+          }
+        }
+      });
+    }, 500); // Chạy sau 500ms để chắc chắn
 
     // Lấy tất cả các cell có text cố định và thêm vào formFields
     const cells = containerRef.current.querySelectorAll('td');
@@ -2422,6 +2618,43 @@ const PreviewFormPage = () => {
             <div className="action-buttons">
               <Button type="primary" className="save-btn" onClick={handleSave}>Lưu dữ liệu</Button>
               <Button className="export-btn" onClick={handleExportPDF}>Xuất PDF</Button>
+              <Button 
+                onClick={() => {
+                  console.log('=== MANUAL DATE CONVERSION TRIGGERED ===');
+                  const allInputs = containerRef.current?.querySelectorAll('input') || [];
+                  console.log('Found inputs:', allInputs.length);
+                  
+                  allInputs.forEach((input, index) => {
+                    const fieldName = input.dataset.fieldName || '';
+                    const originalType = input.dataset.originalFieldType || '';
+                    const apiType = input.dataset.apiFieldType || '';
+                    
+                    console.log(`Input ${index}:`, {
+                      fieldName,
+                      currentType: input.type,
+                      currentValue: input.value,
+                      originalType,
+                      apiType,
+                      hasDateInName: fieldName.toLowerCase().includes('date')
+                    });
+                    
+                    const shouldBeDate = fieldName.toLowerCase().includes('date') || 
+                                       originalType === 'd' ||
+                                       apiType === 'Date' ||
+                                       formFields.some(f => f.fieldName === fieldName && f.fieldType === 'Date');
+                    
+                    if (shouldBeDate && input.type !== 'date') {
+                      console.log(`Converting ${fieldName} to date input`);
+                      input.type = 'date';
+                      input.className = 'form-input date-input';
+                      input.value = '';
+                    }
+                  });
+                }}
+                style={{ marginLeft: 8 }}
+              >
+                🗓️ Fix Dates
+              </Button>
               <div className="mode-switch">
                 <Switch
                   checked={isWordMode}
