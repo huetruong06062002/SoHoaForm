@@ -639,20 +639,36 @@ const PreviewFormPage = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch form information, form fields, Word file và saved data song song
-        const [formInfoResponse, formFieldsResponse, wordFile, savedDataResponse] = await Promise.all([
+        // Fetch form information và Word file trước (bắt buộc phải có)
+        const [formInfoResponse, wordFile] = await Promise.all([
           formService.getFormInfo(formId),
-          formService.getFormFields(formId),
-          formService.getWordFile(formId),
-          formService.getLatestFormData(formId).catch(err => {
-            // Nếu không có dữ liệu đã lưu (404), không báo lỗi
-            if (err.response?.status === 404) {
-              console.log('No saved data found for this form');
-              return null;
-            }
-            throw err;
-          })
+          formService.getWordFile(formId)
         ]);
+
+        // Fetch form fields và saved data (có thể fail)
+        let formFieldsResponse = null;
+        let savedDataResponse = null;
+
+        try {
+          formFieldsResponse = await formService.getFormFields(formId);
+          console.log('✅ Form fields loaded successfully');
+        } catch (fieldsError) {
+          console.log('⚠️ Form fields API failed (404), will use basic mode:', fieldsError.response?.status);
+          formFieldsResponse = { data: { fields: [] } };
+        }
+
+        try {
+          savedDataResponse = await formService.getLatestFormData(formId);
+          console.log('✅ Saved data loaded successfully');
+        } catch (savedError) {
+          if (savedError.response?.status === 404) {
+            console.log('No saved data found for this form');
+            savedDataResponse = null;
+          } else {
+            console.log('⚠️ Saved data API failed:', savedError.response?.status);
+            savedDataResponse = null;
+          }
+        }
 
         // Set form info và fields
         setFormInfo(formInfoResponse.data);
