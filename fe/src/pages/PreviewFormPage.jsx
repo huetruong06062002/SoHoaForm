@@ -891,65 +891,234 @@ const PreviewFormPage = () => {
 
             // Sử dụng array words để parse chính xác
 
-            // Pattern 1: Extract title (từ đầu đến trước VJC)
-            if (vjcIndex > 0) {
-              const titleWords = words.slice(0, vjcIndex);
-              title = titleWords.join(' ').replace(/&amp;/g, '&').trim();
-            } else {
-              // Fallback: lấy từ trước VJC trong text
-              const titleMatch = headerParts.match(/^(.*?)(?=VJC|$)/i);
-              if (titleMatch) {
-                title = titleMatch[1].replace(/&amp;/g, '&')
-                  .replace(/\s+/g, ' ')
-                  .replace(/^[\s\-\.]+|[\s\-\.]+$/g, '')
-                  .trim();
-              }
-            }
-
-            // Pattern 2: Extract VJC code từ words array
-            if (vjcIndex >= 0) {
-              // Lấy từ VJC đến trước Iss (hoặc đến cuối nếu không có Iss)
-              let codeEndIndex = words.length;
-              for (let i = vjcIndex + 1; i < words.length; i++) {
-                if (words[i].toLowerCase().includes('iss')) {
-                  codeEndIndex = i;
-                  break;
-                }
-              }
-
-              const codeWords = words.slice(vjcIndex, codeEndIndex);
-              code = codeWords.join(''); // Ghép tất cả words của code
-              console.log('HEADER DEBUG: Found code from words:', code);
-            }
-
-            // Pattern 3: Extract Issue/Rev từ words array
-            let issueStartIndex = -1;
+            // Pattern 1: Extract title - chỉ lấy "ANNOUNCEMENT ASSESSMENT FORM"
+            console.log('HEADER DEBUG: Extracting title from words...');
+            
+            // Approach 1: Tìm boundaries chính xác của title
+            let titleStartIndex = 0;
+            let titleEndIndex = words.length;
+            
+            // Tìm vị trí kết thúc title (trước VJC, VTC, hoặc các patterns khác)
             for (let i = 0; i < words.length; i++) {
-              if (words[i].toLowerCase().includes('iss')) {
-                issueStartIndex = i;
+              const word = words[i].toUpperCase();
+              // Stop khi gặp code patterns
+              if (word.includes('VJC') || word.includes('VTC') || 
+                  word.match(/^V[JT]C/) || 
+                  word.includes('-') && (word.includes('IF') || word.includes('AA'))) {
+                titleEndIndex = i;
+                console.log('HEADER DEBUG: Found code boundary at index:', i, 'word:', word);
                 break;
               }
             }
+            
+            // Extract title từ đầu đến titleEndIndex
+            if (titleEndIndex > 0) {
+              const titleWords = words.slice(titleStartIndex, titleEndIndex);
+              title = titleWords.join(' ')
+                .replace(/&amp;/g, '&')
+                .replace(/\s+/g, ' ')
+                .trim();
+              console.log('HEADER DEBUG: Extracted title:', title);
+            }
+            
+            // Nếu title vẫn rỗng hoặc quá ngắn, thử approach khác
+            if (!title || title.length < 5) {
+              // Thử regex pattern để tìm title
+              const titlePatterns = [
+                /^(.*?)(?=VTC-|VJC-)/i,
+                /^(ANNOUNCEMENT\s+ASSESSMENT\s+FORM)/i,
+                /^(.*?ASSESSMENT\s+FORM)/i,
+                /^(.*?)(?=\s+V[JT]C)/i
+              ];
+              
+              for (const pattern of titlePatterns) {
+                const match = headerParts.match(pattern);
+                if (match && match[1].trim().length >= 5) {
+                  title = match[1].trim();
+                  console.log('HEADER DEBUG: Found title with pattern:', title);
+                  break;
+                }
+              }
+            }
 
-            if (issueStartIndex >= 0) {
-              // Tìm Rev index
-              let revIndex = -1;
-              for (let i = issueStartIndex; i < words.length && i < issueStartIndex + 5; i++) {
-                if (words[i].toLowerCase().includes('rev')) {
-                  revIndex = i;
+            // Pattern 2: Extract VJC/VTC code - approach đơn giản và hiệu quả hơn
+            console.log('HEADER DEBUG: Extracting code from words:', words);
+            
+            // Approach 1: Tìm trực tiếp trong text với regex patterns
+            const directCodePatterns = [
+              /VJC-VJAA-F-\d+/i,
+              /VTC-VJAA-IF-\d+/i,
+              /VJC-[A-Z]+-[A-Z]+-\d+/i,
+              /VTC-[A-Z]+-[A-Z]+-\d+/i,
+            ];
+            
+            for (const pattern of directCodePatterns) {
+              const match = headerParts.match(pattern);
+              if (match) {
+                code = match[0].toUpperCase();
+                console.log('HEADER DEBUG: Found code with direct pattern:', pattern, 'result:', code);
+                break;
+              }
+            }
+            
+            // Approach 2: Nếu chưa tìm thấy, thử assembly từ words
+            if (!code) {
+              console.log('HEADER DEBUG: Trying word assembly...');
+              
+              for (let i = 0; i < words.length; i++) {
+                const word = words[i].toUpperCase();
+                if (word.includes('VJC') || word.includes('VTC')) {
+                  console.log('HEADER DEBUG: Found VJC/VTC at index:', i, 'word:', word);
+                  
+                  // Collect all potential code parts từ vị trí này
+                  let codeParts = [];
+                  let j = i;
+                  
+                  // Continue cho đến khi gặp Iss hoặc date
+                  while (j < words.length && j < i + 10) {
+                    const currentWord = words[j];
+                    console.log('HEADER DEBUG: Processing word at', j, ':', currentWord);
+                    
+                    if (currentWord.toLowerCase().includes('iss') || 
+                        currentWord.includes('/') ||
+                        currentWord.match(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/)) {
+                      console.log('HEADER DEBUG: Stopping assembly at:', currentWord);
+                      break;
+                    }
+                    
+                    // Add word nếu có potential code content
+                    if (currentWord.match(/[A-Z]{2,4}/) || 
+                        currentWord.match(/^\d{1,4}$/) ||
+                        currentWord.includes('-') ||
+                        currentWord.toUpperCase().includes('VJC') ||
+                        currentWord.toUpperCase().includes('VTC') ||
+                        currentWord.toUpperCase().includes('VJAA') ||
+                        currentWord.toUpperCase().includes('IF') ||
+                        currentWord.toUpperCase() === 'F') {
+                      codeParts.push(currentWord);
+                      console.log('HEADER DEBUG: Added to code parts:', currentWord);
+                    }
+                    
+                    j++;
+                  }
+                  
+                  if (codeParts.length > 0) {
+                    // Join và clean up
+                    code = codeParts.join('-')
+                      .replace(/--+/g, '-')
+                      .replace(/^-+|-+$/g, '')
+                      .toUpperCase();
+                    console.log('HEADER DEBUG: Assembled code:', code);
+                    break;
+                  }
+                }
+              }
+            }
+            
+            // Fallback: Regex patterns với patterns cụ thể hơn
+            if (!code) {
+              const codePatterns = [
+                /VJC-VJAA-F-\d+/i,          // VJC-VJAA-F-087
+                /VTC-VJAA-IF-\d+/i,         // VTC-VJAA-IF-013  
+                /VJC-[A-Z]+-[A-Z]+-\d+/i,   // VJC-XXXX-X-123
+                /VTC-[A-Z]+-[A-Z]+-\d+/i,   // VTC-XXXX-X-123
+                /V[JT]C-[A-Z\d\-]+/i        // General VJC/VTC patterns
+              ];
+              
+              for (const pattern of codePatterns) {
+                const match = headerParts.match(pattern);
+                if (match) {
+                  code = match[0];
+                  console.log('HEADER DEBUG: Found code with regex pattern:', pattern, 'result:', code);
+                  break;
+                }
+              }
+            }
+            
+            // Additional fallback: tìm trong toàn bộ text bằng word boundaries
+            if (!code) {
+              // Tìm bất kỳ pattern nào có dạng XXX-XXX-X-XXX
+              const generalCodeMatch = headerParts.match(/\b[A-Z]{2,3}-[A-Z]{2,4}-[A-Z]{1,2}-\d{1,4}\b/i);
+              if (generalCodeMatch) {
+                code = generalCodeMatch[0];
+                console.log('HEADER DEBUG: Found code with general pattern:', code);
+              }
+            }
+
+            // Pattern 3: Extract Issue/Rev từ words array
+            console.log('HEADER DEBUG: Extracting Issue/Rev from words...');
+            
+            // Approach 1: Tìm pattern Iss X / Rev Y hoặc Iss X Rev Y
+            const issueRevPatterns = [
+              /Iss\s*(\d+)\s*\/\s*Rev\s*(\d+)/i,
+              /Iss\s*(\d+)\s*Rev\s*(\d+)/i,
+              /Issue\s*(\d+)\s*\/\s*Rev\s*(\d+)/i,
+              /Issue\s*(\d+)\s*Rev\s*(\d+)/i
+            ];
+            
+            for (const pattern of issueRevPatterns) {
+              const match = headerParts.match(pattern);
+              if (match) {
+                const issNum = match[1].padStart(2, '0');
+                const revNum = match[2].padStart(2, '0');
+                issue = `Iss${issNum}/Rev${revNum}`;
+                console.log('HEADER DEBUG: Found issue with pattern:', pattern, 'result:', issue);
+                break;
+              }
+            }
+            
+            // Approach 2: Nếu chưa tìm thấy, parse từ words array
+            if (!issue) {
+              let issueStartIndex = -1;
+              for (let i = 0; i < words.length; i++) {
+                if (words[i].toLowerCase().includes('iss')) {
+                  issueStartIndex = i;
+                  console.log('HEADER DEBUG: Found Iss at index:', i, 'word:', words[i]);
                   break;
                 }
               }
 
-              if (revIndex >= 0) {
-                // Ghép Iss number và Rev number
-                const issWord = words[issueStartIndex];
-                const issNum = words[issueStartIndex + 1] || '01';
-                const revWord = words[revIndex];
-                const revNum = words[revIndex + 1] || '01';
+              if (issueStartIndex >= 0) {
+                // Tìm Rev index
+                let revIndex = -1;
+                for (let i = issueStartIndex; i < words.length && i < issueStartIndex + 5; i++) {
+                  if (words[i].toLowerCase().includes('rev')) {
+                    revIndex = i;
+                    console.log('HEADER DEBUG: Found Rev at index:', i, 'word:', words[i]);
+                    break;
+                  }
+                }
 
-                issue = `Iss${issNum.replace(/\D/g, '').padStart(2, '0')}/Rev${revNum.replace(/\D/g, '').padStart(2, '0')}`;
-                console.log('HEADER DEBUG: Found issue from words:', issue);
+                if (revIndex >= 0) {
+                  // Extract numbers carefully
+                  let issNum = '01';
+                  let revNum = '00';
+                  
+                  // Get Iss number - có thể ở cùng word hoặc word tiếp theo
+                  const issWord = words[issueStartIndex];
+                  if (issWord.match(/\d+/)) {
+                    issNum = issWord.match(/\d+/)[0];
+                  } else if (issueStartIndex + 1 < words.length && words[issueStartIndex + 1].match(/^\d+$/)) {
+                    issNum = words[issueStartIndex + 1];
+                  }
+                  
+                  // Get Rev number - có thể ở cùng word hoặc word tiếp theo
+                  const revWord = words[revIndex];
+                  if (revWord.match(/\d+/)) {
+                    const revNumbers = revWord.match(/\d+/g);
+                    revNum = revNumbers[revNumbers.length - 1]; // Lấy số cuối cùng
+                  } else if (revIndex + 1 < words.length && words[revIndex + 1].match(/^\d+$/)) {
+                    revNum = words[revIndex + 1];
+                  }
+                  
+                  // Đảm bảo không lấy date làm Rev number
+                  if (revNum.length > 2) {
+                    revNum = revNum.substring(0, 2); // Chỉ lấy 2 chữ số đầu
+                  }
+                  
+                  issue = `Iss${issNum.padStart(2, '0')}/Rev${revNum.padStart(2, '0')}`;
+                  console.log('HEADER DEBUG: Assembled issue from words:', issue, 'issNum:', issNum, 'revNum:', revNum);
+                }
               }
             }
 
@@ -980,25 +1149,85 @@ const PreviewFormPage = () => {
 
             // Fallbacks cho các trường bị thiếu
             if (!title || title.length < 5) {
+              console.log('HEADER DEBUG: Using fallback for title');
+              
               // Thử extract title từ body content nếu header không có
               const bodyTitleMatch = bodyContent.match(/<h[1-3][^>]*>([^<]+)<\/h[1-3]>/i) ||
                 bodyContent.match(/<p[^>]*style="[^"]*text-align:\s*center[^"]*"[^>]*><strong>([^<]+)<\/strong><\/p>/i) ||
                 bodyContent.match(/<div[^>]*style="[^"]*text-align:\s*center[^"]*"[^>]*><strong>([^<]+)<\/strong><\/div>/i);
 
               if (bodyTitleMatch) {
-                title = bodyTitleMatch[1].trim().replace(/&amp;/g, '&');
+                let extractedTitle = bodyTitleMatch[1].trim().replace(/&amp;/g, '&');
+                // Clean extracted title - loại bỏ code/date nếu có
+                const cleanMatch = extractedTitle.match(/^(.*?)(?=VTC|VJC|Iss|\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+                if (cleanMatch && cleanMatch[1].trim().length > 5) {
+                  title = cleanMatch[1].trim();
+                } else {
+                  title = extractedTitle;
+                }
+                console.log('HEADER DEBUG: Extracted title from body:', title);
               } else {
-                title = 'PRACTICAL ASSESSMENT RESULT';
+                title = 'ANNOUNCEMENT ASSESSMENT FORM';
+              }
+            }
+            
+            // Final cleanup cho title
+            if (title) {
+              title = title.replace(/\s+/g, ' ').trim();
+              console.log('HEADER DEBUG: Final title:', title);
+            }
+
+            // Special case: nếu code = "VJC-V" thì có thể bị truncated
+            if (code === 'VJC-V' || code === 'VTC-V' || code?.length < 8) {
+              console.log('HEADER DEBUG: Code seems truncated:', code, 'trying to find full version...');
+              
+              // Tìm trong raw text 
+              const fullCodePatterns = [
+                /VJC-VJAA-F-\d+/gi,
+                /VTC-VJAA-IF-\d+/gi,
+                /VJC-[A-Z]{2,4}-[A-Z]{1,3}-\d{1,4}/gi,
+                /VTC-[A-Z]{2,4}-[A-Z]{1,3}-\d{1,4}/gi
+              ];
+              
+              for (const pattern of fullCodePatterns) {
+                const matches = headerParts.match(pattern);
+                if (matches && matches[0]) {
+                  code = matches[0].toUpperCase();
+                  console.log('HEADER DEBUG: Found full code with pattern:', pattern, 'result:', code);
+                  break;
+                }
               }
             }
 
-            if (!code) {
-              code = 'VJC-V';
+            // Final fallback cho code nếu vẫn không tìm thấy
+            if (!code || code === 'VJC-V' || code === 'VTC-V') {
+              console.log('HEADER DEBUG: No valid code found, using fallback. Current code:', code);
+              
+              // Thử tìm trong toàn bộ text với pattern loose hơn
+              const looseCodeMatch = headerParts.match(/[A-Z]{2,3}[\-\s][A-Z]{2,4}[\-\s][A-Z]{1,2}[\-\s]\d{1,4}/i);
+              if (looseCodeMatch) {
+                code = looseCodeMatch[0].replace(/\s/g, '-').toUpperCase();
+                console.log('HEADER DEBUG: Found loose code pattern:', code);
+              } else {
+                // Try to extract from form name or use sensible default
+                const formName = formInfoResponse?.data?.formName || '';
+                if (formName.includes('VJC')) {
+                  code = 'VJC-VJAA-F-087';
+                } else if (formName.includes('VTC')) {
+                  code = 'VTC-VJAA-IF-013';
+                } else {
+                  code = 'VJC-VJAA-F-087';  // Default fallback
+                }
+                console.log('HEADER DEBUG: Using default fallback code:', code);
+              }
             }
 
             if (!issue) {
-              issue = 'Iss01/Rev01';
+              console.log('HEADER DEBUG: No issue found, using fallback');
+              issue = 'Iss03/Rev00';
             }
+            
+            console.log('HEADER DEBUG: Final issue value:', issue);
 
             if (!date) {
               date = new Date().toLocaleDateString('en-GB');

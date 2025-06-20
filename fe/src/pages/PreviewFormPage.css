@@ -91,6 +91,32 @@
   word-wrap: break-word; /* Cho phép text wrap trong cells */
 }
 
+/* Specific styling for header table */
+.form-content > div > table:first-child {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+
+.form-content > div > table:first-child td:first-child {
+  width: 25% !important;
+  min-width: 25% !important;
+}
+
+.form-content > div > table:first-child td:nth-child(2) {
+  width: 50% !important;
+  min-width: 50% !important;
+}
+
+.form-content > div > table:first-child td:last-child {
+  width: 25% !important;
+  min-width: 25% !important;
+  max-width: 25% !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  overflow: hidden !important;
+  word-wrap: break-word !important;
+}
+
 .form-content td,
 .form-content th {
   border: 1px solid #000;
@@ -363,6 +389,30 @@
     min-width: 60px !important;
     max-width: 100px !important;
     font-size: 11px;
+  }
+
+  /* Header table mobile responsive */
+  .form-content > div > table:first-child td:last-child {
+    width: 25% !important;
+    min-width: 20% !important;
+    max-width: 25% !important;
+    font-size: 9px !important;
+    padding: 4px !important;
+  }
+
+  .form-content > div > table:first-child td:last-child div {
+    font-size: 9px !important;
+    line-height: 1.2 !important;
+  }
+
+  .form-content > div > table:first-child td:first-child {
+    width: 25% !important;
+    font-size: 12px !important;
+  }
+
+  .form-content > div > table:first-child td:nth-child(2) {
+    width: 50% !important;
+    font-size: 11px !important;
   }
 }
 
