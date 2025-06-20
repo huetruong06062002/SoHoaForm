@@ -28,6 +28,14 @@ const formService = {
     return response.data;
   },
 
+  // API để lấy file Word đã điền với dữ liệu thực tế
+  getFilledWordFile: async (userFillFormId) => {
+    const response = await apiClient.get(`/User/user-fill-form/${userFillFormId}/filled-word-file`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+
   createForm: async (formData) => {
     const response = await apiClient.post('/Admin/forms', formData, {
       headers: {
@@ -103,6 +111,83 @@ const formService = {
   getFilledFormData: async (userFillFormId) => {
     const response = await apiClient.get(`/User/user-fill-form/${userFillFormId}/json-field-value`);
     return response.data;
+  },
+
+  // API để hoàn thành form
+  completeFilledForm: async (userFillFormId) => {
+    const response = await apiClient.put(`/User/fill-form/${userFillFormId}/complete`);
+    return response.data;
+  },
+
+  // Hàm xử lý Word document với dữ liệu thực
+  processWordWithFieldValues: async (wordBlob, fieldValues) => {
+    try {
+      // Tạo mapping từ fieldName sang value
+      const fieldMap = {};
+      fieldValues.forEach(field => {
+        // Chỉ set value nếu có giá trị, nếu không để trống
+        fieldMap[field.fieldName] = field.value || '';
+      });
+
+      console.log('Processing Word document with field mapping:', fieldMap);
+
+      // Sử dụng JSZip để xử lý file Word như một zip file
+      const JSZip = (await import('jszip')).default;
+      const zip = new JSZip();
+      
+      // Load Word document
+      const loadedZip = await zip.loadAsync(wordBlob);
+      
+      // Tìm các file XML trong Word document và thay thế placeholder
+      const xmlFiles = [
+        'word/document.xml',
+        'word/header1.xml', 
+        'word/header2.xml',
+        'word/header3.xml',
+        'word/footer1.xml',
+        'word/footer2.xml', 
+        'word/footer3.xml'
+      ];
+
+      for (const filename of xmlFiles) {
+        const file = loadedZip.file(filename);
+        if (file) {
+          let content = await file.async('text');
+          
+          // Thay thế các placeholder {fieldName} với giá trị thực tế
+          Object.keys(fieldMap).forEach(fieldName => {
+            const placeholder = `{${fieldName}}`;
+            const value = fieldMap[fieldName];
+            
+            // Escape XML special characters in value
+            const escapedValue = value
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&apos;');
+            
+            // Thay thế placeholder với value đã escape
+            content = content.replaceAll(placeholder, escapedValue);
+          });
+          
+          // Cập nhật file content
+          loadedZip.file(filename, content);
+        }
+      }
+      
+      // Tạo blob mới từ zip đã được xử lý
+      const processedBlob = await loadedZip.generateAsync({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      });
+      
+      return processedBlob;
+      
+    } catch (error) {
+      console.error('Error processing Word document:', error);
+      throw error;
+    }
   },
 };
 

@@ -1,0 +1,90 @@
+/* ViewFilledFormPage.css */
+
+/* Docx-preview wrapper styles */
+.docx-wrapper {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin: 0 auto;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Word document container */
+.docx-wrapper .docx {
+  margin: 0 auto;
+  background: white;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  min-height: 600px;
+}
+
+/* Page styling */
+.docx-wrapper .docx-page {
+  background: white;
+  margin: 10px auto;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  border: 1px solid #ddd;
+}
+
+/* Table styling */
+.docx-wrapper table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 10px 0;
+}
+
+.docx-wrapper td, 
+.docx-wrapper th {
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: left;
+}
+
+/* Text styling */
+.docx-wrapper p {
+  margin: 6px 0;
+  line-height: 1.4;
+}
+
+.docx-wrapper h1,
+.docx-wrapper h2,
+.docx-wrapper h3 {
+  margin: 12px 0;
+  color: #333;
+}
+
+/* Form elements styling if any */
+.docx-wrapper input,
+.docx-wrapper select,
+.docx-wrapper textarea {
+  border: 1px solid #d9d9d9;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+/* Docx-preview wrapper styles */
+.docx-wrapper {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin: 0 auto;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Print styles */
+@media print {
+  .docx-wrapper {
+    box-shadow: none;
+    border: none;
+    padding: 0;
+  }
+  
+  .docx-wrapper .docx-page {
+    box-shadow: none;
+    border: none;
+    margin: 0;
+  }
+} 
