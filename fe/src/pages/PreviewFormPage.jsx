@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Spin, Switch, DatePicker, App } from 'antd';
 import mammoth from 'mammoth';
 import html2pdf from 'html2pdf.js';
@@ -8,6 +8,7 @@ import AppLayout from '../components/layout/AppLayout';
 import './PreviewFormPage.css';
 
 const PreviewFormPage = () => {
+  const navigate = useNavigate();
   const { formId } = useParams();
   const { message, modal } = App.useApp();
   const [loading, setLoading] = useState(true);
@@ -2606,10 +2607,11 @@ const PreviewFormPage = () => {
               )}
             </div>
             <div className="page-actions">
+            
               <Button type="primary" onClick={handleComplete}>
                 Hoàn thành cấu hình
               </Button>
-              <Button>Quay lại cấu hình</Button>
+              <Button onClick={() => navigate(`/form-config/${formInfo.formId}`)}>Quay lại cấu hình</Button>
               <Button href="/manage-form">Về danh sách</Button>
             </div>
           </div>

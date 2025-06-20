@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Table, Tag, message, Spin, Space, Tooltip } from 'antd';
+import { Button, Table, Tag, message, Spin, Space, Tooltip, Result } from 'antd';
 import { ArrowLeftOutlined, EyeOutlined, DownloadOutlined, CalendarOutlined } from '@ant-design/icons';
+import { useSelector } from 'react-redux';
 import formService from '../services/formService';
 import AppLayout from '../components/layout/AppLayout';
 import './FormHistoryPage.css';
@@ -10,6 +11,7 @@ import moment from 'moment';
 const FormHistoryPage = () => {
   const { formId } = useParams();
   const navigate = useNavigate();
+  const { user } = useSelector((state) => state.auth);
   const [loading, setLoading] = useState(true);
   const [historyData, setHistoryData] = useState([]);
   const [formInfo, setFormInfo] = useState(null);
@@ -106,6 +108,26 @@ const FormHistoryPage = () => {
       ),
     },
   ];
+
+  // Kiểm tra quyền admin
+  if (user?.role !== 'admin') {
+    return (
+      <AppLayout>
+        <div style={{ padding: '24px' }}>
+          <Result
+            status="403"
+            title="403"
+            subTitle="Xin lỗi, bạn không có quyền truy cập trang này. Chỉ quản trị viên mới có thể xem lịch sử điền form."
+            extra={
+              <Button type="primary" onClick={() => navigate('/')}>
+                Về trang chủ
+              </Button>
+            }
+          />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

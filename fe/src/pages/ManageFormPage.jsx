@@ -1,7 +1,8 @@
-import { Table, Button, Typography, Modal, Form, Input, Upload, App } from 'antd';
+import { Table, Button, Typography, Modal, Form, Input, Upload, App, Result } from 'antd';
 import { PlusOutlined, UploadOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import AppLayout from '../components/layout/AppLayout';
 import formService from '../services/formService';
 import dayjs from 'dayjs';
@@ -11,6 +12,7 @@ const { Title } = Typography;
 const ManageFormPage = () => {
   const navigate = useNavigate();
   const { message } = App.useApp();
+  const { user } = useSelector((state) => state.auth);
   const [loading, setLoading] = useState(false);
   const [forms, setForms] = useState([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -185,6 +187,26 @@ const ManageFormPage = () => {
       ),
     },
   ];
+
+  // Kiểm tra quyền admin
+  if (user?.role !== 'admin') {
+    return (
+      <AppLayout>
+        <div style={{ padding: '24px' }}>
+          <Result
+            status="403"
+            title="403"
+            subTitle="Xin lỗi, bạn không có quyền truy cập trang này. Chỉ quản trị viên mới có thể quản lý form."
+            extra={
+              <Button type="primary" onClick={() => navigate('/')}>
+                Về trang chủ
+              </Button>
+            }
+          />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

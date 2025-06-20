@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Table, Button, Typography, Card, Row, Col, Tag, Checkbox, Space, Input, Collapse, App, Form } from 'antd';
+import { Table, Button, Typography, Card, Row, Col, Tag, Checkbox, Space, Input, Collapse, App, Form, Result } from 'antd';
 import { CaretRightOutlined, CaretDownOutlined, InfoCircleOutlined, EyeOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSelector } from 'react-redux';
 import AppLayout from '../components/layout/AppLayout';
 import formService from '../services/formService';
 import { isApiSuccess, getApiData } from '../utils/apiUtils';
@@ -15,6 +16,7 @@ const FormConfigPage = () => {
   const { formId } = useParams();
   const navigate = useNavigate();
   const { message } = App.useApp();
+  const { user } = useSelector((state) => state.auth);
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState(null);
@@ -710,6 +712,26 @@ const FormConfigPage = () => {
       },
     },
   ];
+
+  // Kiểm tra quyền admin
+  if (user?.role !== 'admin') {
+    return (
+      <AppLayout>
+        <div style={{ padding: '24px' }}>
+          <Result
+            status="403"
+            title="403"
+            subTitle="Xin lỗi, bạn không có quyền truy cập trang này. Chỉ quản trị viên mới có thể cấu hình form."
+            extra={
+              <Button type="primary" onClick={() => navigate('/')}>
+                Về trang chủ
+              </Button>
+            }
+          />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>

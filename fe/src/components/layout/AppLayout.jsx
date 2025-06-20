@@ -102,17 +102,20 @@ const AppLayout = ({ children }) => {
             >
               Điền form
             </div>
-            <div
-              style={{
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '14px',
-                opacity: window.location.pathname === '/manage' ? 1 : 0.85
-              }}
-              onClick={() => navigate('/manage-form')}
-            >
-              Quản lý form
-            </div>
+            {/* Chỉ hiển thị "Quản lý form" cho admin */}
+            {user?.role === 'admin' && (
+              <div
+                style={{
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  opacity: window.location.pathname === '/manage' ? 1 : 0.85
+                }}
+                onClick={() => navigate('/manage-form')}
+              >
+                Quản lý form
+              </div>
+            )}
           </div>
         </div>
 
