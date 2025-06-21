@@ -457,6 +457,51 @@ namespace SoHoaFormApi.Controllers
             }
         }
 
+        [HttpPut("user-fill-form/{userFillFormId}/update-field-values")]
+        [Authorize]
+        public async Task<IActionResult> UpdateUserFillFormFieldValues(Guid userFillFormId, [FromBody] UpdateUserFillFormRequest request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                // Lấy UserId từ token để verify ownership
+                var userIdClaim = User.FindFirst("UserId");
+                if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+                {
+                    return BadRequest(new HTTPResponseClient<object>
+                    {
+                        StatusCode = 400,
+                        Message = "Không thể xác định UserId",
+                        Data = null,
+                        DateTime = DateTime.Now
+                    });
+                }
+
+                var result = await _userService.UpdateUserFillFormFieldValuesAsync(userFillFormId, userId, request);
+
+                if (result.StatusCode != 200)
+                {
+                    return StatusCode(result.StatusCode, result);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new HTTPResponseClient<object>
+                {
+                    StatusCode = 500,
+                    Message = $"Internal server error: {ex.Message}",
+                    Data = null,
+                    DateTime = DateTime.Now
+                });
+            }
+        }
+
         [HttpGet("user-fill-form/{userFillFormId}/raw-json")]
         public async Task<IActionResult> GetRawJsonFieldValue(Guid userFillFormId)
         {

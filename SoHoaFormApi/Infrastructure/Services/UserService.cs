@@ -20,6 +20,8 @@ public interface IUserService
   Task<HTTPResponseClient<string>> GetRawJsonFieldValueAsync(Guid userFillFormId);
 
   Task<HTTPResponseClient<CompleteUserFillFormResponse>> CompleteUserFillFormAsync(Guid userFillFormId, Guid userId);
+
+  Task<HTTPResponseClient<UpdateUserFillFormResponse>> UpdateUserFillFormFieldValuesAsync(Guid userFillFormId, Guid userId, UpdateUserFillFormRequest request);
 }
 
 public class UserService : IUserService
@@ -697,6 +699,122 @@ public class UserService : IUserService
       {
         StatusCode = 500,
         Message = $"Lỗi khi hoàn thành form: {ex.Message}",
+        Data = null,
+        DateTime = DateTime.Now
+      };
+    }
+  }
+
+  public async Task<HTTPResponseClient<UpdateUserFillFormResponse>> UpdateUserFillFormFieldValuesAsync(Guid userFillFormId, Guid userId, UpdateUserFillFormRequest request)
+  {
+    try
+    {
+      // Tìm UserFillForm và verify ownership
+      var userFillForm = await _context.UserFillForms
+          .Include(uff => uff.Form)
+          .Include(uff => uff.User)
+          .FirstOrDefaultAsync(uff => uff.Id == userFillFormId);
+
+      if (userFillForm == null)
+      {
+        return new HTTPResponseClient<UpdateUserFillFormResponse>
+        {
+          StatusCode = 404,
+          Message = "Không tìm thấy UserFillForm hoặc bạn không có quyền truy cập",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      // **KIỂM TRA TRẠNG THÁI COMPLETE - NGĂN KHÔNG CHO EDIT**
+      if (userFillForm.Status?.ToLower() == "complete")
+      {
+        return new HTTPResponseClient<UpdateUserFillFormResponse>
+        {
+          StatusCode = 400,
+          Message = "Form đã được hoàn thành và không thể chỉnh sửa",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
+
+      // Lưu giá trị cũ để trả về
+      List<FieldValueDto> oldFieldValues = new List<FieldValueDto>();
+      if (!string.IsNullOrEmpty(userFillForm.JsonFieldValue))
+      {
+        try
+        {
+          oldFieldValues = System.Text.Json.JsonSerializer.Deserialize<List<FieldValueDto>>(
+              userFillForm.JsonFieldValue,
+              new JsonSerializerOptions
+              {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+              }) ?? new List<FieldValueDto>();
+        }
+        catch
+        {
+          oldFieldValues = new List<FieldValueDto>();
+        }
+      }
+
+      // Chuyển đổi FieldValues mới thành JSON
+      var newJsonFieldValue = System.Text.Json.JsonSerializer.Serialize(request.FieldValues, new JsonSerializerOptions
+      {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = true
+      });
+
+      // Cập nhật UserFillForm
+      userFillForm.JsonFieldValue = newJsonFieldValue;
+      userFillForm.DateTime = DateTime.Now; // Cập nhật thời gian sửa đổi
+
+      _context.UserFillForms.Update(userFillForm);
+
+      // Tạo UserFillFormHistory cho việc update
+      var updateHistory = new UserFillFormHistory
+      {
+        Id = Guid.NewGuid(),
+        UserFillFormId = userFillFormId,
+        DateWrite = DateTime.Now,
+        DateFill = DateTime.Now,
+        Status = userFillForm.Status ?? "Draft"
+      };
+
+      _context.UserFillFormHistories.Add(updateHistory);
+
+      // Lưu changes
+      await _context.SaveChangesAsync();
+
+      var response = new UpdateUserFillFormResponse
+      {
+        UserFillFormId = userFillFormId,
+        FormId = userFillForm.FormId ?? Guid.Empty,
+        FormName = userFillForm.Form?.Name ?? "Unknown",
+        UserId = userId,
+        UserName = userFillForm.User?.Name ?? "Unknown",
+        Status = userFillForm.Status ?? "Draft",
+        NewFieldValues = request.FieldValues,
+        OldFieldValues = oldFieldValues,
+        HistoryId = updateHistory.Id,
+        UpdatedAt = DateTime.Now,
+        IsUpdated = true,
+        Message = $"Cập nhật field values cho form '{userFillForm.Form?.Name}' thành công"
+      };
+
+      return new HTTPResponseClient<UpdateUserFillFormResponse>
+      {
+        StatusCode = 200,
+        Message = "Cập nhật field values thành công",
+        Data = response,
+        DateTime = DateTime.Now
+      };
+    }
+    catch (Exception ex)
+    {
+      return new HTTPResponseClient<UpdateUserFillFormResponse>
+      {
+        StatusCode = 500,
+        Message = $"Lỗi khi cập nhật field values: {ex.Message}",
         Data = null,
         DateTime = DateTime.Now
       };
