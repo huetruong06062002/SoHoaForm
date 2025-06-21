@@ -2309,30 +2309,31 @@ const PreviewFormPage = () => {
         const formName = formInfo?.formName || 'FORM';
         const formCode = formInfo?.formCode || 'VJC-VJAA-IF-XXX';
 
+        const currentDate = new Date().toLocaleDateString('en-GB');
         const vietjetHeader = `
-          <div style="margin-bottom: 20px;">
-            <table style="width: 100%; border-collapse: collapse; border: 1px solid #000;">
-              <tr>
-                <td style="width: 30%; border-right: 1px solid #000; padding: 15px; text-align: center; vertical-align: middle;">
-                  <div style="color: #e31e24; font-weight: bold; font-size: 18px; font-family: Arial, sans-serif;">
-                    vietjetair.com
-                  </div>
-                </td>
-                <td style="width: 40%; border-right: 1px solid #000; padding: 15px; text-align: center; vertical-align: middle;">
-                  <div style="font-weight: bold; font-size: 16px; color: #333; line-height: 1.3; font-family: Arial, sans-serif;">
-                    ${formName.toUpperCase()}
-                  </div>
-                </td>
-                <td style="width: 30%; padding: 10px; vertical-align: top;">
-                  <div style="font-size: 11px; line-height: 1.4; font-family: Arial, sans-serif;">
-                    <div style="margin-bottom: 8px; font-weight: bold;">${formCode}</div>
-                    <div style="margin-bottom: 8px;">Iss01/Rev01</div>
-                    <div>${new Date().toLocaleDateString('en-GB').replace(/\//g, '/')}</div>
-                  </div>
-                </td>
-              </tr>
-            </table>
-          </div>
+          <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; margin-bottom: 20px;">
+            <tr>
+              <td style="width: 20%; border-right: 1px solid #000; padding: 15px; text-align: center; vertical-align: middle;">
+                <div style="font-family: Arial, sans-serif;">
+                  <div style="color: #e31e24; font-weight: bold; font-size: 16px;">vietjet</div>
+                  <div style="background: #e31e24; color: white; font-weight: bold; font-size: 12px; padding: 2px 4px; margin-top: 2px;">Air</div>
+                  <div style="font-size: 10px; color: #e31e24; margin-top: 2px;">.com</div>
+                </div>
+              </td>
+              <td style="width: 60%; border-right: 1px solid #000; padding: 15px; text-align: center; vertical-align: middle;">
+                <div style="font-weight: bold; font-size: 16px; color: #000; font-family: Arial, sans-serif;">
+                  COMPETENCY CHECK FORM
+                </div>
+              </td>
+              <td style="width: 20%; padding: 8px; vertical-align: top;">
+                <div style="font-size: 10px; line-height: 1.4; font-family: Arial, sans-serif;">
+                  <div style="font-weight: bold; margin-bottom: 5px;">VJC-VJAA-IF-032</div>
+                  <div style="margin-bottom: 5px;">Iss03/Rev01</div>
+                  <div>${currentDate}</div>
+                </div>
+              </td>
+            </tr>
+          </table>
         `;
 
         printContentHTML = vietjetHeader + printContentHTML;
@@ -2356,208 +2357,390 @@ const PreviewFormPage = () => {
 
       console.log('Final PDF content with VietJet header:', printContentHTML);
 
-      // Tạo HTML hoàn chỉnh cho trang mới
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html lang="vi">
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>${formInfo?.formName || 'Form'} - Preview</title>
-          <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              margin: 0;
-              padding: 0;
-              line-height: 1.4;
-              background-color: #2f2f2f;
-              overflow-x: auto;
-              min-height: 100vh;
-            }
-            .container {
-              max-width: 210mm;
-              margin: 20px auto;
-              background-color: white;
-              padding: 20mm;
-              box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-              zoom: 1.3;
-              transform-origin: top center;
-              min-height: calc(100vh - 40px);
-            }
-            
-            /* Responsive zoom cho các màn hình khác nhau */
-            @media screen and (min-width: 1600px) {
-              .container {
-                zoom: 1.5;
-              }
-            }
-            
-            @media screen and (min-width: 1920px) {
-              .container {
-                zoom: 1.7;
-              }
-            }
-            
-            @media screen and (max-width: 1400px) {
-              .container {
-                zoom: 1.1;
-              }
-            }
-            
-            @media screen and (max-width: 1200px) {
-              .container {
-                zoom: 1.0;
-                margin: 10px;
-              }
-            }
-            .header {
-              text-align: center;
-              margin-bottom: 30px;
-              border-bottom: 2px solid #1890ff;
-              padding-bottom: 20px;
-            }
-            .form-title {
-              font-size: 24px;
-              font-weight: bold;
-              color: #1890ff;
-              margin-bottom: 10px;
-            }
-            .form-info {
-              font-size: 14px;
-              color: #666;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-bottom: 20px;
-            }
-            td, th {
-              border: 1px solid #000;
-              padding: 8px;
-              vertical-align: middle;
-              font-size: 12px;
-            }
-            .actions {
-              position: fixed;
-              top: 20px;
-              right: 20px;
-              z-index: 1000;
-              background: rgba(255, 255, 255, 0.95);
-              padding: 15px;
-              border-radius: 8px;
-              box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-              backdrop-filter: blur(10px);
-              border: 1px solid rgba(255,255,255,0.3);
-            }
-            .btn {
-              padding: 8px 16px;
-              margin: 0 5px;
-              border: none;
-              border-radius: 4px;
-              cursor: pointer;
-              font-size: 14px;
-            }
-            .btn-primary {
-              background-color: #1890ff;
-              color: white;
-            }
-            .btn-secondary {
-              background-color: #52c41a;
-              color: white;
-            }
-            .btn-default {
-              background-color: #f0f0f0;
-              color: #333;
-            }
-            @media print {
-              .actions {
-                display: none !important;
-              }
-              body {
-                background-color: white;
-              }
-              .container {
-                box-shadow: none;
-                margin: 0;
-                padding: 0;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="actions">
-            <button class="btn btn-primary" onclick="downloadPDF()">Tải PDF</button>
-            <button class="btn btn-secondary" onclick="window.print()">In</button>
-            <button class="btn" onclick="toggleFullscreen()" style="background-color: #722ed1; color: white;">Full Screen</button>
-            <button class="btn btn-default" onclick="window.close()">Đóng</button>
-          </div>
-          
-          <div class="container" id="content">
-             ${printContentHTML}
-          </div>
+      // Tạo HTML giống PDF viewer chuyên nghiệp
+      const formTitle = (formInfo && formInfo.formName) ? formInfo.formName : 'Form';
+      const currentDate = new Date().toLocaleDateString('vi-VN');
+      const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${formTitle} - PDF Preview</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      background: #525659; 
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+    
+    /* Header giống PDF viewer */
+    .pdf-header {
+      background: #323639;
+      color: white;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+    
+    .pdf-title {
+      font-size: 16px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .pdf-icon {
+      width: 24px;
+      height: 24px;
+      background: #dc3545;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+      color: white;
+    }
+    
+    /* Toolbar giống PDF viewer */
+    .pdf-toolbar {
+      background: #3c4043;
+      padding: 8px 20px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      color: white;
+      font-size: 14px;
+      border-bottom: 1px solid #5f6368;
+    }
+    
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .toolbar-btn {
+      background: transparent;
+      border: 1px solid #5f6368;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .toolbar-btn:hover {
+      background: #5f6368;
+      border-color: #80868b;
+    }
+    
+    .toolbar-btn.primary {
+      background: #1a73e8;
+      border-color: #1a73e8;
+    }
+    
+    .toolbar-btn.primary:hover {
+      background: #1557b0;
+    }
+    
+    .page-info {
+      color: #9aa0a6;
+      font-size: 13px;
+      margin-left: auto;
+    }
+    
+         /* Content area giống PDF viewer */
+     .pdf-viewer {
+       background: #525659;
+       min-height: calc(100vh - 120px);
+       overflow: auto;
+       padding: 20px 0;
+     }
+     
+     .pdf-page {
+       background: white;
+       max-width: 100%;
+       width: auto;
+       min-height: calc(100vh - 160px);
+       padding: 30px 40px;
+       margin: 0 auto 20px;
+       box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+       border-radius: 2px;
+       zoom: 1.2;
+       transform-origin: top center;
+     }
+    
+         /* PDF content styling */
+     table { 
+       width: 100%; 
+       border-collapse: collapse; 
+       margin: 15px 0; 
+       font-size: 12px;
+       line-height: 1.4;
+     }
+     
+     td, th { 
+       border: 1px solid #000; 
+       padding: 8px 10px; 
+       vertical-align: top;
+       text-align: left;
+     }
+    
+    th {
+      background: #f8f9fa;
+      font-weight: bold;
+    }
+    
+         /* Responsive design */
+     @media screen and (max-width: 1400px) {
+       .pdf-page {
+         zoom: 1.0;
+         padding: 25px 30px;
+       }
+     }
+     
+     @media screen and (min-width: 1600px) {
+       .pdf-page {
+         zoom: 1.4;
+       }
+     }
+     
+     @media screen and (min-width: 1920px) {
+       .pdf-page {
+         zoom: 1.6;
+       }
+     }
+    
+         @media print {
+       .pdf-header, .pdf-toolbar { display: none !important; }
+       .pdf-viewer { padding: 0; background: white; }
+       .pdf-page { 
+         box-shadow: none; 
+         margin: 0; 
+         zoom: 1.0;
+         padding: 20px;
+         min-height: auto;
+       }
+       body { background: white; }
+     }
+    
+    /* Loading indicator */
+    .loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 20px 30px;
+      border-radius: 8px;
+      display: none;
+      z-index: 9999;
+    }
+    
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #1a73e8;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header giống Chrome PDF viewer -->
+  <div class="pdf-header">
+    <div class="pdf-title">
+      <div class="pdf-icon">PDF</div>
+      <span>${formTitle} - ${currentDate}</span>
+    </div>
+    <div class="toolbar-group">
+      <button class="toolbar-btn" onclick="window.close()">
+        ✕ Đóng
+      </button>
+    </div>
+  </div>
+  
+  <!-- Toolbar giống Chrome PDF viewer -->
+  <div class="pdf-toolbar">
+    <div class="toolbar-group">
+      <button class="toolbar-btn primary" onclick="printPDF()">
+        📄 Tải PDF
+      </button>
+      <button class="toolbar-btn" onclick="window.print()">
+        🖨 In tài liệu
+      </button>
+    </div>
+    
+    <div class="page-info">
+      Trang 1 / 1 • 100%
+    </div>
+  </div>
+  
+  <!-- PDF content area -->
+  <div class="pdf-viewer">
+    <div class="pdf-page" id="pdfContent">
+      ${printContentHTML}
+    </div>
+  </div>
+  
+  <!-- Loading indicator -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <div>Đang tạo PDF...</div>
+  </div>
+  
+  <script>
+    function showLoading() {
+      document.getElementById('loading').style.display = 'block';
+    }
+    
+    function hideLoading() {
+      document.getElementById('loading').style.display = 'none';
+    }
+    
+         function printPDF() {
+       // Sử dụng browser's built-in PDF generation
+       var element = document.getElementById('pdfContent');
+       var formName = '${formTitle}';
+       var date = new Date().toLocaleDateString('vi-VN');
+       
+       // Tạo window mới với layout tối ưu cho PDF
+       var printWindow = window.open('', '_blank');
+       
+       var printContent = '<!DOCTYPE html>' +
+         '<html><head>' +
+         '<meta charset="UTF-8">' +
+         '<title>' + formName + '</title>' +
+         '<style>' +
+         '@page { ' +
+         '  size: A4 portrait; ' +
+         '  margin: 8mm; ' +
+         '  -webkit-print-color-adjust: exact; ' +
+         '  print-color-adjust: exact; ' +
+         '}' +
+         'body { ' +
+         '  font-family: Arial, sans-serif; ' +
+         '  font-size: 9px; ' +
+         '  line-height: 1.2; ' +
+         '  margin: 0; ' +
+         '  padding: 0; ' +
+         '  width: 100%; ' +
+         '}' +
+         'table { ' +
+         '  width: 100%; ' +
+         '  border-collapse: collapse; ' +
+         '  margin: 6px 0; ' +
+         '  font-size: 8px; ' +
+         '  page-break-inside: auto; ' +
+         '}' +
+         'td, th { ' +
+         '  border: 1px solid #000; ' +
+         '  padding: 2px 4px; ' +
+         '  vertical-align: top; ' +
+         '  font-size: 8px; ' +
+         '  word-wrap: break-word; ' +
+         '  overflow-wrap: break-word; ' +
+         '  line-height: 1.1; ' +
+         '}' +
+         'th { ' +
+         '  background: #f5f5f5 !important; ' +
+         '  font-weight: bold; ' +
+         '  font-size: 8px; ' +
+         '}' +
+         '.header-table { margin-bottom: 10px; }' +
+         '.vietjet-logo { color: #e31e24 !important; font-weight: bold; }' +
+         '.form-title { font-weight: bold; text-align: center; font-size: 10px; }' +
+         '.form-info { font-size: 7px; }' +
+         '/* Tối ưu bảng rộng để fit A4 dọc */' +
+         'table td:nth-child(n+8) { ' +
+         '  font-size: 7px; ' +
+         '  padding: 1px 2px; ' +
+         '}' +
+         '/* Responsive column width */' +
+         'table { table-layout: auto; }' +
+         'td { max-width: 80px; }' +
+         '@media print {' +
+         '  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }' +
+         '  .no-print { display: none !important; }' +
+         '  table { page-break-inside: avoid; }' +
+         '  tr { page-break-inside: avoid; }' +
+         '}' +
+         '</style>' +
+         '</head><body>' +
+         element.innerHTML +
+         '</body></html>';
+       
+       printWindow.document.write(printContent);
+       printWindow.document.close();
+       
+       // Tự động trigger Save as PDF
+       printWindow.onload = function() {
+         setTimeout(function() {
+           // Mở print dialog với Ctrl+P để user chọn "Save as PDF"
+           printWindow.focus();
+           printWindow.print();
+           
+           // Đóng window sau 3 giây
+           setTimeout(function() {
+             printWindow.close();
+           }, 3000);
+         }, 800);
+       };
+     }
+    
+         // Auto-fit content on load
+     window.addEventListener('load', function() {
+       // Scroll to top
+       window.scrollTo(0, 0);
+       
+       // Adjust for different screen sizes
+       var screenWidth = window.innerWidth;
+       var pdfPage = document.getElementById('pdfContent');
+       
+       if (screenWidth < 1200) {
+         pdfPage.style.zoom = '0.9';
+       } else if (screenWidth >= 1920) {
+         pdfPage.style.zoom = '1.6';
+       } else if (screenWidth >= 1600) {
+         pdfPage.style.zoom = '1.4';
+       } else {
+         pdfPage.style.zoom = '1.2';
+       }
+     });
+  </script>
+</body>
+</html>`;
 
-          <script>
-            // Auto fit window to screen on load
-            window.addEventListener('load', function() {
-              if (window.outerHeight < screen.height * 0.9 || window.outerWidth < screen.width * 0.9) {
-                window.moveTo(0, 0);
-                window.resizeTo(screen.width, screen.height);
-              }
-            });
-
-            function toggleFullscreen() {
-              if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                  console.log('Error attempting to enable fullscreen:', err.message);
-                });
-              } else {
-                document.exitFullscreen();
-              }
-            }
-
-            function downloadPDF() {
-              const element = document.getElementById('content');
-              const formName = '${formInfo?.formName || 'form'}';
-              const timestamp = new Date().toISOString().slice(0, 10);
-              
-              const opt = {
-                margin: [10, 10, 10, 10],
-                filename: formName + '_' + timestamp + '.pdf',
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { 
-                  scale: 2,
-                  useCORS: true,
-                  letterRendering: true,
-                  allowTaint: true
-                },
-                jsPDF: { 
-                  unit: 'mm', 
-                  format: 'a4', 
-                  orientation: 'portrait',
-                  compress: true
-                }
-              };
-              
-              html2pdf().set(opt).from(element).save();
-            }
-          </script>
-        </body>
-        </html>
-      `;
-
-      // Mở tab mới với nội dung preview full screen
-      const newWindow = window.open('', '_blank', 'width=' + screen.width + ',height=' + screen.height + ',fullscreen=yes,scrollbars=yes');
-      newWindow.document.write(htmlContent);
-      newWindow.document.close();
-
-      // Thử maximize window nếu browser hỗ trợ
-      if (newWindow.outerHeight < screen.height || newWindow.outerWidth < screen.width) {
-        newWindow.moveTo(0, 0);
-        newWindow.resizeTo(screen.width, screen.height);
+      // Mở tab mới với preview PDF
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(htmlContent);
+        newWindow.document.close();
+        console.log('Đã mở tab PDF preview thành công');
+      } else {
+        alert('Không thể mở tab mới. Vui lòng cho phép popup trong browser.');
       }
-
-      message.success('Đã mở trang preview PDF!');
 
     } catch (error) {
       console.error('Error creating PDF preview:', error);
@@ -2620,43 +2803,6 @@ const PreviewFormPage = () => {
             <div className="action-buttons">
               <Button type="primary" className="save-btn" onClick={handleSave}>Lưu dữ liệu</Button>
               <Button className="export-btn" onClick={handleExportPDF}>Xuất PDF</Button>
-              <Button 
-                onClick={() => {
-                  console.log('=== MANUAL DATE CONVERSION TRIGGERED ===');
-                  const allInputs = containerRef.current?.querySelectorAll('input') || [];
-                  console.log('Found inputs:', allInputs.length);
-                  
-                  allInputs.forEach((input, index) => {
-                    const fieldName = input.dataset.fieldName || '';
-                    const originalType = input.dataset.originalFieldType || '';
-                    const apiType = input.dataset.apiFieldType || '';
-                    
-                    console.log(`Input ${index}:`, {
-                      fieldName,
-                      currentType: input.type,
-                      currentValue: input.value,
-                      originalType,
-                      apiType,
-                      hasDateInName: fieldName.toLowerCase().includes('date')
-                    });
-                    
-                    const shouldBeDate = fieldName.toLowerCase().includes('date') || 
-                                       originalType === 'd' ||
-                                       apiType === 'Date' ||
-                                       formFields.some(f => f.fieldName === fieldName && f.fieldType === 'Date');
-                    
-                    if (shouldBeDate && input.type !== 'date') {
-                      console.log(`Converting ${fieldName} to date input`);
-                      input.type = 'date';
-                      input.className = 'form-input date-input';
-                      input.value = '';
-                    }
-                  });
-                }}
-                style={{ marginLeft: 8 }}
-              >
-                🗓️ Fix Dates
-              </Button>
               <div className="mode-switch">
                 <Switch
                   checked={isWordMode}
