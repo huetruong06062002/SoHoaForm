@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Spin, Typography, App, Space, Tooltip } from 'antd';
-import { ArrowLeftOutlined, ZoomInOutlined, ZoomOutOutlined, SearchOutlined, DownloadOutlined } from '@ant-design/icons';
+import { Button, Spin, Typography, App, Space, Tooltip, Modal, Form, Input, Select, Checkbox, DatePicker } from 'antd';
+import { ArrowLeftOutlined, ZoomInOutlined, ZoomOutOutlined, SearchOutlined, DownloadOutlined, EditOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import { renderAsync } from 'docx-preview';
 import formService from '../services/formService';
 import AppLayout from '../components/layout/AppLayout';
@@ -25,6 +26,9 @@ const ViewFilledFormPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [editForm] = Form.useForm();
+  const [isUpdating, setIsUpdating] = useState(false);
   const containerRef = useRef(null);
   const hasRenderedRef = useRef(false);
   const renderPromiseRef = useRef(null);
@@ -741,6 +745,95 @@ const ViewFilledFormPage = () => {
     }
   };
 
+  // Hàm mở modal chỉnh sửa
+  const handleEditForm = () => {
+    if (!filledData?.parsedFieldValues) {
+      messageApi.error('Không có dữ liệu để chỉnh sửa');
+      return;
+    }
+
+    // Tạo initial values cho form
+    const initialValues = {};
+    filledData.parsedFieldValues.forEach(field => {
+      if (field.fieldType === 'c') {
+        // Checkbox
+        initialValues[field.fieldName] = field.value === 'true';
+      } else if (field.fieldType === 'd' || field.fieldType === 'dt') {
+        // Date/DateTime
+        initialValues[field.fieldName] = field.value ? dayjs(field.value) : null;
+      } else {
+        // Text, Number, Select
+        initialValues[field.fieldName] = field.value || '';
+      }
+    });
+
+    editForm.setFieldsValue(initialValues);
+    setIsEditModalVisible(true);
+  };
+
+  // Hàm cập nhật field values
+  const handleUpdateFieldValues = async (values) => {
+    try {
+      setIsUpdating(true);
+
+      // Chuyển đổi values thành format API yêu cầu
+      const fieldValues = filledData.parsedFieldValues.map(field => {
+        let newValue = values[field.fieldName];
+
+        // Xử lý theo từng field type
+        if (field.fieldType === 'c') {
+          // Checkbox
+          newValue = newValue ? 'true' : 'false';
+                 } else if (field.fieldType === 'd') {
+           // Date
+           newValue = newValue ? newValue.format('YYYY-MM-DD') : '';
+         } else if (field.fieldType === 'dt') {
+           // DateTime
+           newValue = newValue ? newValue.format('YYYY-MM-DD HH:mm:ss') : '';
+         } else {
+          // Text, Number, Select
+          newValue = newValue || '';
+        }
+
+        return {
+          fieldName: field.fieldName,
+          fieldType: field.fieldType,
+          label: field.label,
+          value: newValue
+        };
+      });
+
+      // Gọi API update
+      const response = await formService.updateFieldValues(userFillFormId, fieldValues);
+
+      if (response.statusCode === 200) {
+        messageApi.success('Cập nhật dữ liệu thành công!');
+        
+        // Cập nhật state với dữ liệu mới
+        setFilledData(prev => ({
+          ...prev,
+          parsedFieldValues: fieldValues,
+          rawJsonFieldValue: JSON.stringify(fieldValues, null, 2)
+        }));
+
+        // Đóng modal
+        setIsEditModalVisible(false);
+        
+        // Reprocess Word document với dữ liệu mới
+        if (originalWordBlob) {
+          await processWordWithData(originalWordBlob, fieldValues);
+        }
+      } else {
+        messageApi.error('Có lỗi xảy ra khi cập nhật dữ liệu');
+      }
+    } catch (error) {
+      console.error('Error updating field values:', error);
+      messageApi.error('Có lỗi xảy ra khi cập nhật dữ liệu');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   if (loading) {
     return (
       <AppLayout>
@@ -783,19 +876,35 @@ const ViewFilledFormPage = () => {
           {/* Action Buttons */}
           <Space size="middle">
             {filledData?.status === 'Draft' && (
-              <Button 
-                type="default"
-                onClick={handleCompleteForm}
-                loading={isCompleting}
-                size="large"
-                style={{ 
-                  backgroundColor: '#52c41a',
-                  borderColor: '#52c41a',
-                  color: 'white'
-                }}
-              >
-                Hoàn thành
-              </Button>
+              <>
+                <Button 
+                  type="default"
+                  icon={<EditOutlined />}
+                  onClick={handleEditForm}
+                  size="large"
+                  style={{ 
+                    backgroundColor: '#1890ff',
+                    borderColor: '#1890ff',
+                    color: 'white'
+                  }}
+                >
+                  Chỉnh sửa
+                </Button>
+                
+                <Button 
+                  type="default"
+                  onClick={handleCompleteForm}
+                  loading={isCompleting}
+                  size="large"
+                  style={{ 
+                    backgroundColor: '#52c41a',
+                    borderColor: '#52c41a',
+                    color: 'white'
+                  }}
+                >
+                  Hoàn thành
+                </Button>
+              </>
             )}
             
             <Button 
@@ -957,6 +1066,133 @@ const ViewFilledFormPage = () => {
             }}
           />
         </div>
+
+        {/* Edit Modal */}
+        <Modal
+          title="Chỉnh sửa dữ liệu form"
+          open={isEditModalVisible}
+          onCancel={() => setIsEditModalVisible(false)}
+          footer={null}
+          width={800}
+          maskClosable={false}
+        >
+          <Form
+            form={editForm}
+            layout="vertical"
+            onFinish={handleUpdateFieldValues}
+            style={{ maxHeight: '500px', overflowY: 'auto' }}
+          >
+            {filledData?.parsedFieldValues?.map((field, index) => {
+              const renderField = () => {
+                switch (field.fieldType) {
+                  case 'c': // Checkbox
+                    return (
+                      <Form.Item
+                        key={field.fieldName}
+                        name={field.fieldName}
+                        label={field.label || field.fieldName}
+                        valuePropName="checked"
+                      >
+                        <Checkbox>{field.label || field.fieldName}</Checkbox>
+                      </Form.Item>
+                    );
+                  
+                  case 'd': // Date
+                    return (
+                      <Form.Item
+                        key={field.fieldName}
+                        name={field.fieldName}
+                        label={field.label || field.fieldName}
+                      >
+                        <DatePicker 
+                          style={{ width: '100%' }}
+                          format="DD/MM/YYYY"
+                          placeholder="Chọn ngày"
+                        />
+                      </Form.Item>
+                    );
+                  
+                  case 'dt': // DateTime
+                    return (
+                      <Form.Item
+                        key={field.fieldName}
+                        name={field.fieldName}
+                        label={field.label || field.fieldName}
+                      >
+                        <DatePicker 
+                          showTime
+                          style={{ width: '100%' }}
+                          format="DD/MM/YYYY HH:mm"
+                          placeholder="Chọn ngày và giờ"
+                        />
+                      </Form.Item>
+                    );
+                  
+                  case 'n': // Number
+                    return (
+                      <Form.Item
+                        key={field.fieldName}
+                        name={field.fieldName}
+                        label={field.label || field.fieldName}
+                      >
+                        <Input 
+                          type="number" 
+                          placeholder={`Nhập ${field.label || field.fieldName}`}
+                        />
+                      </Form.Item>
+                    );
+                  
+                  case 's': // Select
+                    return (
+                      <Form.Item
+                        key={field.fieldName}
+                        name={field.fieldName}
+                        label={field.label || field.fieldName}
+                      >
+                        <Select 
+                          placeholder={`Chọn ${field.label || field.fieldName}`}
+                          allowClear
+                        >
+                          {/* Tạm thời để trống, có thể cần thêm options từ API */}
+                          <Select.Option value={field.value}>{field.value}</Select.Option>
+                        </Select>
+                      </Form.Item>
+                    );
+                  
+                  default: // Text
+                    return (
+                      <Form.Item
+                        key={field.fieldName}
+                        name={field.fieldName}
+                        label={field.label || field.fieldName}
+                      >
+                        <Input 
+                          placeholder={`Nhập ${field.label || field.fieldName}`}
+                        />
+                      </Form.Item>
+                    );
+                }
+              };
+
+              return renderField();
+            })}
+            
+            <Form.Item style={{ marginTop: '24px', textAlign: 'right' }}>
+              <Space>
+                <Button onClick={() => setIsEditModalVisible(false)}>
+                  Hủy
+                </Button>
+                <Button 
+                  type="primary" 
+                  htmlType="submit" 
+                  loading={isUpdating}
+                >
+                  Cập nhật
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Modal>
       </div>
     </AppLayout>
   );

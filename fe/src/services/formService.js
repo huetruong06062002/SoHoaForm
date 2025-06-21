@@ -119,6 +119,14 @@ const formService = {
     return response.data;
   },
 
+  // API để cập nhật field values
+  updateFieldValues: async (userFillFormId, fieldValues) => {
+    const response = await apiClient.put(`/User/user-fill-form/${userFillFormId}/update-field-values`, {
+      fieldValues: fieldValues
+    });
+    return response.data;
+  },
+
   // Hàm xử lý Word document với dữ liệu thực
   processWordWithFieldValues: async (wordBlob, fieldValues) => {
     try {
