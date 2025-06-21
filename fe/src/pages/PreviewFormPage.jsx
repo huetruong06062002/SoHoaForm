@@ -2641,8 +2641,8 @@ const PreviewFormPage = () => {
          '}' +
          'body { ' +
          '  font-family: Arial, sans-serif; ' +
-         '  font-size: 9px; ' +
-         '  line-height: 1.2; ' +
+         '  font-size: 11px; ' +
+         '  line-height: 1.3; ' +
          '  margin: 0; ' +
          '  padding: 0; ' +
          '  width: 100%; ' +
@@ -2650,36 +2650,74 @@ const PreviewFormPage = () => {
          'table { ' +
          '  width: 100%; ' +
          '  border-collapse: collapse; ' +
-         '  margin: 6px 0; ' +
-         '  font-size: 8px; ' +
+         '  margin: 8px 0; ' +
+         '  font-size: 10px; ' +
          '  page-break-inside: auto; ' +
          '}' +
          'td, th { ' +
          '  border: 1px solid #000; ' +
-         '  padding: 2px 4px; ' +
          '  vertical-align: top; ' +
-         '  font-size: 8px; ' +
          '  word-wrap: break-word; ' +
          '  overflow-wrap: break-word; ' +
-         '  line-height: 1.1; ' +
          '}' +
          'th { ' +
          '  background: #f5f5f5 !important; ' +
          '  font-weight: bold; ' +
+         '  text-align: center; ' +
+         '  padding: 4px; ' +
+         '  font-size: 9px; ' +
+         '}' +
+         'td { ' +
+         '  padding: 4px; ' +
+         '  font-size: 10px; ' +
+         '}' +
+         '/* Cột 1: Task - rộng nhất cho text dài */' +
+         'td:first-child { ' +
+         '  width: 200px; ' +
+         '  min-width: 200px; ' +
+         '  font-size: 11px; ' +
+         '  padding: 6px; ' +
+         '  line-height: 1.3; ' +
+         '}' +
+         'th:first-child { ' +
+         '  width: 200px; ' +
+         '  min-width: 200px; ' +
+         '}' +
+         '/* Cột 2: Reference - vừa phải */' +
+         'td:nth-child(2) { ' +
+         '  width: 150px; ' +
+         '  min-width: 150px; ' +
+         '  font-size: 10px; ' +
+         '  padding: 5px; ' +
+         '}' +
+         'th:nth-child(2) { ' +
+         '  width: 150px; ' +
+         '  min-width: 150px; ' +
+         '}' +
+         '/* Từ cột 3 trở đi: Competency - nhỏ gọn */' +
+         'td:nth-child(n+3) { ' +
+         '  width: 60px; ' +
+         '  min-width: 60px; ' +
+         '  max-width: 60px; ' +
+         '  text-align: center; ' +
+         '  font-size: 10px; ' +
+         '  font-weight: bold; ' +
+         '  padding: 3px; ' +
+         '}' +
+         'th:nth-child(n+3) { ' +
+         '  width: 60px; ' +
+         '  min-width: 60px; ' +
+         '  max-width: 60px; ' +
          '  font-size: 8px; ' +
+         '  padding: 2px; ' +
+         '  writing-mode: vertical-rl; ' +
+         '  text-orientation: mixed; ' +
+         '  height: 100px; ' +
          '}' +
          '.header-table { margin-bottom: 10px; }' +
          '.vietjet-logo { color: #e31e24 !important; font-weight: bold; }' +
          '.form-title { font-weight: bold; text-align: center; font-size: 10px; }' +
          '.form-info { font-size: 7px; }' +
-         '/* Tối ưu bảng rộng để fit A4 dọc */' +
-         'table td:nth-child(n+8) { ' +
-         '  font-size: 7px; ' +
-         '  padding: 1px 2px; ' +
-         '}' +
-         '/* Responsive column width */' +
-         'table { table-layout: auto; }' +
-         'td { max-width: 80px; }' +
          '@media print {' +
          '  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }' +
          '  .no-print { display: none !important; }' +
