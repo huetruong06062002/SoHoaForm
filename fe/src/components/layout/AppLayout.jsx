@@ -11,6 +11,8 @@ const AppLayout = ({ children }) => {
   const dispatch = useDispatch();
   const { isAuthenticated, user } = useSelector((state) => state.auth);
 
+  console.log("isAuthenticated", isAuthenticated);
+
   const handleLogout = async () => {
     try {
       await dispatch(logoutAsync()).unwrap();
@@ -24,7 +26,7 @@ const AppLayout = ({ children }) => {
     {
       key: 'role',
       label: (
-        <div style={{ 
+        <div style={{
           padding: '5px 16px',
           color: 'rgba(0, 0, 0, 0.88)',
           fontWeight: 400,
@@ -37,7 +39,7 @@ const AppLayout = ({ children }) => {
     {
       key: 'logout',
       label: (
-        <div style={{ 
+        <div style={{
           padding: '5px 16px',
           color: 'rgba(0, 0, 0, 0.88)',
           fontWeight: 400,
@@ -56,7 +58,7 @@ const AppLayout = ({ children }) => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ 
+      <Header style={{
         padding: '0 16px',
         background: '#1677ff',
         display: 'flex',
@@ -67,10 +69,10 @@ const AppLayout = ({ children }) => {
       }}>
         {/* Left side - Logo and Navigation */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-          <div 
-            style={{ 
-              color: 'white', 
-              fontSize: '16px', 
+          <div
+            style={{
+              color: 'white',
+              fontSize: '16px',
               fontWeight: 'bold',
               cursor: 'pointer'
             }}
@@ -78,7 +80,7 @@ const AppLayout = ({ children }) => {
           >
             SoHoaForm
           </div>
-          
+
           <div style={{ display: 'flex', gap: '24px' }}>
             <div
               style={{
@@ -91,7 +93,7 @@ const AppLayout = ({ children }) => {
             >
               Trang chủ
             </div>
-            <div
+            {isAuthenticated && (<div
               style={{
                 color: 'white',
                 cursor: 'pointer',
@@ -101,7 +103,7 @@ const AppLayout = ({ children }) => {
               onClick={() => navigate('/allForm')}
             >
               Điền form
-            </div>
+            </div>)}
             {/* Chỉ hiển thị "Quản lý form" cho admin */}
             {user?.role === 'admin' && (
               <div
@@ -127,8 +129,8 @@ const AppLayout = ({ children }) => {
               trigger={['click']}
               placement="bottomRight"
             >
-              <div style={{ 
-                color: 'white', 
+              <div style={{
+                color: 'white',
                 cursor: 'pointer',
                 fontSize: '14px',
                 display: 'flex',
@@ -136,7 +138,7 @@ const AppLayout = ({ children }) => {
                 gap: '4px'
               }}>
                 <Space>
-                <Avatar size="small" icon={<UserOutlined />} />
+                  <Avatar size="small" icon={<UserOutlined />} />
                   Vai trò: {user.role === 'admin' ? 'Quản trị viên' : 'Người dùng'}
                   <DownOutlined style={{ fontSize: '12px' }} />
                 </Space>
@@ -144,8 +146,8 @@ const AppLayout = ({ children }) => {
             </Dropdown>
           ) : (
             <div
-              style={{ 
-                color: 'white', 
+              style={{
+                color: 'white',
                 cursor: 'pointer',
                 fontSize: '14px',
                 opacity: 0.85

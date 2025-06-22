@@ -1927,6 +1927,27 @@ const PreviewFormPage = () => {
           });
   };
 
+  // Helper function để debug form state
+  const debugFormState = () => {
+    console.log('\n🔍 DEBUGGING FORM STATE');
+    console.log('Container ref:', !!containerRef.current);
+    
+    if (containerRef.current) {
+      const allInputs = containerRef.current.querySelectorAll('.form-input');
+      console.log(`Found ${allInputs.length} inputs in DOM:`);
+      
+      allInputs.forEach((input, i) => {
+        console.log(`  ${i}: ${input.dataset.fieldName} (${input.dataset.fieldType}) = "${input.value}"`);
+      });
+      
+      console.log(`\nForm fields from API (${formFields.length}):`);
+      formFields.forEach((field, i) => {
+        console.log(`  ${i}: ${field.fieldName} (${field.fieldType}) required: ${field.isRequired}`);
+      });
+    }
+    console.log('End debug\n');
+  };
+
   // Function validate form trước khi lưu
   const validateForm = () => {
     const errors = [];
@@ -1937,62 +1958,151 @@ const PreviewFormPage = () => {
     
     // Tạo map để dễ tra cứu giá trị
     const fieldValueMap = new Map();
-    inputs.forEach(input => {
+    inputs.forEach((input, index) => {
       const fieldName = input.dataset.fieldName;
       let value = '';
+      
+      // Debug each input element
+      console.log(`Input ${index}:`, {
+        tagName: input.tagName,
+        type: input.type,
+        fieldName: fieldName,
+        fieldType: input.dataset.fieldType,
+        rawValue: input.value,
+        checked: input.checked,
+        selectedIndex: input.selectedIndex,
+        hasOptions: input.options?.length
+      });
       
       switch (input.dataset.fieldType?.toLowerCase()) {
         case 'c': // checkbox
           value = input.checked;
+          console.log(`  Checkbox value: ${value}`);
           break;
         case 's': // select
           value = input.value;
+          console.log(`  Select value: "${value}" (selectedIndex: ${input.selectedIndex})`);
           break;
         case 'dt': // date
+          value = input.value?.trim() || '';
+          console.log(`  Date value: "${value}"`);
+          break;
         case 'd': // number
+          value = input.value?.trim() || '';
+          console.log(`  Number value: "${value}"`);
+          break;
         case 't': // text
+          value = input.value?.trim() || '';
+          console.log(`  Text value: "${value}"`);
+          break;
         case 'f': // formula
+          value = input.value?.trim() || '';
+          console.log(`  Formula value: "${value}"`);
+          break;
         default:
           value = input.value?.trim() || '';
+          console.log(`  Default value: "${value}"`);
           break;
       }
       
       fieldValueMap.set(fieldName, value);
-      console.log(`Field ${fieldName} (${input.dataset.fieldType}): "${value}"`);
+      console.log(`  Final mapped: ${fieldName} (${input.dataset.fieldType}) = "${value}"`);
     });
 
-    console.log('fieldValueMap:', fieldValueMap);
+    console.log('fieldValueMap size:', fieldValueMap.size);
+    console.log('fieldValueMap entries:', Array.from(fieldValueMap.entries()));
 
     // Validate từng field
-    formFields.forEach(fieldInfo => {
-      const fieldName = fieldInfo.fieldName;
-      const fieldValue = fieldValueMap.get(fieldName);
+    console.log('formFields to validate:', formFields.length);
+    formFields.forEach((fieldInfo, index) => {
+      const originalFieldName = fieldInfo.fieldName;
+      let fieldName = originalFieldName;
+      let fieldValue = fieldValueMap.get(fieldName);
+      let actualDomFieldName = fieldName; // Track the actual DOM field name
+      
+      // If exact match not found, try case-insensitive match
+      if (fieldValue === undefined) {
+        console.log(`Exact match not found for ${fieldName}, trying case-insensitive...`);
+        for (const [mapKey, mapValue] of fieldValueMap.entries()) {
+          if (mapKey && fieldName && mapKey.toLowerCase() === fieldName.toLowerCase()) {
+            fieldValue = mapValue;
+            actualDomFieldName = mapKey; // Use the actual DOM field name
+            console.log(`Found case-insensitive match: ${mapKey} -> ${fieldName}`);
+            console.log(`Will use DOM field name: ${actualDomFieldName}`);
+            break;
+          }
+        }
+      }
 
-      console.log(`Validating field ${fieldName}:`, {
+      console.log(`\n--- Validating field ${index}: ${originalFieldName} ---`);
+      console.log('Field info:', {
+        originalFieldName: fieldInfo.fieldName,
+        actualDomFieldName: actualDomFieldName,
         fieldType: fieldInfo.fieldType,
         isRequired: fieldInfo.isRequired,
-        fieldValue: fieldValue,
-        formula: fieldInfo.formula
+        formula: fieldInfo.formula,
+        fieldDescription: fieldInfo.fieldDescription
       });
+      console.log('Field value from map:', fieldValue);
+      console.log('Value type:', typeof fieldValue);
+      console.log('Value === "":', fieldValue === '');
+      console.log('!fieldValue:', !fieldValue);
+
+      // Debug: check if field exists in DOM using the actual DOM field name
+      const domInput = containerRef.current?.querySelector(`[data-field-name="${actualDomFieldName}"]`);
+      if (domInput) {
+        console.log('DOM input found:', {
+          tagName: domInput.tagName,
+          type: domInput.type,
+          value: domInput.value,
+          checked: domInput.checked,
+          fieldType: domInput.dataset.fieldType
+        });
+               } else {
+         console.log('❌ DOM input NOT FOUND for field:', actualDomFieldName);
+         
+         // Try to find with partial match
+         const allInputs = containerRef.current?.querySelectorAll('.form-input') || [];
+         const similarInputs = Array.from(allInputs).filter(inp => 
+           inp.dataset.fieldName?.toLowerCase().includes(originalFieldName.toLowerCase()) ||
+           originalFieldName.toLowerCase().includes(inp.dataset.fieldName?.toLowerCase() || '')
+         );
+         console.log('Similar inputs found:', similarInputs.map(inp => ({
+           fieldName: inp.dataset.fieldName,
+           value: inp.value
+         })));
+       }
+
+       // Skip validation if field doesn't exist in DOM (might be hidden/not rendered)
+       if (!domInput) {
+         console.log(`⚠️ Skipping validation for ${originalFieldName} (DOM: ${actualDomFieldName}) - no DOM input found`);
+         return; // Skip this field entirely
+       }
 
       // 1. Validate isRequired
       if (fieldInfo.isRequired) {
+        console.log(`Field ${originalFieldName} (DOM: ${actualDomFieldName}) is required, checking...`);
         let isEmpty = false;
         
         if (fieldInfo.fieldType?.toLowerCase() === 'boolean') {
           // Boolean field required nghĩa là phải được check (true)
           isEmpty = !fieldValue; // false = empty, true = not empty
-          console.log(`Boolean field ${fieldName} required check - checked: ${fieldValue}, isEmpty: ${isEmpty}`);
+          console.log(`Boolean field ${originalFieldName} required check - checked: ${fieldValue}, isEmpty: ${isEmpty}`);
         } else {
           isEmpty = !fieldValue || fieldValue === '';
-          console.log(`Non-boolean field ${fieldName} required check - value: "${fieldValue}", isEmpty: ${isEmpty}`);
+          console.log(`Non-boolean field ${originalFieldName} required check - value: "${fieldValue}", isEmpty: ${isEmpty}`);
         }
         
         if (isEmpty) {
-          const errorMsg = `${getDisplayFieldName(fieldName)} là bắt buộc`;
-          console.log(`Adding required error: ${errorMsg}`);
+          // Use actualDomFieldName for display as it matches what user sees
+          const errorMsg = `${getDisplayFieldName(actualDomFieldName)} là bắt buộc`;
+          console.log(`❌ Adding required error: ${errorMsg}`);
           errors.push(errorMsg);
+        } else {
+          console.log(`✅ Field ${originalFieldName} has valid value: "${fieldValue}"`);
         }
+      } else {
+        console.log(`Field ${originalFieldName} is not required, skipping`);
       }
 
       // 2. Validate isUpperCase cho Text fields
@@ -2000,7 +2110,7 @@ const PreviewFormPage = () => {
           (fieldInfo.fieldType?.toLowerCase() === 'text') && 
           fieldValue && fieldValue !== '') {
         if (fieldValue !== fieldValue.toUpperCase()) {
-          errors.push(`${getDisplayFieldName(fieldName)} phải viết HOA`);
+          errors.push(`${getDisplayFieldName(actualDomFieldName)} phải viết HOA`);
         }
       }
 
@@ -2009,7 +2119,7 @@ const PreviewFormPage = () => {
           fieldInfo.formula && 
           !fieldInfo.formula.match(/^\{c_.*\}$/)) {
         
-        console.log(`Processing Boolean dependency for ${fieldName}:`, {
+        console.log(`Processing Boolean dependency for ${originalFieldName}:`, {
           formula: fieldInfo.formula,
           fieldValue: fieldValue,
           isChecked: !!fieldValue
@@ -2017,11 +2127,11 @@ const PreviewFormPage = () => {
         
         // CHỈ kiểm tra dependencies khi Boolean field được check (true)
         if (fieldValue) {
-          console.log(`${fieldName} is checked, validating dependencies...`);
+          console.log(`${originalFieldName} is checked, validating dependencies...`);
           
           // Parse dependencies từ formula đơn giản: "TraineeName, TraineeID"
           const dependencies = fieldInfo.formula.split(',').map(f => f.trim()).filter(f => f.length > 0);
-          console.log(`Dependencies for ${fieldName}:`, dependencies);
+          console.log(`Dependencies for ${originalFieldName}:`, dependencies);
           
           // Kiểm tra từng dependency
           dependencies.forEach(depFieldName => {
@@ -2029,13 +2139,13 @@ const PreviewFormPage = () => {
             console.log(`Checking dependency ${depFieldName}: value = "${depValue}"`);
             
             if (!depValue || depValue === '') {
-              const errorMsg = `${getDisplayFieldName(depFieldName)} phải có giá trị vì liên quan đến ${getDisplayFieldName(fieldName)}`;
+              const errorMsg = `${getDisplayFieldName(depFieldName)} phải có giá trị vì liên quan đến ${getDisplayFieldName(actualDomFieldName)}`;
               console.log(`Adding dependency error: ${errorMsg}`);
               errors.push(errorMsg);
             }
           });
         } else {
-          console.log(`${fieldName} is not checked, skipping dependency validation`);
+          console.log(`${originalFieldName} is not checked, skipping dependency validation`);
         }
       }
     });
@@ -2052,6 +2162,9 @@ const PreviewFormPage = () => {
 
   const handleSave = async () => {
     try {
+      // Debug form state first
+      debugFormState();
+      
       // Validate form trước khi lưu
       const validationResult = validateForm();
       
