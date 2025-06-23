@@ -9,6 +9,16 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 Environment.SetEnvironmentVariable("TZ", "Asia/Ho_Chi_Minh");
+// BYPASS tất cả font validation
+Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
+Environment.SetEnvironmentVariable("SPIRE_IGNORE_MISSING_FONTS", "true");
+Environment.SetEnvironmentVariable("SPIRE_DISABLE_FONT_VALIDATION", "true");
+Environment.SetEnvironmentVariable("SPIRE_USE_SYSTEM_FONTS", "false");
+Environment.SetEnvironmentVariable("SPIRE_FORCE_DEFAULT_FONT", "true");
+
+// Đặt font mặc định là system default
+Environment.SetEnvironmentVariable("SPIRE_DEFAULT_FONT", "");
+
 
 // Add services to the container.
 builder.Services.AddControllers();
