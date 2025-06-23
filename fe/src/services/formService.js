@@ -141,9 +141,9 @@ const formService = {
     return response.data;
   },
 
-  // API để lấy PDF từ userFillFormId
-  getFormPDF: async (userFillFormId) => {
-    const response = await apiClient.get(`/User/user-fill-form/${userFillFormId}/pdf`, {
+  // API để lấy PDF từ formId
+  getFormPDF: async (formId) => {
+    const response = await apiClient.get(`/User/form/${formId}/export-pdf`, {
       responseType: 'blob'
     });
     return response.data;

@@ -695,10 +695,12 @@ namespace SoHoaFormApi.Infrastructure.Services
                 var document = new Spire.Doc.Document();
                 document.LoadFromFile(wordFilePath);
 
-                // 🎯 FILL DATA VÀO WORD TEMPLATE
-                if (fieldValues.Any())
+                // 🎯 LUÔN CLEAN PLACEHOLDER - DÙ CÓ DATA HAY KHÔNG
+                await Task.Run(() => CleanAllPlaceholders(document, fieldValues ?? new List<FieldValueDto>()));
+
+                // Chỉ add data table nếu có data
+                if (fieldValues?.Any() == true)
                 {
-                    await Task.Run(() => FillWordTemplateWithSpire(document, fieldValues));
                     await Task.Run(() => AddDataToWordDocumentWithSpire(document, form, fieldValues));
                 }
 
@@ -714,6 +716,160 @@ namespace SoHoaFormApi.Infrastructure.Services
                 Console.WriteLine($"❌ Error with Spire.Doc: {ex.Message}");
                 throw;
             }
+        }
+        private void CleanAllPlaceholders(Spire.Doc.Document document, List<FieldValueDto> fieldValues)
+        {
+            try
+            {
+                Console.WriteLine($"🧹 Processing ALL placeholders with {fieldValues.Count} field values...");
+
+                // 1. TẠO DICTIONARY TỪ FIELD VALUES
+                var fieldDict = fieldValues.ToDictionary(f => f.FieldName, f => f.Value?.ToString() ?? "");
+
+                // 2. TÌM TẤT CẢ PLACEHOLDER TRONG DOCUMENT
+                var documentText = document.GetText();
+                var placeholderPattern = @"\{([^}]+)\}";
+                var regex = new System.Text.RegularExpressions.Regex(placeholderPattern);
+                var matches = regex.Matches(documentText);
+
+                Console.WriteLine($"🔍 Found {matches.Count} total placeholders to process");
+
+                var processedPlaceholders = new HashSet<string>();
+                int successCount = 0;
+                int emptyCount = 0;
+
+                foreach (System.Text.RegularExpressions.Match match in matches)
+                {
+                    var placeholder = match.Value; // Full placeholder như {n_so1}
+                    var fieldKey = match.Groups[1].Value; // Chỉ lấy phần trong {} như n_so1
+
+                    // Bỏ qua nếu đã xử lý
+                    if (processedPlaceholders.Contains(placeholder))
+                        continue;
+
+                    Console.WriteLine($"🔄 Processing placeholder: {placeholder}");
+
+                    // 3. LẤY REPLACEMENT VALUE HOẶC RỖNG
+                    var replacementValue = GetReplacementValue(fieldKey, fieldDict);
+
+                    // 4. BẮT BUỘC THAY THẾ - DÙNG NHIỀU PHƯƠNG PHÁP
+                    var replaceSuccess = false;
+
+                    // Method 1: Standard replace
+                    var replaceCount = document.Replace(placeholder, replacementValue, true, true);
+                    if (replaceCount > 0)
+                    {
+                        Console.WriteLine($"  ✅ Standard replace: {placeholder} → '{replacementValue}' ({replaceCount} times)");
+                        replaceSuccess = true;
+                        if (string.IsNullOrEmpty(replacementValue)) emptyCount++; else successCount++;
+                    }
+                    else
+                    {
+                        // Method 2: Case insensitive
+                        var replaceCount2 = document.Replace(placeholder, replacementValue, false, true);
+                        if (replaceCount2 > 0)
+                        {
+                            Console.WriteLine($"  ✅ Case insensitive: {placeholder} → '{replacementValue}' ({replaceCount2} times)");
+                            replaceSuccess = true;
+                            if (string.IsNullOrEmpty(replacementValue)) emptyCount++; else successCount++;
+                        }
+                        else
+                        {
+                            // Method 3: Force manual replace
+                            var manualCount = ForceManualReplace(document, placeholder, replacementValue);
+                            if (manualCount > 0)
+                            {
+                                Console.WriteLine($"  🔧 Manual replace: {placeholder} → '{replacementValue}' ({manualCount} times)");
+                                replaceSuccess = true;
+                                if (string.IsNullOrEmpty(replacementValue)) emptyCount++; else successCount++;
+                            }
+                        }
+                    }
+
+                    if (!replaceSuccess)
+                    {
+                        Console.WriteLine($"  ❌ ALL METHODS FAILED for: {placeholder}");
+                    }
+
+                    processedPlaceholders.Add(placeholder);
+                }
+
+                Console.WriteLine($"📊 Processing summary:");
+                Console.WriteLine($"  - Total placeholders: {matches.Count}");
+                Console.WriteLine($"  - Filled with data: {successCount}");
+                Console.WriteLine($"  - Replaced with empty: {emptyCount}");
+                Console.WriteLine($"  - Failed: {matches.Count - successCount - emptyCount}");
+
+                Console.WriteLine("✅ All placeholders processing completed");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error processing placeholders: {ex.Message}");
+            }
+        }
+
+        // 🆕 HÀM FORCE MANUAL REPLACE
+        private int ForceManualReplace(Spire.Doc.Document document, string findText, string replaceText)
+        {
+            int totalReplacements = 0;
+            try
+            {
+                // Duyệt qua tất cả sections
+                foreach (Section section in document.Sections)
+                {
+                    // Duyệt qua tất cả paragraphs
+                    foreach (Paragraph paragraph in section.Paragraphs)
+                    {
+                        var paragraphText = paragraph.Text;
+                        if (paragraphText.Contains(findText))
+                        {
+                            // Thay thế text trong paragraph
+                            var newText = paragraphText.Replace(findText, replaceText ?? "");
+
+                            // Clear paragraph và thêm text mới
+                            paragraph.ChildObjects.Clear();
+                            var textRange = paragraph.AppendText(newText);
+                            textRange.CharacterFormat.FontName = "Times New Roman";
+                            textRange.CharacterFormat.FontSize = 12;
+
+                            totalReplacements++;
+                            Console.WriteLine($"    🔧 Manual replaced in paragraph: {findText} → '{replaceText}'");
+                        }
+                    }
+
+                    // Duyệt qua tất cả tables
+                    foreach (Table table in section.Tables)
+                    {
+                        foreach (TableRow row in table.Rows)
+                        {
+                            foreach (TableCell cell in row.Cells)
+                            {
+                                foreach (Paragraph cellPara in cell.Paragraphs)
+                                {
+                                    var cellText = cellPara.Text;
+                                    if (cellText.Contains(findText))
+                                    {
+                                        var newText = cellText.Replace(findText, replaceText ?? "");
+                                        cellPara.ChildObjects.Clear();
+                                        var textRange = cellPara.AppendText(newText);
+                                        textRange.CharacterFormat.FontName = "Times New Roman";
+                                        textRange.CharacterFormat.FontSize = 12;
+
+                                        totalReplacements++;
+                                        Console.WriteLine($"    🔧 Manual replaced in table cell: {findText} → '{replaceText}'");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error in manual replace: {ex.Message}");
+            }
+
+            return totalReplacements;
         }
 
         private void FillWordTemplateWithSpire(Spire.Doc.Document document, List<FieldValueDto> fieldValues)
@@ -888,7 +1044,7 @@ namespace SoHoaFormApi.Infrastructure.Services
             }
         }
 
-    
+
         private void AddDataToWordDocumentWithSpire(Spire.Doc.Document document, Form form, List<FieldValueDto> fieldValues)
         {
             try

@@ -20,6 +20,7 @@ const PreviewFormPage = () => {
   const [formInfo, setFormInfo] = useState(null);
   const [formFields, setFormFields] = useState([]);
   const [savedFormData, setSavedFormData] = useState(null);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
   const containerRef = useRef(null);
 
   // Function để tính toán công thức
@@ -255,14 +256,14 @@ const PreviewFormPage = () => {
           apiFieldType: apiFieldInfo?.fieldType,
           formFieldsDataLength: formFieldsData.length
         });
-        
+
         if (apiFieldInfo && apiFieldInfo.fieldType === 'Date') {
           internalFieldType = 'dt'; // Date
           console.log(`Setting ${fieldName} as date field (dt)`);
         } else {
           // Fallback: check nếu fieldName chứa "date"
-          if (fieldName.toLowerCase().includes('date') || 
-              fieldName.toLowerCase().includes('ngay')) {
+          if (fieldName.toLowerCase().includes('date') ||
+            fieldName.toLowerCase().includes('ngay')) {
             internalFieldType = 'dt'; // Date
             console.log(`Setting ${fieldName} as date field (dt) based on name`);
           } else {
@@ -426,7 +427,7 @@ const PreviewFormPage = () => {
     element.dataset.fieldType = internalFieldType;
     element.dataset.fieldName = fieldName;
     element.dataset.originalFieldType = fieldType; // Lưu field type gốc từ placeholder pattern
-    
+
     // Nếu có fieldInfo từ API, lưu luôn API field type
     if (fieldInfo && fieldInfo.fieldType) {
       element.dataset.apiFieldType = fieldInfo.fieldType;
@@ -632,7 +633,7 @@ const PreviewFormPage = () => {
 
       // Pass fieldType từ placeholder (d, t, c, etc.) để logic trong createInputElement xử lý đúng
       const inputElement = createInputElement(fieldType, fieldName, fieldInfo, formFields);
-      
+
       console.log('DEBUG - Created input element:', {
         tagName: inputElement.tagName,
         type: inputElement.type,
@@ -665,8 +666,8 @@ const PreviewFormPage = () => {
     setTimeout(() => {
       if (containerRef.current && formFields.length > 0) {
         console.log('POST-PROCESS: Converting Date fields to date inputs...');
-        console.log('POST-PROCESS: Available formFields:', formFields.map(f => ({name: f.fieldName, type: f.fieldType})));
-        
+        console.log('POST-PROCESS: Available formFields:', formFields.map(f => ({ name: f.fieldName, type: f.fieldType })));
+
         // Tìm tất cả input elements hiện có
         const allInputs = containerRef.current.querySelectorAll('input[data-field-name]');
         console.log('POST-PROCESS: Found inputs:', Array.from(allInputs).map(input => ({
@@ -674,20 +675,20 @@ const PreviewFormPage = () => {
           type: input.type,
           currentClass: input.className
         })));
-        
+
         formFields.forEach(field => {
           if (field.fieldType === 'Date') {
             console.log(`POST-PROCESS: Processing Date field: ${field.fieldName}`);
-            
+
             // Tìm input element cho field này - thử nhiều cách
             let inputs = containerRef.current.querySelectorAll(`input[data-field-name="${field.fieldName}"]`);
-            
+
             // Nếu không tìm thấy chính xác, thử tìm bằng partial match
             if (inputs.length === 0) {
               inputs = containerRef.current.querySelectorAll(`input[data-field-name*="${field.fieldName}"]`);
               console.log(`POST-PROCESS: Used partial match for ${field.fieldName}, found ${inputs.length} inputs`);
             }
-            
+
             // Nếu vẫn không có, thử tìm bằng field name variations
             if (inputs.length === 0) {
               const variations = [
@@ -695,7 +696,7 @@ const PreviewFormPage = () => {
                 field.fieldName.replace(/\s+/g, ''),
                 field.fieldName.replace(/\s+/g, '').toLowerCase(),
               ];
-              
+
               for (const variation of variations) {
                 inputs = containerRef.current.querySelectorAll(`input[data-field-name="${variation}"]`);
                 if (inputs.length > 0) {
@@ -704,23 +705,23 @@ const PreviewFormPage = () => {
                 }
               }
             }
-            
+
             console.log(`POST-PROCESS: Found ${inputs.length} inputs for ${field.fieldName}`);
-            
+
             inputs.forEach((input, index) => {
               console.log(`POST-PROCESS: Processing input ${index} for ${field.fieldName}:`, {
                 currentType: input.type,
                 currentValue: input.value,
                 currentClass: input.className
               });
-              
+
               if (input.type !== 'date') {
                 console.log(`POST-PROCESS: Converting ${field.fieldName} from ${input.type} to date`);
                 const currentValue = input.value;
                 input.type = 'date';
                 input.className = 'form-input date-input';
                 input.dataset.fieldType = 'dt';
-                
+
                 // Clear invalid values (như chữ "d")
                 if (currentValue === 'd' || currentValue === '0' || !currentValue || currentValue.length < 3) {
                   input.value = '';
@@ -738,7 +739,7 @@ const PreviewFormPage = () => {
                     input.value = ''; // Clear invalid date
                   }
                 }
-                
+
                 console.log(`POST-PROCESS: Successfully converted ${field.fieldName} to date input`);
               } else {
                 console.log(`POST-PROCESS: ${field.fieldName} already is date input`);
@@ -746,21 +747,21 @@ const PreviewFormPage = () => {
             });
           }
         });
-        
+
         // Thêm fallback: tìm tất cả inputs có value="d" hoặc "0" và convert thành date nếu tên field chứa "date"
         const suspiciousInputs = containerRef.current.querySelectorAll('input[type="text"], input[type="number"]');
         suspiciousInputs.forEach(input => {
           const fieldName = input.dataset.fieldName || '';
           const value = input.value || '';
-          
-          if ((fieldName.toLowerCase().includes('date') || fieldName.toLowerCase().includes('ngay')) && 
-              (value === 'd' || value === '0' || value === '' || input.type === 'number')) {
+
+          if ((fieldName.toLowerCase().includes('date') || fieldName.toLowerCase().includes('ngay')) &&
+            (value === 'd' || value === '0' || value === '' || input.type === 'number')) {
             console.log(`POST-PROCESS: FALLBACK - Converting suspicious input to date:`, {
               fieldName: fieldName,
               currentType: input.type,
               currentValue: value
             });
-            
+
             input.type = 'date';
             input.className = 'form-input date-input';
             input.dataset.fieldType = 'dt';
@@ -776,16 +777,16 @@ const PreviewFormPage = () => {
     // Thêm một cơ chế fallback mạnh mẽ hơn
     setTimeout(() => {
       console.log('FINAL FALLBACK: Checking for date fields...');
-      
+
       // Tìm tất cả inputs hiện tại
       const allInputs = containerRef.current?.querySelectorAll('input') || [];
       console.log('FINAL FALLBACK: Total inputs found:', allInputs.length);
-      
+
       allInputs.forEach((input, index) => {
         const fieldName = input.dataset.fieldName || input.name || `input-${index}`;
         const currentType = input.type;
         const currentValue = input.value;
-        
+
         console.log(`FINAL FALLBACK: Input ${index}:`, {
           fieldName,
           type: currentType,
@@ -793,27 +794,27 @@ const PreviewFormPage = () => {
           hasDateInName: fieldName.toLowerCase().includes('date'),
           isFromDPattern: input.dataset.originalFieldType === 'd'
         });
-        
+
         // Conditions để convert thành date input:
         // 1. Field name chứa "date" 
         // 2. Hoặc data-field-type là từ 'd' pattern
         // 3. Hoặc có API field type là "Date"
         // 4. Hoặc có trong formFields với fieldType="Date"
-        const shouldBeDate = fieldName.toLowerCase().includes('date') || 
-                           fieldName.toLowerCase().includes('ngay') ||
-                           input.dataset.originalFieldType === 'd' ||
-                           input.dataset.apiFieldType === 'Date' ||
-                           formFields.some(f => f.fieldName === fieldName && f.fieldType === 'Date');
-        
+        const shouldBeDate = fieldName.toLowerCase().includes('date') ||
+          fieldName.toLowerCase().includes('ngay') ||
+          input.dataset.originalFieldType === 'd' ||
+          input.dataset.apiFieldType === 'Date' ||
+          formFields.some(f => f.fieldName === fieldName && f.fieldType === 'Date');
+
         if (shouldBeDate && currentType !== 'date') {
           console.log(`FINAL FALLBACK: Converting ${fieldName} to date input`);
           input.type = 'date';
           input.className = 'form-input date-input';
           input.dataset.fieldType = 'dt';
-          
+
           // Clear invalid values
-          if (currentValue === 'd' || currentValue === '0' || currentValue === '1' || 
-              !currentValue || currentValue.length < 3) {
+          if (currentValue === 'd' || currentValue === '0' || currentValue === '1' ||
+            !currentValue || currentValue.length < 3) {
             input.value = '';
             console.log(`FINAL FALLBACK: Cleared invalid value "${currentValue}"`);
           }
@@ -1093,24 +1094,24 @@ const PreviewFormPage = () => {
 
             // Pattern 1: Extract title - chỉ lấy "ANNOUNCEMENT ASSESSMENT FORM"
             console.log('HEADER DEBUG: Extracting title from words...');
-            
+
             // Approach 1: Tìm boundaries chính xác của title
             let titleStartIndex = 0;
             let titleEndIndex = words.length;
-            
+
             // Tìm vị trí kết thúc title (trước VJC, VTC, hoặc các patterns khác)
             for (let i = 0; i < words.length; i++) {
               const word = words[i].toUpperCase();
               // Stop khi gặp code patterns
-              if (word.includes('VJC') || word.includes('VTC') || 
-                  word.match(/^V[JT]C/) || 
-                  word.includes('-') && (word.includes('IF') || word.includes('AA'))) {
+              if (word.includes('VJC') || word.includes('VTC') ||
+                word.match(/^V[JT]C/) ||
+                word.includes('-') && (word.includes('IF') || word.includes('AA'))) {
                 titleEndIndex = i;
                 console.log('HEADER DEBUG: Found code boundary at index:', i, 'word:', word);
                 break;
               }
             }
-            
+
             // Extract title từ đầu đến titleEndIndex
             if (titleEndIndex > 0) {
               const titleWords = words.slice(titleStartIndex, titleEndIndex);
@@ -1120,7 +1121,7 @@ const PreviewFormPage = () => {
                 .trim();
               console.log('HEADER DEBUG: Extracted title:', title);
             }
-            
+
             // Nếu title vẫn rỗng hoặc quá ngắn, thử approach khác
             if (!title || title.length < 5) {
               // Thử regex pattern để tìm title
@@ -1130,7 +1131,7 @@ const PreviewFormPage = () => {
                 /^(.*?ASSESSMENT\s+FORM)/i,
                 /^(.*?)(?=\s+V[JT]C)/i
               ];
-              
+
               for (const pattern of titlePatterns) {
                 const match = headerParts.match(pattern);
                 if (match && match[1].trim().length >= 5) {
@@ -1143,7 +1144,7 @@ const PreviewFormPage = () => {
 
             // Pattern 2: Extract VJC/VTC code - approach đơn giản và hiệu quả hơn
             console.log('HEADER DEBUG: Extracting code from words:', words);
-            
+
             // Approach 1: Tìm trực tiếp trong text với regex patterns
             const directCodePatterns = [
               /VJC-VJAA-F-\d+/i,
@@ -1151,7 +1152,7 @@ const PreviewFormPage = () => {
               /VJC-[A-Z]+-[A-Z]+-\d+/i,
               /VTC-[A-Z]+-[A-Z]+-\d+/i,
             ];
-            
+
             for (const pattern of directCodePatterns) {
               const match = headerParts.match(pattern);
               if (match) {
@@ -1160,48 +1161,48 @@ const PreviewFormPage = () => {
                 break;
               }
             }
-            
+
             // Approach 2: Nếu chưa tìm thấy, thử assembly từ words
             if (!code) {
               console.log('HEADER DEBUG: Trying word assembly...');
-              
+
               for (let i = 0; i < words.length; i++) {
                 const word = words[i].toUpperCase();
                 if (word.includes('VJC') || word.includes('VTC')) {
                   console.log('HEADER DEBUG: Found VJC/VTC at index:', i, 'word:', word);
-                  
+
                   // Collect all potential code parts từ vị trí này
                   let codeParts = [];
                   let j = i;
-                  
+
                   // Continue cho đến khi gặp Iss hoặc date
                   while (j < words.length && j < i + 10) {
                     const currentWord = words[j];
                     console.log('HEADER DEBUG: Processing word at', j, ':', currentWord);
-                    
-                    if (currentWord.toLowerCase().includes('iss') || 
-                        currentWord.includes('/') ||
-                        currentWord.match(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/)) {
+
+                    if (currentWord.toLowerCase().includes('iss') ||
+                      currentWord.includes('/') ||
+                      currentWord.match(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/)) {
                       console.log('HEADER DEBUG: Stopping assembly at:', currentWord);
                       break;
                     }
-                    
+
                     // Add word nếu có potential code content
-                    if (currentWord.match(/[A-Z]{2,4}/) || 
-                        currentWord.match(/^\d{1,4}$/) ||
-                        currentWord.includes('-') ||
-                        currentWord.toUpperCase().includes('VJC') ||
-                        currentWord.toUpperCase().includes('VTC') ||
-                        currentWord.toUpperCase().includes('VJAA') ||
-                        currentWord.toUpperCase().includes('IF') ||
-                        currentWord.toUpperCase() === 'F') {
+                    if (currentWord.match(/[A-Z]{2,4}/) ||
+                      currentWord.match(/^\d{1,4}$/) ||
+                      currentWord.includes('-') ||
+                      currentWord.toUpperCase().includes('VJC') ||
+                      currentWord.toUpperCase().includes('VTC') ||
+                      currentWord.toUpperCase().includes('VJAA') ||
+                      currentWord.toUpperCase().includes('IF') ||
+                      currentWord.toUpperCase() === 'F') {
                       codeParts.push(currentWord);
                       console.log('HEADER DEBUG: Added to code parts:', currentWord);
                     }
-                    
+
                     j++;
                   }
-                  
+
                   if (codeParts.length > 0) {
                     // Join và clean up
                     code = codeParts.join('-')
@@ -1214,7 +1215,7 @@ const PreviewFormPage = () => {
                 }
               }
             }
-            
+
             // Fallback: Regex patterns với patterns cụ thể hơn
             if (!code) {
               const codePatterns = [
@@ -1224,7 +1225,7 @@ const PreviewFormPage = () => {
                 /VTC-[A-Z]+-[A-Z]+-\d+/i,   // VTC-XXXX-X-123
                 /V[JT]C-[A-Z\d\-]+/i        // General VJC/VTC patterns
               ];
-              
+
               for (const pattern of codePatterns) {
                 const match = headerParts.match(pattern);
                 if (match) {
@@ -1234,7 +1235,7 @@ const PreviewFormPage = () => {
                 }
               }
             }
-            
+
             // Additional fallback: tìm trong toàn bộ text bằng word boundaries
             if (!code) {
               // Tìm bất kỳ pattern nào có dạng XXX-XXX-X-XXX
@@ -1247,7 +1248,7 @@ const PreviewFormPage = () => {
 
             // Pattern 3: Extract Issue/Rev từ words array
             console.log('HEADER DEBUG: Extracting Issue/Rev from words...');
-            
+
             // Approach 1: Tìm pattern Iss X / Rev Y hoặc Iss X Rev Y
             const issueRevPatterns = [
               /Iss\s*(\d+)\s*\/\s*Rev\s*(\d+)/i,
@@ -1255,7 +1256,7 @@ const PreviewFormPage = () => {
               /Issue\s*(\d+)\s*\/\s*Rev\s*(\d+)/i,
               /Issue\s*(\d+)\s*Rev\s*(\d+)/i
             ];
-            
+
             for (const pattern of issueRevPatterns) {
               const match = headerParts.match(pattern);
               if (match) {
@@ -1266,7 +1267,7 @@ const PreviewFormPage = () => {
                 break;
               }
             }
-            
+
             // Approach 2: Nếu chưa tìm thấy, parse từ words array
             if (!issue) {
               let issueStartIndex = -1;
@@ -1293,7 +1294,7 @@ const PreviewFormPage = () => {
                   // Extract numbers carefully
                   let issNum = '01';
                   let revNum = '00';
-                  
+
                   // Get Iss number - có thể ở cùng word hoặc word tiếp theo
                   const issWord = words[issueStartIndex];
                   if (issWord.match(/\d+/)) {
@@ -1301,7 +1302,7 @@ const PreviewFormPage = () => {
                   } else if (issueStartIndex + 1 < words.length && words[issueStartIndex + 1].match(/^\d+$/)) {
                     issNum = words[issueStartIndex + 1];
                   }
-                  
+
                   // Get Rev number - có thể ở cùng word hoặc word tiếp theo
                   const revWord = words[revIndex];
                   if (revWord.match(/\d+/)) {
@@ -1310,12 +1311,12 @@ const PreviewFormPage = () => {
                   } else if (revIndex + 1 < words.length && words[revIndex + 1].match(/^\d+$/)) {
                     revNum = words[revIndex + 1];
                   }
-                  
+
                   // Đảm bảo không lấy date làm Rev number
                   if (revNum.length > 2) {
                     revNum = revNum.substring(0, 2); // Chỉ lấy 2 chữ số đầu
                   }
-                  
+
                   issue = `Iss${issNum.padStart(2, '0')}/Rev${revNum.padStart(2, '0')}`;
                   console.log('HEADER DEBUG: Assembled issue from words:', issue, 'issNum:', issNum, 'revNum:', revNum);
                 }
@@ -1350,7 +1351,7 @@ const PreviewFormPage = () => {
             // Fallbacks cho các trường bị thiếu
             if (!title || title.length < 5) {
               console.log('HEADER DEBUG: Using fallback for title');
-              
+
               // Thử extract title từ body content nếu header không có
               const bodyTitleMatch = bodyContent.match(/<h[1-3][^>]*>([^<]+)<\/h[1-3]>/i) ||
                 bodyContent.match(/<p[^>]*style="[^"]*text-align:\s*center[^"]*"[^>]*><strong>([^<]+)<\/strong><\/p>/i) ||
@@ -1370,7 +1371,7 @@ const PreviewFormPage = () => {
                 title = 'ANNOUNCEMENT ASSESSMENT FORM';
               }
             }
-            
+
             // Final cleanup cho title
             if (title) {
               title = title.replace(/\s+/g, ' ').trim();
@@ -1380,7 +1381,7 @@ const PreviewFormPage = () => {
             // Special case: nếu code = "VJC-V" thì có thể bị truncated
             if (code === 'VJC-V' || code === 'VTC-V' || code?.length < 8) {
               console.log('HEADER DEBUG: Code seems truncated:', code, 'trying to find full version...');
-              
+
               // Tìm trong raw text 
               const fullCodePatterns = [
                 /VJC-VJAA-F-\d+/gi,
@@ -1388,7 +1389,7 @@ const PreviewFormPage = () => {
                 /VJC-[A-Z]{2,4}-[A-Z]{1,3}-\d{1,4}/gi,
                 /VTC-[A-Z]{2,4}-[A-Z]{1,3}-\d{1,4}/gi
               ];
-              
+
               for (const pattern of fullCodePatterns) {
                 const matches = headerParts.match(pattern);
                 if (matches && matches[0]) {
@@ -1402,7 +1403,7 @@ const PreviewFormPage = () => {
             // Final fallback cho code nếu vẫn không tìm thấy
             if (!code || code === 'VJC-V' || code === 'VTC-V') {
               console.log('HEADER DEBUG: No valid code found, using fallback. Current code:', code);
-              
+
               // Thử tìm trong toàn bộ text với pattern loose hơn
               const looseCodeMatch = headerParts.match(/[A-Z]{2,3}[\-\s][A-Z]{2,4}[\-\s][A-Z]{1,2}[\-\s]\d{1,4}/i);
               if (looseCodeMatch) {
@@ -1426,7 +1427,7 @@ const PreviewFormPage = () => {
               console.log('HEADER DEBUG: No issue found, using fallback');
               issue = 'Iss03/Rev00';
             }
-            
+
             console.log('HEADER DEBUG: Final issue value:', issue);
 
             if (!date) {
@@ -1583,30 +1584,30 @@ const PreviewFormPage = () => {
         return `${labelFromWord} (${fieldName})`;
       }
     }
-    
+
     // Tìm field info từ API data sau
     const fieldInfo = formFields.find(f => f.fieldName === fieldName);
-    
+
     if (fieldInfo && fieldInfo.fieldDescription && fieldInfo.fieldDescription.trim() !== '') {
       // Sử dụng fieldDescription từ API làm display name chính
       return `${fieldInfo.fieldDescription} (${fieldName})`;
     }
-    
+
     // Fallback: Tự động tạo tên đẹp từ fieldName
     let displayName = fieldName;
-    
+
     // Pattern: {type_FieldName} -> Field Name
     const typeMatch = fieldName.match(/^\{[a-z]_(.+)\}$/);
     if (typeMatch) {
       displayName = typeMatch[1];
     }
-    
+
     // Convert camelCase/PascalCase to readable
     displayName = displayName
       .replace(/([A-Z])/g, ' $1') // Add space before capitals
       .replace(/^./, str => str.toUpperCase()) // Capitalize first letter
       .trim();
-    
+
 
     return `${displayName} (${fieldName})`;
   };
@@ -1614,254 +1615,254 @@ const PreviewFormPage = () => {
   // Function extract label từ Word content
   const extractLabelFromWordContent = (fieldName) => {
     if (!wordContent || !fieldName) return null;
-    
+
     // Map fieldName với field pattern trong Word
     const fieldInfo = formFields.find(f => f.fieldName === fieldName);
     if (!fieldInfo || !fieldInfo.formula) return null;
-    
+
     // Extract pattern từ formula 
     const patternMatch = fieldInfo.formula.match(/^\{([a-z]_.*)\}$/);
     if (!patternMatch) return null;
-    
+
     const fullPattern = patternMatch[1]; // "t_TraineeName"
-    
+
     // Escape pattern cho regex
     const escapedPattern = fullPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    
-         // Tìm pattern trong wordContent và extract text xung quanh
-     const regex = new RegExp(`([^{]*?)\\{${escapedPattern}\\}`, 'i');
-     const match = wordContent.match(regex);
-     
-     if (match && match[1]) {
-       let rawText = match[1];
-       
-       // Extract text từ HTML, ưu tiên text trong <strong> tags
-       let label = '';
-       
-       // Đặc biệt xử lý cho các field trong table (1S, 1W, 2A, etc.)
-       if (/^[0-9][A-Z]+$/.test(fieldName)) {
-         // Tìm table header hoặc column title cho field này
-         label = extractTableColumnLabel(fieldName, wordContent);
-         if (label) {
-           return label;
-         }
-       }
-       
-        // Tìm tất cả text trong <strong> tags
-        const strongMatches = rawText.match(/<strong[^>]*>([^<]+)<\/strong>/gi);
-        if (strongMatches && strongMatches.length > 0) {
-          // Lấy <strong> tag cuối cùng (gần với pattern nhất)
-          const lastStrong = strongMatches[strongMatches.length - 1];
-          const match = lastStrong.match(/<strong[^>]*>([^<]+)<\/strong>/i);
-          if (match && match[1]) {
-            label = match[1].trim();
-            
-            // Xử lý trường hợp có nhiều từ trong <strong>, chỉ lấy từ chính
-            if (label.includes(' ')) {
-              // Nếu có "Name BLOCK LETTER" → lấy "Name"
-              // Nếu có "Duration hrs" → lấy "Duration"
-              const words = label.split(' ');
-              label = words[0]; // Lấy từ đầu tiên
-            }
-          }
-        } else {
-          // Fallback: lấy text cuối cùng, bỏ HTML tags
-          const plainText = rawText.replace(/<[^>]*>/g, ' ')
-                                  .replace(/\s+/g, ' ')
-                                  .trim();
-          const words = plainText.split(' ').filter(w => w.length > 0);
-          
-          // Tìm từ có nghĩa cuối cùng (bỏ qua các từ ngắn như "You", "of", etc.)
-          for (let i = words.length - 1; i >= 0; i--) {
-            const word = words[i];
-            if (word.length >= 3 && 
-                !/^(You|The|And|Of|In|On|At|To|For|With|By)$/i.test(word)) {
-              label = word;
-              break;
-            }
-          }
-          
-          // Nếu không tìm thấy, lấy từ cuối cùng
-          if (!label && words.length > 0) {
-            label = words[words.length - 1];
+
+    // Tìm pattern trong wordContent và extract text xung quanh
+    const regex = new RegExp(`([^{]*?)\\{${escapedPattern}\\}`, 'i');
+    const match = wordContent.match(regex);
+
+    if (match && match[1]) {
+      let rawText = match[1];
+
+      // Extract text từ HTML, ưu tiên text trong <strong> tags
+      let label = '';
+
+      // Đặc biệt xử lý cho các field trong table (1S, 1W, 2A, etc.)
+      if (/^[0-9][A-Z]+$/.test(fieldName)) {
+        // Tìm table header hoặc column title cho field này
+        label = extractTableColumnLabel(fieldName, wordContent);
+        if (label) {
+          return label;
+        }
+      }
+
+      // Tìm tất cả text trong <strong> tags
+      const strongMatches = rawText.match(/<strong[^>]*>([^<]+)<\/strong>/gi);
+      if (strongMatches && strongMatches.length > 0) {
+        // Lấy <strong> tag cuối cùng (gần với pattern nhất)
+        const lastStrong = strongMatches[strongMatches.length - 1];
+        const match = lastStrong.match(/<strong[^>]*>([^<]+)<\/strong>/i);
+        if (match && match[1]) {
+          label = match[1].trim();
+
+          // Xử lý trường hợp có nhiều từ trong <strong>, chỉ lấy từ chính
+          if (label.includes(' ')) {
+            // Nếu có "Name BLOCK LETTER" → lấy "Name"
+            // Nếu có "Duration hrs" → lấy "Duration"
+            const words = label.split(' ');
+            label = words[0]; // Lấy từ đầu tiên
           }
         }
-      
+      } else {
+        // Fallback: lấy text cuối cùng, bỏ HTML tags
+        const plainText = rawText.replace(/<[^>]*>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        const words = plainText.split(' ').filter(w => w.length > 0);
+
+        // Tìm từ có nghĩa cuối cùng (bỏ qua các từ ngắn như "You", "of", etc.)
+        for (let i = words.length - 1; i >= 0; i--) {
+          const word = words[i];
+          if (word.length >= 3 &&
+            !/^(You|The|And|Of|In|On|At|To|For|With|By)$/i.test(word)) {
+            label = word;
+            break;
+          }
+        }
+
+        // Nếu không tìm thấy, lấy từ cuối cùng
+        if (!label && words.length > 0) {
+          label = words[words.length - 1];
+        }
+      }
+
       // Clean up label
       if (label.endsWith(':')) {
         label = label.slice(0, -1).trim();
       }
-      
+
       // Validate label
-      if (label && 
-          label.length > 0 && 
-          label.length < 30 && 
-          !label.includes('{') && 
-          !label.includes('}') &&
-          !label.includes('<') &&
-          !label.includes('>') &&
-          !/^\d+$/.test(label) &&
-          !/^[^\w\s]*$/.test(label)) {
-        
+      if (label &&
+        label.length > 0 &&
+        label.length < 30 &&
+        !label.includes('{') &&
+        !label.includes('}') &&
+        !label.includes('<') &&
+        !label.includes('>') &&
+        !/^\d+$/.test(label) &&
+        !/^[^\w\s]*$/.test(label)) {
+
         return label;
       }
     }
-    
+
     return null;
   };
 
   // Function extract table column label cho các field trong table
   const extractTableColumnLabel = (fieldName, content) => {
     if (!content || !fieldName) return null;
-    
+
     console.log('Extracting table column for:', fieldName);
-    
+
     // Tìm field pattern trong content
     const fieldInfo = formFields.find(f => f.fieldName === fieldName);
     if (!fieldInfo || !fieldInfo.formula) {
       console.log('No field info found for:', fieldName);
       return null;
     }
-    
+
     const patternMatch = fieldInfo.formula.match(/^\{([a-z]_.*)\}$/);
     if (!patternMatch) {
       console.log('No pattern match for formula:', fieldInfo.formula);
       return null;
     }
-    
+
     const fullPattern = patternMatch[1]; // "s_1A", "s_2C", etc.
     console.log('Looking for pattern:', fullPattern);
-    
+
     const escapedPattern = fullPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    
+
     // Tìm vị trí của field trong content
     const fieldRegex = new RegExp(`\\{${escapedPattern}\\}`, 'i');
     const fieldMatch = content.search(fieldRegex);
-    
+
     if (fieldMatch === -1) {
       console.log('Pattern not found in content');
       return null;
     }
-    
+
     console.log('Found pattern at position:', fieldMatch);
-    
+
     // Lấy phần content từ đầu đến field
     const beforeField = content.substring(0, fieldMatch);
-    
+
     // Tìm table gần nhất chứa field này
     const tableStart = beforeField.lastIndexOf('<table');
     if (tableStart === -1) {
       console.log('No table found before field');
       return null;
     }
-    
+
     console.log('Table starts at:', tableStart);
-    
+
     // Lấy table content rộng hơn để có đủ headers
     const tableEnd = content.indexOf('</table>', tableStart);
-    const tableContent = tableEnd !== -1 ? 
-      content.substring(tableStart, tableEnd + 8) : 
+    const tableContent = tableEnd !== -1 ?
+      content.substring(tableStart, tableEnd + 8) :
       content.substring(tableStart, fieldMatch + 500);
-    
+
     console.log('Table content length:', tableContent.length);
-    
-         // Đếm số <td> tags trước field để xác định column index
-     const beforeFieldInTable = beforeField.substring(tableStart);
-     const tdMatches = beforeFieldInTable.match(/<td[^>]*>/gi) || [];
-     
-     // Tìm row hiện tại chứa field
-     const fieldContext = content.substring(fieldMatch - 200, fieldMatch + 50);
-     const currentRowStart = fieldContext.lastIndexOf('<tr');
-     let columnIndexInRow = 0;
-     
-     if (currentRowStart !== -1) {
-       // Đếm <td> trong row hiện tại
-       const currentRowContent = fieldContext.substring(currentRowStart, fieldContext.length);
-       const tdInCurrentRow = currentRowContent.substring(0, currentRowContent.indexOf(fullPattern)).match(/<td[^>]*>/gi) || [];
-       columnIndexInRow = tdInCurrentRow.length;
-       console.log('Column index in current row:', columnIndexInRow);
-     }
-     
-     const columnIndex = columnIndexInRow > 0 ? columnIndexInRow : tdMatches.length;
-     
-     console.log('Total TD count:', tdMatches.length, 'Column index used:', columnIndex);
-    
-         // Tìm tất cả table headers - thử nhiều cách khác nhau
-     let headerMatches = tableContent.match(/<th[^>]*>.*?<\/th>/gi);
-     
-     // Nếu không có <th>, thử tìm <td> trong row đầu tiên (có thể là header row)
-     if (!headerMatches) {
-       console.log('No <th> tags found, trying first row <td> tags');
-       
-       // Tìm row đầu tiên trong table
-       const firstRowMatch = tableContent.match(/<tr[^>]*>(.*?)<\/tr>/i);
-       if (firstRowMatch && firstRowMatch[1]) {
-         headerMatches = firstRowMatch[1].match(/<td[^>]*>.*?<\/td>/gi);
-         console.log('Found first row cells:', headerMatches ? headerMatches.length : 0);
-       }
-     }
-     
-     // Nếu vẫn không có, thử tìm tất cả <td> có text trong table
-     if (!headerMatches) {
-       console.log('Trying all <td> tags with meaningful text');
-       const allCells = tableContent.match(/<td[^>]*>.*?<\/td>/gi) || [];
-       
-       // Lọc những cell có text có nghĩa (không chỉ là pattern hoặc rỗng)
-       headerMatches = allCells.filter(cell => {
-         const text = cell.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-         return text && 
-                text.length > 3 && 
-                text.length < 100 &&
-                !text.includes('{') && 
-                !text.includes('}') &&
-                !/^[A-Z]\}$/.test(text); // Không phải pattern như "A}", "C}"
-       }).slice(0, 15); // Lấy tối đa 15 cells đầu làm headers
-       
-       console.log('Found meaningful cells:', headerMatches ? headerMatches.length : 0);
-     }
-     
-     if (!headerMatches || headerMatches.length === 0) {
-       console.log('No headers found in table at all');
-       return null;
-     }
-     
-     console.log('Found headers:', headerMatches.length);
-     
-     // Extract text từ headers
-     const headers = headerMatches.map((header, index) => {
-       // Bỏ HTML tags và lấy text
-       const text = header.replace(/<[^>]*>/g, ' ')
-                         .replace(/\s+/g, ' ')
-                         .trim();
-       console.log(`Header ${index}:`, text);
-       return text;
-     });
-    
+
+    // Đếm số <td> tags trước field để xác định column index
+    const beforeFieldInTable = beforeField.substring(tableStart);
+    const tdMatches = beforeFieldInTable.match(/<td[^>]*>/gi) || [];
+
+    // Tìm row hiện tại chứa field
+    const fieldContext = content.substring(fieldMatch - 200, fieldMatch + 50);
+    const currentRowStart = fieldContext.lastIndexOf('<tr');
+    let columnIndexInRow = 0;
+
+    if (currentRowStart !== -1) {
+      // Đếm <td> trong row hiện tại
+      const currentRowContent = fieldContext.substring(currentRowStart, fieldContext.length);
+      const tdInCurrentRow = currentRowContent.substring(0, currentRowContent.indexOf(fullPattern)).match(/<td[^>]*>/gi) || [];
+      columnIndexInRow = tdInCurrentRow.length;
+      console.log('Column index in current row:', columnIndexInRow);
+    }
+
+    const columnIndex = columnIndexInRow > 0 ? columnIndexInRow : tdMatches.length;
+
+    console.log('Total TD count:', tdMatches.length, 'Column index used:', columnIndex);
+
+    // Tìm tất cả table headers - thử nhiều cách khác nhau
+    let headerMatches = tableContent.match(/<th[^>]*>.*?<\/th>/gi);
+
+    // Nếu không có <th>, thử tìm <td> trong row đầu tiên (có thể là header row)
+    if (!headerMatches) {
+      console.log('No <th> tags found, trying first row <td> tags');
+
+      // Tìm row đầu tiên trong table
+      const firstRowMatch = tableContent.match(/<tr[^>]*>(.*?)<\/tr>/i);
+      if (firstRowMatch && firstRowMatch[1]) {
+        headerMatches = firstRowMatch[1].match(/<td[^>]*>.*?<\/td>/gi);
+        console.log('Found first row cells:', headerMatches ? headerMatches.length : 0);
+      }
+    }
+
+    // Nếu vẫn không có, thử tìm tất cả <td> có text trong table
+    if (!headerMatches) {
+      console.log('Trying all <td> tags with meaningful text');
+      const allCells = tableContent.match(/<td[^>]*>.*?<\/td>/gi) || [];
+
+      // Lọc những cell có text có nghĩa (không chỉ là pattern hoặc rỗng)
+      headerMatches = allCells.filter(cell => {
+        const text = cell.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        return text &&
+          text.length > 3 &&
+          text.length < 100 &&
+          !text.includes('{') &&
+          !text.includes('}') &&
+          !/^[A-Z]\}$/.test(text); // Không phải pattern như "A}", "C}"
+      }).slice(0, 15); // Lấy tối đa 15 cells đầu làm headers
+
+      console.log('Found meaningful cells:', headerMatches ? headerMatches.length : 0);
+    }
+
+    if (!headerMatches || headerMatches.length === 0) {
+      console.log('No headers found in table at all');
+      return null;
+    }
+
+    console.log('Found headers:', headerMatches.length);
+
+    // Extract text từ headers
+    const headers = headerMatches.map((header, index) => {
+      // Bỏ HTML tags và lấy text
+      const text = header.replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      console.log(`Header ${index}:`, text);
+      return text;
+    });
+
     console.log('All headers:', headers);
     console.log('Target header at index', columnIndex, ':', headers[columnIndex]);
-    
+
     // Lấy header tương ứng với column index
     if (headers[columnIndex]) {
       let columnTitle = headers[columnIndex];
-      
+
       // Clean up column title
       columnTitle = columnTitle
         .replace(/^\W+|\W+$/g, '') // Remove leading/trailing punctuation
         .trim();
-      
+
       console.log('Cleaned column title:', columnTitle);
-      
+
       // Validate và return
-      if (columnTitle && 
-          columnTitle.length > 2 && 
-          columnTitle.length < 100 &&
-          !columnTitle.includes('{') &&
-          !columnTitle.includes('}')) {
+      if (columnTitle &&
+        columnTitle.length > 2 &&
+        columnTitle.length < 100 &&
+        !columnTitle.includes('{') &&
+        !columnTitle.includes('}')) {
         console.log('Returning column title:', columnTitle);
         return columnTitle;
       }
     }
-    
+
     console.log('No valid column title found');
     return null;
   };
@@ -1876,9 +1877,9 @@ const PreviewFormPage = () => {
           <p style={{ marginBottom: '12px', color: '#666' }}>
             Có <strong>{errors.length}</strong> lỗi cần được sửa:
           </p>
-          <ul style={{ 
-            listStyle: 'none', 
-            padding: 0, 
+          <ul style={{
+            listStyle: 'none',
+            padding: 0,
             margin: 0,
             maxHeight: '300px',
             overflowY: 'auto'
@@ -1895,8 +1896,8 @@ const PreviewFormPage = () => {
                 display: 'flex',
                 alignItems: 'center'
               }}>
-                <span style={{ 
-                  marginRight: '8px', 
+                <span style={{
+                  marginRight: '8px',
                   fontSize: '16px',
                   color: '#ff4d4f'
                 }}>
@@ -1906,12 +1907,12 @@ const PreviewFormPage = () => {
               </li>
             ))}
           </ul>
-          <div style={{ 
-            marginTop: '16px', 
-            padding: '12px', 
-            backgroundColor: '#f6ffed', 
-            border: '1px solid #b7eb8f', 
-            borderRadius: '4px' 
+          <div style={{
+            marginTop: '16px',
+            padding: '12px',
+            backgroundColor: '#f6ffed',
+            border: '1px solid #b7eb8f',
+            borderRadius: '4px'
           }}>
             <p style={{ margin: 0, color: '#389e0d', fontSize: '13px' }}>
               💡 <strong>Gợi ý:</strong> Hãy điền đầy đủ thông tin bắt buộc và kiểm tra định dạng trước khi lưu.
@@ -1927,22 +1928,22 @@ const PreviewFormPage = () => {
           borderColor: '#1890ff'
         }
       }
-          });
+    });
   };
 
   // Helper function để debug form state
   const debugFormState = () => {
     console.log('\n🔍 DEBUGGING FORM STATE');
     console.log('Container ref:', !!containerRef.current);
-    
+
     if (containerRef.current) {
       const allInputs = containerRef.current.querySelectorAll('.form-input');
       console.log(`Found ${allInputs.length} inputs in DOM:`);
-      
+
       allInputs.forEach((input, i) => {
         console.log(`  ${i}: ${input.dataset.fieldName} (${input.dataset.fieldType}) = "${input.value}"`);
       });
-      
+
       console.log(`\nForm fields from API (${formFields.length}):`);
       formFields.forEach((field, i) => {
         console.log(`  ${i}: ${field.fieldName} (${field.fieldType}) required: ${field.isRequired}`);
@@ -1955,16 +1956,16 @@ const PreviewFormPage = () => {
   const validateForm = () => {
     const errors = [];
     const inputs = containerRef.current.querySelectorAll('.form-input');
-    
+
     console.log('=== VALIDATION START ===');
     console.log('Total inputs found:', inputs.length);
-    
+
     // Tạo map để dễ tra cứu giá trị
     const fieldValueMap = new Map();
     inputs.forEach((input, index) => {
       const fieldName = input.dataset.fieldName;
       let value = '';
-      
+
       // Debug each input element
       console.log(`Input ${index}:`, {
         tagName: input.tagName,
@@ -1976,7 +1977,7 @@ const PreviewFormPage = () => {
         selectedIndex: input.selectedIndex,
         hasOptions: input.options?.length
       });
-      
+
       switch (input.dataset.fieldType?.toLowerCase()) {
         case 'c': // checkbox
           value = input.checked;
@@ -2007,7 +2008,7 @@ const PreviewFormPage = () => {
           console.log(`  Default value: "${value}"`);
           break;
       }
-      
+
       fieldValueMap.set(fieldName, value);
       console.log(`  Final mapped: ${fieldName} (${input.dataset.fieldType}) = "${value}"`);
     });
@@ -2022,7 +2023,7 @@ const PreviewFormPage = () => {
       let fieldName = originalFieldName;
       let fieldValue = fieldValueMap.get(fieldName);
       let actualDomFieldName = fieldName; // Track the actual DOM field name
-      
+
       // If exact match not found, try case-insensitive match
       if (fieldValue === undefined) {
         console.log(`Exact match not found for ${fieldName}, trying case-insensitive...`);
@@ -2061,32 +2062,32 @@ const PreviewFormPage = () => {
           checked: domInput.checked,
           fieldType: domInput.dataset.fieldType
         });
-               } else {
-         console.log('❌ DOM input NOT FOUND for field:', actualDomFieldName);
-         
-         // Try to find with partial match
-         const allInputs = containerRef.current?.querySelectorAll('.form-input') || [];
-         const similarInputs = Array.from(allInputs).filter(inp => 
-           inp.dataset.fieldName?.toLowerCase().includes(originalFieldName.toLowerCase()) ||
-           originalFieldName.toLowerCase().includes(inp.dataset.fieldName?.toLowerCase() || '')
-         );
-         console.log('Similar inputs found:', similarInputs.map(inp => ({
-           fieldName: inp.dataset.fieldName,
-           value: inp.value
-         })));
-       }
+      } else {
+        console.log('❌ DOM input NOT FOUND for field:', actualDomFieldName);
 
-       // Skip validation if field doesn't exist in DOM (might be hidden/not rendered)
-       if (!domInput) {
-         console.log(`⚠️ Skipping validation for ${originalFieldName} (DOM: ${actualDomFieldName}) - no DOM input found`);
-         return; // Skip this field entirely
-       }
+        // Try to find with partial match
+        const allInputs = containerRef.current?.querySelectorAll('.form-input') || [];
+        const similarInputs = Array.from(allInputs).filter(inp =>
+          inp.dataset.fieldName?.toLowerCase().includes(originalFieldName.toLowerCase()) ||
+          originalFieldName.toLowerCase().includes(inp.dataset.fieldName?.toLowerCase() || '')
+        );
+        console.log('Similar inputs found:', similarInputs.map(inp => ({
+          fieldName: inp.dataset.fieldName,
+          value: inp.value
+        })));
+      }
+
+      // Skip validation if field doesn't exist in DOM (might be hidden/not rendered)
+      if (!domInput) {
+        console.log(`⚠️ Skipping validation for ${originalFieldName} (DOM: ${actualDomFieldName}) - no DOM input found`);
+        return; // Skip this field entirely
+      }
 
       // 1. Validate isRequired
       if (fieldInfo.isRequired) {
         console.log(`Field ${originalFieldName} (DOM: ${actualDomFieldName}) is required, checking...`);
         let isEmpty = false;
-        
+
         if (fieldInfo.fieldType?.toLowerCase() === 'boolean') {
           // Boolean field required nghĩa là phải được check (true)
           isEmpty = !fieldValue; // false = empty, true = not empty
@@ -2095,7 +2096,7 @@ const PreviewFormPage = () => {
           isEmpty = !fieldValue || fieldValue === '';
           console.log(`Non-boolean field ${originalFieldName} required check - value: "${fieldValue}", isEmpty: ${isEmpty}`);
         }
-        
+
         if (isEmpty) {
           // Use actualDomFieldName for display as it matches what user sees
           const errorMsg = `${getDisplayFieldName(actualDomFieldName)} là bắt buộc`;
@@ -2109,38 +2110,38 @@ const PreviewFormPage = () => {
       }
 
       // 2. Validate isUpperCase cho Text fields
-      if (fieldInfo.isUpperCase && 
-          (fieldInfo.fieldType?.toLowerCase() === 'text') && 
-          fieldValue && fieldValue !== '') {
+      if (fieldInfo.isUpperCase &&
+        (fieldInfo.fieldType?.toLowerCase() === 'text') &&
+        fieldValue && fieldValue !== '') {
         if (fieldValue !== fieldValue.toUpperCase()) {
           errors.push(`${getDisplayFieldName(actualDomFieldName)} phải viết HOA`);
         }
       }
 
       // 3. Validate dependencies cho Boolean fields có formula phụ thuộc
-      if (fieldInfo.fieldType?.toLowerCase() === 'boolean' && 
-          fieldInfo.formula && 
-          !fieldInfo.formula.match(/^\{c_.*\}$/)) {
-        
+      if (fieldInfo.fieldType?.toLowerCase() === 'boolean' &&
+        fieldInfo.formula &&
+        !fieldInfo.formula.match(/^\{c_.*\}$/)) {
+
         console.log(`Processing Boolean dependency for ${originalFieldName}:`, {
           formula: fieldInfo.formula,
           fieldValue: fieldValue,
           isChecked: !!fieldValue
         });
-        
+
         // CHỈ kiểm tra dependencies khi Boolean field được check (true)
         if (fieldValue) {
           console.log(`${originalFieldName} is checked, validating dependencies...`);
-          
+
           // Parse dependencies từ formula đơn giản: "TraineeName, TraineeID"
           const dependencies = fieldInfo.formula.split(',').map(f => f.trim()).filter(f => f.length > 0);
           console.log(`Dependencies for ${originalFieldName}:`, dependencies);
-          
+
           // Kiểm tra từng dependency
           dependencies.forEach(depFieldName => {
             const depValue = fieldValueMap.get(depFieldName);
             console.log(`Checking dependency ${depFieldName}: value = "${depValue}"`);
-            
+
             if (!depValue || depValue === '') {
               const errorMsg = `${getDisplayFieldName(depFieldName)} phải có giá trị vì liên quan đến ${getDisplayFieldName(actualDomFieldName)}`;
               console.log(`Adding dependency error: ${errorMsg}`);
@@ -2152,11 +2153,11 @@ const PreviewFormPage = () => {
         }
       }
     });
-    
+
     console.log('=== VALIDATION END ===');
     console.log('Total errors:', errors.length);
     console.log('Errors:', errors);
-    
+
     return {
       isValid: errors.length === 0,
       errors: errors
@@ -2167,10 +2168,10 @@ const PreviewFormPage = () => {
     try {
       // Debug form state first
       debugFormState();
-      
+
       // Validate form trước khi lưu
       const validationResult = validateForm();
-      
+
       if (!validationResult.isValid) {
         showValidationErrors(validationResult.errors);
         return;
@@ -2263,24 +2264,25 @@ const PreviewFormPage = () => {
     }
   };
 
-    const handleExportPDF = async () => {
+      const handleExportPDF = async () => {
     try {
-      console.log('📄 Starting Word file export...');
+      setIsExportingPDF(true);
+      console.log('📄 Starting PDF export...');
       
-      if (!savedFormData?.userFillFormId) {
-        message.error('Không tìm thấy userFillFormId để xuất file');
+      if (!formId) {
+        message.error('Không tìm thấy formId để xuất PDF');
         return;
       }
 
-      // Gọi API để lấy Word file đã điền dữ liệu
-      console.log('📄 Fetching filled Word file from server...');
-      const wordBlob = await formService.getFilledWordFile(savedFormData.userFillFormId);
+      // Gọi API để lấy PDF file từ server
+      console.log('📄 Fetching PDF from server with formId:', formId);
+      const pdfBlob = await formService.getFormPDF(formId);
       
       // Tạo URL để download
-      const url = window.URL.createObjectURL(wordBlob);
+      const url = window.URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${(formInfo?.formName || 'Form').replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.docx`;
+      link.download = `${(formInfo?.formName || 'Form').replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
       
       // Trigger download
       document.body.appendChild(link);
@@ -2290,12 +2292,14 @@ const PreviewFormPage = () => {
       // Clean up URL object
       window.URL.revokeObjectURL(url);
       
-      console.log('✅ Word file export completed successfully!');
-      message.success('Đã xuất file Word thành công!');
+      console.log('✅ PDF export completed successfully!');
+      message.success('Đã xuất PDF thành công!');
 
     } catch (error) {
-      console.error('🚨 Error exporting Word file:', error);
-      message.error('Có lỗi xảy ra khi xuất file: ' + error.message);
+      console.error('🚨 Error exporting PDF:', error);
+      message.error('Có lỗi xảy ra khi xuất PDF: ' + error.message);
+    } finally {
+      setIsExportingPDF(false);
     }
   };
 
@@ -2303,7 +2307,7 @@ const PreviewFormPage = () => {
   const handlePDFPreview = async () => {
     try {
       console.log('Creating PDF preview...');
-      
+
       // Backup old logic for PDF preview if needed
       const remainingPatterns = ['pattern1', 'pattern2']; // dummy
       if (remainingPatterns) {
@@ -2788,7 +2792,7 @@ const PreviewFormPage = () => {
               )}
             </div>
             <div className="page-actions">
-            
+
               <Button type="primary" onClick={handleComplete}>
                 Hoàn thành cấu hình
               </Button>
@@ -2800,7 +2804,14 @@ const PreviewFormPage = () => {
           <div className="form-actions">
             <div className="action-buttons">
               <Button type="primary" className="save-btn" onClick={handleSave}>Lưu dữ liệu</Button>
-                              <Button className="export-btn" onClick={handleExportPDF}>Xuất Word</Button>
+                             <Button 
+                className="export-btn" 
+                onClick={handleExportPDF}
+                loading={isExportingPDF}
+                disabled={isExportingPDF}
+              >
+                {isExportingPDF ? 'Đang xuất PDF...' : 'Xuất PDF'}
+              </Button>
               <div className="mode-switch">
                 <Switch
                   checked={isWordMode}
@@ -2819,7 +2830,15 @@ const PreviewFormPage = () => {
           <div className="bottom-actions">
             <Button type="primary" onClick={handleComplete}>Hoàn thành cấu hình</Button>
             <Button type="primary" className="save-btn" onClick={handleSave}>Lưu dữ liệu</Button>
-                            <Button type="primary" className="export-btn" onClick={handleExportPDF}>Xuất Word</Button>
+                                         <Button 
+                type="primary" 
+                className="export-btn" 
+                onClick={handleExportPDF}
+                loading={isExportingPDF}
+                disabled={isExportingPDF}
+              >
+                {isExportingPDF ? 'Đang xuất PDF...' : 'Xuất PDF'}
+              </Button>
           </div>
         </Spin>
       </div>
