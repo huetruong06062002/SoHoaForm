@@ -18,7 +18,8 @@ Environment.SetEnvironmentVariable("SPIRE_FORCE_DEFAULT_FONT", "true");
 
 // Đặt font mặc định là system default
 Environment.SetEnvironmentVariable("SPIRE_DEFAULT_FONT", "");
-
+Environment.SetEnvironmentVariable("SPIRE_ARIAL_FONT", "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf");
+Environment.SetEnvironmentVariable("SPIRE_TIMES_FONT", "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf");
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -58,46 +59,42 @@ builder.Services.AddScoped<IPdfExportService, PdfExportService>();
 
 if (builder.Environment.IsProduction())
 {
-    // 🎯 FONT CONFIGURATION WITH CORRECT PATHS
+      // 🎯 FONT CONFIGURATION WITH CORRECT PATHS
     try
     {
         // Verify fonts exist first
         var msttcorefontsPath = "/usr/share/fonts/truetype/msttcorefonts";
-        var arialExists = File.Exists(Path.Combine(msttcorefontsPath, "Arial.ttf")) ||
+        var arialExists = File.Exists(Path.Combine(msttcorefontsPath, "Arial.ttf")) || 
                          File.Exists(Path.Combine(msttcorefontsPath, "arial.ttf"));
         var timesExists = File.Exists(Path.Combine(msttcorefontsPath, "Times_New_Roman.ttf")) ||
                          File.Exists(Path.Combine(msttcorefontsPath, "times.ttf"));
-
+        
         Console.WriteLine($"🔍 Checking fonts:");
         Console.WriteLine($"  Arial exists: {arialExists}");
         Console.WriteLine($"  Times exists: {timesExists}");
-
+        
         if (arialExists && timesExists)
         {
             Console.WriteLine("✅ Fonts confirmed - configuring Spire.Doc");
-
+            
             // Font environment setup
             Environment.SetEnvironmentVariable("FONTCONFIG_PATH", "/etc/fonts");
             Environment.SetEnvironmentVariable("FONTCONFIG_FILE", "/etc/fonts/fonts.conf");
             Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
-
+            
             // .NET Drawing support
             AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
             AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
-
+            
             // Spire.Doc font configuration
             Environment.SetEnvironmentVariable("SPIRE_DEFAULT_FONT", "Arial");
             Environment.SetEnvironmentVariable("SPIRE_FONT_PATH", msttcorefontsPath);
             Environment.SetEnvironmentVariable("SPIRE_FALLBACK_FONTS", "Arial;Times New Roman;DejaVu Sans");
             Environment.SetEnvironmentVariable("SPIRE_IGNORE_MISSING_FONTS", "false");
-
-            // 🎯 FORCE SPECIFIC FONT PATHS 
-            Environment.SetEnvironmentVariable("SPIRE_ARIAL_FONT", "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf");
-            Environment.SetEnvironmentVariable("SPIRE_TIMES_FONT", "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf");
-
+            
             // Enable font validation since we have fonts
             Environment.SetEnvironmentVariable("SPIRE_ENABLE_FONT_VALIDATION", "true");
-
+            
             Console.WriteLine($"✅ Font path set to: {msttcorefontsPath}");
         }
         else
@@ -128,18 +125,18 @@ if (builder.Environment.IsProduction())
                 RedirectStandardError = true
             }
         };
-
+        
         process.Start();
         var output = process.StandardOutput.ReadToEnd();
         var error = process.StandardError.ReadToEnd();
         process.WaitForExit(10000);
-
+        
         Console.WriteLine($"📋 fc-cache output: {output}");
         if (!string.IsNullOrEmpty(error))
         {
             Console.WriteLine($"⚠️ fc-cache error: {error}");
         }
-
+        
         if (process.ExitCode == 0)
         {
             Console.WriteLine("✅ Font cache refreshed successfully");
@@ -149,7 +146,6 @@ if (builder.Environment.IsProduction())
     {
         Console.WriteLine($"⚠️ Font cache refresh failed: {ex.Message}");
     }
-
     builder.WebHost.UseUrls("http://*:80");
 }
 else
@@ -159,41 +155,37 @@ else
     {
         // Verify fonts exist first
         var msttcorefontsPath = "/usr/share/fonts/truetype/msttcorefonts";
-        var arialExists = File.Exists(Path.Combine(msttcorefontsPath, "Arial.ttf")) ||
+        var arialExists = File.Exists(Path.Combine(msttcorefontsPath, "Arial.ttf")) || 
                          File.Exists(Path.Combine(msttcorefontsPath, "arial.ttf"));
         var timesExists = File.Exists(Path.Combine(msttcorefontsPath, "Times_New_Roman.ttf")) ||
                          File.Exists(Path.Combine(msttcorefontsPath, "times.ttf"));
-
+        
         Console.WriteLine($"🔍 Checking fonts:");
         Console.WriteLine($"  Arial exists: {arialExists}");
         Console.WriteLine($"  Times exists: {timesExists}");
-
+        
         if (arialExists && timesExists)
         {
             Console.WriteLine("✅ Fonts confirmed - configuring Spire.Doc");
-
+            
             // Font environment setup
             Environment.SetEnvironmentVariable("FONTCONFIG_PATH", "/etc/fonts");
             Environment.SetEnvironmentVariable("FONTCONFIG_FILE", "/etc/fonts/fonts.conf");
             Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
-
+            
             // .NET Drawing support
             AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
             AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
-
+            
             // Spire.Doc font configuration
             Environment.SetEnvironmentVariable("SPIRE_DEFAULT_FONT", "Arial");
             Environment.SetEnvironmentVariable("SPIRE_FONT_PATH", msttcorefontsPath);
             Environment.SetEnvironmentVariable("SPIRE_FALLBACK_FONTS", "Arial;Times New Roman;DejaVu Sans");
             Environment.SetEnvironmentVariable("SPIRE_IGNORE_MISSING_FONTS", "false");
-
-            // 🎯 FORCE SPECIFIC FONT PATHS 
-            Environment.SetEnvironmentVariable("SPIRE_ARIAL_FONT", "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf");
-            Environment.SetEnvironmentVariable("SPIRE_TIMES_FONT", "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf");
-
+            
             // Enable font validation since we have fonts
             Environment.SetEnvironmentVariable("SPIRE_ENABLE_FONT_VALIDATION", "true");
-
+            
             Console.WriteLine($"✅ Font path set to: {msttcorefontsPath}");
         }
         else
@@ -224,18 +216,18 @@ else
                 RedirectStandardError = true
             }
         };
-
+        
         process.Start();
         var output = process.StandardOutput.ReadToEnd();
         var error = process.StandardError.ReadToEnd();
         process.WaitForExit(10000);
-
+        
         Console.WriteLine($"📋 fc-cache output: {output}");
         if (!string.IsNullOrEmpty(error))
         {
             Console.WriteLine($"⚠️ fc-cache error: {error}");
         }
-
+        
         if (process.ExitCode == 0)
         {
             Console.WriteLine("✅ Font cache refreshed successfully");
