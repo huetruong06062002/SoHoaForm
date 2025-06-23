@@ -437,12 +437,17 @@ public class UserService : IUserService
       // Lấy tất cả UserFillFormId theo FormId
       var userFillFormIds = await _context.UserFillForms
           .Where(uff => uff.FormId == formId)
+          .Include(uff => uff.UserFillFormHistories)
           .Select(uff => new
           {
             UserFillFormId = uff.Id,
             UserId = uff.UserId,
             Status = uff.Status,
-            CreatedAt = uff.DateTime
+            CreatedAt = uff.DateTime,
+            DateFinish = uff.UserFillFormHistories
+                .Where(ufh => ufh.Status.ToLower() == "complete")
+                .Select(ufh => ufh.DateFinish)
+                .FirstOrDefault(),
           })
           .OrderByDescending(uff => uff.CreatedAt)
           .ToListAsync();
@@ -463,6 +468,7 @@ public class UserService : IUserService
         FormId = formId,
         FormName = form.Name,
         TotalRecords = userFillFormIds.Count,
+        DateFinish = userFillFormIds.Select(uff => uff.DateFinish).FirstOrDefault(),
         UserFillFormIds = userFillFormIds
       };
 

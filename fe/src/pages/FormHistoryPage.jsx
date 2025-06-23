@@ -80,8 +80,8 @@ const FormHistoryPage = () => {
     },
     {
       title: 'Ngày hoàn tất',
-      dataIndex: 'completedAt',
-      key: 'completedAt',
+      dataIndex: 'dateFinish',
+      key: 'dateFinish',
       render: (date) => date ? moment(date).format('HH:mm:ss DD/MM/YYYY') : 'Chưa hoàn tất',
     },
     {
