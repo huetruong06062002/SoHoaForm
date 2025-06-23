@@ -177,3 +177,29 @@
 .preview-table .ant-card-head-title {
   padding: 0 !important;
 } 
+
+
+.ant-table-expanded-row > td {
+  padding: 0 !important;
+  border-bottom: none !important;
+}
+
+.ant-table-expanded-row .ant-table-expanded-row-cell {
+  padding: 0 !important;
+}
+
+.ant-table-tbody > tr.ant-table-expanded-row:hover > td {
+  background: transparent !important;
+}
+
+.ant-table-row-expand-icon {
+  transition: transform 0.2s ease !important;
+}
+
+.ant-table-row-expand-icon.ant-table-row-expanded {
+  transform: rotate(0deg) !important;
+}
+
+.ant-table-row-expand-icon.ant-table-row-collapsed {
+  transform: rotate(-90deg) !important;
+}

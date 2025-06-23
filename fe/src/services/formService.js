@@ -53,8 +53,15 @@ const formService = {
 
   // API để cập nhật formula field
   updateFormula: async (formId, fieldId, payload) => {
-    const response = await apiClient.put(`/Admin/form/${formId}/field/${fieldId}/formula`, payload);
-    return response.data;
+    try {
+      console.log('Updating formula:', { formId, fieldId, payload });
+      const response = await apiClient.put(`/Admin/form/${formId}/field/${fieldId}/formula`, payload);
+      console.log('Formula update response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating formula:', error);
+      throw error;
+    }
   },
 
   // API để cập nhật field config
@@ -65,10 +72,15 @@ const formService = {
 
   // API để cập nhật select options
   updateSelectOptions: async (formId, fieldId, options) => {
-    const response = await apiClient.put(`/Admin/form/${formId}/field/${fieldId}/select-options`, {
-      options: options
-    });
-    return response.data;
+    try {
+      console.log('Updating select options:', { formId, fieldId, options });
+      const response = await apiClient.put(`/Admin/form/${formId}/field/${fieldId}/select-options`, options);
+      console.log('Select options update response:', response);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating select options:', error);
+      throw error;
+    }
   },
 
   // API để cập nhật Boolean formula (dependent variables)
