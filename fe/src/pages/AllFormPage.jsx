@@ -72,7 +72,7 @@ const AllFormPage = () => {
   };
 
   const handleFillForm = (formId) => {
-    navigate(`/preview-form/${formId}`);
+    navigate(`/fill-form/${formId}`);
   };
 
   const handleViewHistory = (formId) => {

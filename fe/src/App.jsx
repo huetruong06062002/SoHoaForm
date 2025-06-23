@@ -14,6 +14,7 @@ import AllFormPage from './pages/AllFormPage';
 import FormHistoryPage from './pages/FormHistoryPage';
 import AssessmentForm from './components/AssessmentForm';
 import ViewFilledFormPage from './pages/ViewFilledFormPage';
+import FillFormPage from './pages/FillFormPage';
 
 // Ant Design theme configuration
 const theme = {
@@ -44,6 +45,7 @@ function AppComponent() {
               />
               <Route path="/form-config/:formId" element={<FormConfigPage />} />
               <Route path="/preview-form/:formId" element={<PreviewFormPage />} />
+              <Route path="/fill-form/:formId" element={<FillFormPage />} />
               <Route path="/allForm" element={<AllFormPage />} />
               <Route path="/form-history/:formId" element={<FormHistoryPage />} />
               <Route path="/view-filled-form/:userFillFormId" element={<ViewFilledFormPage />} />
