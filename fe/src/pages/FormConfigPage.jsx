@@ -682,68 +682,6 @@ const FormConfigPage = () => {
                   </motion.div>
                 </>
               )}
-              {/* Chỉ hiển thị pattern cho các template pattern phức tạp */}
-              {(record.fieldType === "Text" ||
-                record.fieldType === "Number" ||
-                record.fieldType === "Date") &&
-                record.formula &&
-                record.formula.startsWith("{") && 
-                !record.formula.match(/^\{[td]_[a-zA-Z]+\}$/) && (
-                  <motion.div
-                    initial={{ x: -20, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    transition={{ delay: 0.1 }}
-                    style={{ width: "100%" }}
-                  >
-                    <div style={{ marginBottom: "8px" }}>
-                      <div
-                        style={{
-                          fontWeight: "500",
-                          marginBottom: "4px",
-                          display: "block",
-                        }}
-                      >
-                        Pattern hiện tại:{" "}
-                        <span
-                          style={{ color: "#1890ff", fontFamily: "monospace" }}
-                        >
-                          {record.formula}
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          color: "#6b7280",
-                          marginBottom: "8px",
-                          lineHeight: "1.4",
-                        }}
-                      >
-                        Field này sử dụng pattern tự động từ template. Bạn có
-                        thể chỉnh sửa nếu cần.
-                      </div>
-                      <Form.Item
-                        name={`formula_${record.formFieldId}`}
-                        style={{ marginBottom: "8px" }}
-                      >
-                        <Input
-                          placeholder={`Pattern hiện tại: ${record.formula}`}
-                        />
-                      </Form.Item>
-                      <Button
-                        type="primary"
-                        size="small"
-                        onClick={() => handleSaveFormula(record)}
-                        style={{
-                          height: "28px",
-                          fontSize: "12px",
-                          padding: "4px 12px",
-                        }}
-                      >
-                        Cập nhật pattern
-                      </Button>
-                    </div>
-                  </motion.div>
-                )}
             </Space>
           </div>
         </motion.div>
