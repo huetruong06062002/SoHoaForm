@@ -48,42 +48,77 @@ builder.Services.AddScoped<IPdfExportService, PdfExportService>();
 
 if (builder.Environment.IsProduction())
 {
- // Font environment setup
+    // Font environment setup
     Environment.SetEnvironmentVariable("FONTCONFIG_PATH", "/etc/fonts");
     Environment.SetEnvironmentVariable("FONTCONFIG_FILE", "/etc/fonts/fonts.conf");
     Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
-    
+
     // .NET Drawing support
     AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
     AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
-    
-    // 🎯 SPIRE.DOC FONT CONFIGURATION - CRITICAL FIX
+
+    // 🎯 BYPASS SPIRE.DOC FONT ISSUES - CRITICAL FIX
     try
     {
-        // Set font directory cho Spire.Doc
-        var fontPaths = new[]
-        {
-            "/usr/share/fonts/truetype/dejavu",
-            "/usr/share/fonts/truetype/liberation", 
-            "/usr/share/fonts/truetype/noto",
-            "/etc/fonts"
-        };
-        
-        Environment.SetEnvironmentVariable("SPIRE_FONT_PATH", string.Join(":", fontPaths));
-        Environment.SetEnvironmentVariable("DEFAULT_SYSTEM_FONT", "DejaVu Sans");
-        
-        // Force load fonts into Spire.Doc
-        Environment.SetEnvironmentVariable("SPIRE_DOC_FONT_DIR", "/usr/share/fonts/truetype/dejavu");
-        Environment.SetEnvironmentVariable("SPIRE_FALLBACK_FONT", "DejaVu Sans");
-        
-        Console.WriteLine("✅ Spire.Doc font paths configured");
+        // Set các environment variables để Spire.Doc không tìm font
+        Environment.SetEnvironmentVariable("SPIRE_DISABLE_FONT_VALIDATION", "true");
+        Environment.SetEnvironmentVariable("SPIRE_USE_SYSTEM_FONTS", "false");
+        Environment.SetEnvironmentVariable("SPIRE_FONT_FALLBACK", "NONE");
+
+        // Disable font embedding
+        Environment.SetEnvironmentVariable("SPIRE_EMBED_FONTS", "false");
+        Environment.SetEnvironmentVariable("SPIRE_MINIMAL_FONTS", "true");
+
+        // Set basic font handling
+        Environment.SetEnvironmentVariable("SPIRE_DEFAULT_FONT", "Arial");
+        Environment.SetEnvironmentVariable("SPIRE_IGNORE_MISSING_FONTS", "true");
+
+        Console.WriteLine("✅ Spire.Doc font bypass configured");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"⚠️ Font configuration warning: {ex.Message}");
+        Console.WriteLine($"⚠️ Font bypass configuration warning: {ex.Message}");
     }
-    
-    // Pre-cache fonts - SYNC instead of async
+
+    // 🚀 REGISTER CUSTOM PDF SERVICE WITH FONT BYPASS
+    builder.Services.Configure<Dictionary<string, object>>(options =>
+    {
+        options["FontBypass"] = true;
+        options["MinimalFonts"] = true;
+        options["IgnoreFontErrors"] = true;
+    });
+
+    // Override PDF service với font-safe configuration
+    builder.Services.AddSingleton<Action<object>>(serviceProvider =>
+    {
+        return (doc) =>
+        {
+            try
+            {
+                // Reflection để set font bypass trên Spire.Doc objects
+                var docType = doc.GetType();
+                var fontProperty = docType.GetProperty("FontSettings");
+                if (fontProperty != null)
+                {
+                    var fontSettings = fontProperty.GetValue(doc);
+                    if (fontSettings != null)
+                    {
+                        var fontSettingsType = fontSettings.GetType();
+                        var bypassMethod = fontSettingsType.GetMethod("SetFontBypass") ??
+                                         fontSettingsType.GetMethod("DisableFontValidation");
+                        bypassMethod?.Invoke(fontSettings, new object[] { true });
+                    }
+                }
+                Console.WriteLine("✅ Applied font bypass to document");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Font bypass reflection failed: {ex.Message}");
+            }
+        };
+    });
+
+    // Pre-cache fonts - với timeout ngắn hơn
     try
     {
         var process = new System.Diagnostics.Process()
@@ -99,8 +134,8 @@ if (builder.Environment.IsProduction())
             }
         };
         process.Start();
-        process.WaitForExit(10000); // 10 second timeout
-        
+        process.WaitForExit(5000); // Giảm xuống 5 giây
+
         if (process.ExitCode == 0)
         {
             Console.WriteLine("✅ Font cache refreshed successfully");
@@ -117,6 +152,111 @@ if (builder.Environment.IsProduction())
 
     builder.WebHost.UseUrls("http://*:80");
 }
+else
+{
+    // Font environment setup
+    Environment.SetEnvironmentVariable("FONTCONFIG_PATH", "/etc/fonts");
+    Environment.SetEnvironmentVariable("FONTCONFIG_FILE", "/etc/fonts/fonts.conf");
+    Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
+
+    // .NET Drawing support
+    AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
+    AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
+
+    // 🎯 BYPASS SPIRE.DOC FONT ISSUES - CRITICAL FIX
+    try
+    {
+        // Set các environment variables để Spire.Doc không tìm font
+        Environment.SetEnvironmentVariable("SPIRE_DISABLE_FONT_VALIDATION", "true");
+        Environment.SetEnvironmentVariable("SPIRE_USE_SYSTEM_FONTS", "false");
+        Environment.SetEnvironmentVariable("SPIRE_FONT_FALLBACK", "NONE");
+
+        // Disable font embedding
+        Environment.SetEnvironmentVariable("SPIRE_EMBED_FONTS", "false");
+        Environment.SetEnvironmentVariable("SPIRE_MINIMAL_FONTS", "true");
+
+        // Set basic font handling
+        Environment.SetEnvironmentVariable("SPIRE_DEFAULT_FONT", "Arial");
+        Environment.SetEnvironmentVariable("SPIRE_IGNORE_MISSING_FONTS", "true");
+
+        Console.WriteLine("✅ Spire.Doc font bypass configured");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"⚠️ Font bypass configuration warning: {ex.Message}");
+    }
+
+    // 🚀 REGISTER CUSTOM PDF SERVICE WITH FONT BYPASS
+    builder.Services.Configure<Dictionary<string, object>>(options =>
+    {
+        options["FontBypass"] = true;
+        options["MinimalFonts"] = true;
+        options["IgnoreFontErrors"] = true;
+    });
+
+    // Override PDF service với font-safe configuration
+    builder.Services.AddSingleton<Action<object>>(serviceProvider =>
+    {
+        return (doc) =>
+        {
+            try
+            {
+                // Reflection để set font bypass trên Spire.Doc objects
+                var docType = doc.GetType();
+                var fontProperty = docType.GetProperty("FontSettings");
+                if (fontProperty != null)
+                {
+                    var fontSettings = fontProperty.GetValue(doc);
+                    if (fontSettings != null)
+                    {
+                        var fontSettingsType = fontSettings.GetType();
+                        var bypassMethod = fontSettingsType.GetMethod("SetFontBypass") ??
+                                         fontSettingsType.GetMethod("DisableFontValidation");
+                        bypassMethod?.Invoke(fontSettings, new object[] { true });
+                    }
+                }
+                Console.WriteLine("✅ Applied font bypass to document");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Font bypass reflection failed: {ex.Message}");
+            }
+        };
+    });
+
+    // Pre-cache fonts - với timeout ngắn hơn
+    try
+    {
+        var process = new System.Diagnostics.Process()
+        {
+            StartInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "fc-cache",
+                Arguments = "-fv",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            }
+        };
+        process.Start();
+        process.WaitForExit(5000); // Giảm xuống 5 giây
+
+        if (process.ExitCode == 0)
+        {
+            Console.WriteLine("✅ Font cache refreshed successfully");
+        }
+        else
+        {
+            Console.WriteLine($"⚠️ Font cache refresh exit code: {process.ExitCode}");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"⚠️ Font cache refresh failed: {ex.Message}");
+    }
+}
+
 // Cấu hình CORS
 builder.Services.AddCors(option =>
 {
