@@ -772,33 +772,101 @@ const ViewFilledFormPage = () => {
   };
 
   // Hàm cập nhật field values
+  // Function để tính toán công thức
+  const calculateFormula = (formula, values) => {
+    try {
+      // Replace field references [fieldName] with their values
+      let calculationFormula = formula;
+      Object.entries(values).forEach(([fieldName, value]) => {
+        const regex = new RegExp(`\\[${fieldName}\\]`, 'g');
+        calculationFormula = calculationFormula.replace(regex, value || '0');
+      });
+
+      // Evaluate the formula
+      const result = eval(calculationFormula);
+      return result;
+    } catch (error) {
+      console.error('Error calculating formula:', error);
+      return 0;
+    }
+  };
+
+  // Function để validate field values
+  const validateFieldValues = (values, formFields) => {
+    const errors = [];
+
+    formFields.forEach(field => {
+      const value = values[field.fieldName];
+
+      // Skip formula fields
+      if (field.fieldType === 'Formula') {
+        return;
+      }
+
+      // Check required fields
+      if (field.isRequired && (value === undefined || value === null || value === '')) {
+        errors.push(`${field.fieldName} là trường bắt buộc`);
+      }
+
+      // Check number fields
+      if (field.fieldType === 'Number' && value !== '' && value !== null) {
+        if (isNaN(value)) {
+          errors.push(`${field.fieldName} phải là số`);
+        }
+      }
+    });
+
+    return errors;
+  };
+
   const handleUpdateFieldValues = async (values) => {
     try {
       setIsUpdating(true);
 
+      // Fetch form fields để lấy thông tin validation và formula
+      const formFieldsResponse = await formService.getFormFields(filledData.formId);
+      if (formFieldsResponse.statusCode !== 200) {
+        throw new Error('Không thể lấy thông tin form fields');
+      }
+
+      const formFields = formFieldsResponse.data.fields;
+
+      // Validate field values
+      const errors = validateFieldValues(values, formFields);
+      if (errors.length > 0) {
+        messageApi.error(errors.join(', '));
+        return;
+      }
+
+      // Calculate formula fields
+      const formulaFields = formFields.filter(field => field.fieldType === 'Formula');
+      formulaFields.forEach(field => {
+        values[field.fieldName] = calculateFormula(field.formula, values);
+      });
+
       // Chuyển đổi values thành format API yêu cầu
-      const fieldValues = filledData.parsedFieldValues.map(field => {
+      const fieldValues = formFields.map(field => {
         let newValue = values[field.fieldName];
 
         // Xử lý theo từng field type
         if (field.fieldType === 'c') {
           // Checkbox
           newValue = newValue ? 'true' : 'false';
-                 } else if (field.fieldType === 'd') {
-           // Date
-           newValue = newValue ? newValue.format('YYYY-MM-DD') : '';
-         } else if (field.fieldType === 'dt') {
-           // DateTime
-           newValue = newValue ? newValue.format('YYYY-MM-DD HH:mm:ss') : '';
-         } else {
-          // Text, Number, Select
-          newValue = newValue || '';
+        } else if (field.fieldType === 'd') {
+          // Date
+          newValue = newValue ? newValue.format('YYYY-MM-DD') : '';
+        } else if (field.fieldType === 'dt') {
+          // DateTime
+          newValue = newValue ? newValue.format('YYYY-MM-DD HH:mm:ss') : '';
+        } else {
+          // Text, Number, Select, Formula
+          newValue = newValue?.toString() || '';
         }
 
         return {
           fieldName: field.fieldName,
           fieldType: field.fieldType,
-          label: field.label,
+          label: field.fieldDescription || field.fieldName,
           value: newValue
         };
       });
@@ -1081,6 +1149,24 @@ const ViewFilledFormPage = () => {
             layout="vertical"
             onFinish={handleUpdateFieldValues}
             style={{ maxHeight: '500px', overflowY: 'auto' }}
+            onValuesChange={(changedValues, allValues) => {
+              // Fetch form fields để lấy thông tin formula
+              formService.getFormFields(filledData.formId).then(response => {
+                if (response.statusCode === 200) {
+                  const formFields = response.data.fields;
+                  const formulaFields = formFields.filter(field => field.fieldType === 'Formula');
+                  
+                  // Tính toán giá trị cho các trường formula
+                  const newValues = { ...allValues };
+                  formulaFields.forEach(field => {
+                    newValues[field.fieldName] = calculateFormula(field.formula, allValues);
+                  });
+                  
+                  // Cập nhật form với các giá trị mới
+                  editForm.setFieldsValue(newValues);
+                }
+              });
+            }}
           >
             {filledData?.parsedFieldValues?.map((field, index) => {
               const renderField = () => {
@@ -1156,6 +1242,20 @@ const ViewFilledFormPage = () => {
                           {/* Tạm thời để trống, có thể cần thêm options từ API */}
                           <Select.Option value={field.value}>{field.value}</Select.Option>
                         </Select>
+                      </Form.Item>
+                    );
+                  
+                  case 'Formula': // Formula field
+                    return (
+                      <Form.Item
+                        key={field.fieldName}
+                        name={field.fieldName}
+                        label={field.fieldDescription || field.fieldName}
+                      >
+                        <Input 
+                          readOnly
+                          style={{ backgroundColor: '#f5f5f5' }}
+                        />
                       </Form.Item>
                     );
                   
