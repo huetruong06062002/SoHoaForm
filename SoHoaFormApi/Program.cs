@@ -48,7 +48,7 @@ builder.Services.AddScoped<IPdfExportService, PdfExportService>();
 
 if (builder.Environment.IsProduction())
 {
-    // Font environment setup
+    // Font environment setup với Windows fonts đã có
     Environment.SetEnvironmentVariable("FONTCONFIG_PATH", "/etc/fonts");
     Environment.SetEnvironmentVariable("FONTCONFIG_FILE", "/etc/fonts/fonts.conf");
     Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
@@ -57,70 +57,61 @@ if (builder.Environment.IsProduction())
     AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
     AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
 
-    // 🎯 BYPASS SPIRE.DOC FONT ISSUES - CRITICAL FIX
+    // 🎯 WINDOWS FONTS CONFIGURATION - BẬT LẠI FONT DETECTION
     try
     {
-        // Set các environment variables để Spire.Doc không tìm font
-        Environment.SetEnvironmentVariable("SPIRE_DISABLE_FONT_VALIDATION", "true");
-        Environment.SetEnvironmentVariable("SPIRE_USE_SYSTEM_FONTS", "false");
-        Environment.SetEnvironmentVariable("SPIRE_FONT_FALLBACK", "NONE");
-
-        // Disable font embedding
-        Environment.SetEnvironmentVariable("SPIRE_EMBED_FONTS", "false");
-        Environment.SetEnvironmentVariable("SPIRE_MINIMAL_FONTS", "true");
-
-        // Set basic font handling
+        // Set Windows fonts làm default (KHÔNG bypass nữa vì đã có fonts)
         Environment.SetEnvironmentVariable("SPIRE_DEFAULT_FONT", "Arial");
-        Environment.SetEnvironmentVariable("SPIRE_IGNORE_MISSING_FONTS", "true");
-
-        Console.WriteLine("✅ Spire.Doc font bypass configured");
+        Environment.SetEnvironmentVariable("SPIRE_FALLBACK_FONTS", "Times New Roman;Calibri;DejaVu Sans");
+        Environment.SetEnvironmentVariable("SPIRE_IGNORE_MISSING_FONTS", "false"); // Bật lại vì có fonts rồi
+        
+        // BỎ CÁC DÒNG BYPASS FONT - vì giờ có fonts rồi
+        // Environment.SetEnvironmentVariable("SPIRE_DISABLE_FONT_VALIDATION", "true");
+        // Environment.SetEnvironmentVariable("SPIRE_USE_SYSTEM_FONTS", "false");
+        
+        // Set font paths
+        var fontPaths = new[]
+        {
+            "/usr/share/fonts/truetype/msttcorefonts",    // Microsoft Core Fonts - CHÍNH
+            "/usr/share/fonts/truetype/dejavu",           // Backup
+            "/usr/share/fonts/truetype/liberation",       // Backup
+            "/usr/share/fonts/truetype/noto"              // Backup
+        };
+        
+        Environment.SetEnvironmentVariable("SPIRE_FONT_PATH", string.Join(":", fontPaths));
+        
+        Console.WriteLine("✅ Windows fonts configuration completed with actual fonts");
+        
+        // Verify Arial font exists
+        if (File.Exists("/usr/share/fonts/truetype/msttcorefonts/arial.ttf"))
+        {
+            Console.WriteLine("✅ Arial font confirmed at: /usr/share/fonts/truetype/msttcorefonts/arial.ttf");
+        }
+        
+        if (File.Exists("/usr/share/fonts/truetype/msttcorefonts/times.ttf"))
+        {
+            Console.WriteLine("✅ Times New Roman font confirmed at: /usr/share/fonts/truetype/msttcorefonts/times.ttf");
+        }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"⚠️ Font bypass configuration warning: {ex.Message}");
+        Console.WriteLine($"⚠️ Windows fonts configuration error: {ex.Message}");
     }
 
-    // 🚀 REGISTER CUSTOM PDF SERVICE WITH FONT BYPASS
+    // BỎ PHẦN FONT BYPASS SERVICE - vì giờ có fonts thật rồi
+    /*
     builder.Services.Configure<Dictionary<string, object>>(options =>
     {
         options["FontBypass"] = true;
         options["MinimalFonts"] = true;
         options["IgnoreFontErrors"] = true;
     });
+    */
 
-    // Override PDF service với font-safe configuration
-    builder.Services.AddSingleton<Action<object>>(serviceProvider =>
-    {
-        return (doc) =>
-        {
-            try
-            {
-                // Reflection để set font bypass trên Spire.Doc objects
-                var docType = doc.GetType();
-                var fontProperty = docType.GetProperty("FontSettings");
-                if (fontProperty != null)
-                {
-                    var fontSettings = fontProperty.GetValue(doc);
-                    if (fontSettings != null)
-                    {
-                        var fontSettingsType = fontSettings.GetType();
-                        var bypassMethod = fontSettingsType.GetMethod("SetFontBypass") ??
-                                         fontSettingsType.GetMethod("DisableFontValidation");
-                        bypassMethod?.Invoke(fontSettings, new object[] { true });
-                    }
-                }
-                Console.WriteLine("✅ Applied font bypass to document");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"⚠️ Font bypass reflection failed: {ex.Message}");
-            }
-        };
-    });
-
-    // Pre-cache fonts - với timeout ngắn hơn
+    // Font cache refresh
     try
     {
+        Console.WriteLine("🔄 Refreshing font cache with Windows fonts...");
         var process = new System.Diagnostics.Process()
         {
             StartInfo = new System.Diagnostics.ProcessStartInfo
@@ -133,16 +124,15 @@ if (builder.Environment.IsProduction())
                 RedirectStandardError = true
             }
         };
+        
         process.Start();
-        process.WaitForExit(5000); // Giảm xuống 5 giây
-
+        var output = process.StandardOutput.ReadToEnd();
+        process.WaitForExit(10000);
+        
         if (process.ExitCode == 0)
         {
             Console.WriteLine("✅ Font cache refreshed successfully");
-        }
-        else
-        {
-            Console.WriteLine($"⚠️ Font cache refresh exit code: {process.ExitCode}");
+            Console.WriteLine($"📋 Fonts available: Arial, Times New Roman, Calibri");
         }
     }
     catch (Exception ex)
@@ -151,110 +141,6 @@ if (builder.Environment.IsProduction())
     }
 
     builder.WebHost.UseUrls("http://*:80");
-}
-else
-{
-    // Font environment setup
-    Environment.SetEnvironmentVariable("FONTCONFIG_PATH", "/etc/fonts");
-    Environment.SetEnvironmentVariable("FONTCONFIG_FILE", "/etc/fonts/fonts.conf");
-    Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
-
-    // .NET Drawing support
-    AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
-    AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
-
-    // 🎯 BYPASS SPIRE.DOC FONT ISSUES - CRITICAL FIX
-    try
-    {
-        // Set các environment variables để Spire.Doc không tìm font
-        Environment.SetEnvironmentVariable("SPIRE_DISABLE_FONT_VALIDATION", "true");
-        Environment.SetEnvironmentVariable("SPIRE_USE_SYSTEM_FONTS", "false");
-        Environment.SetEnvironmentVariable("SPIRE_FONT_FALLBACK", "NONE");
-
-        // Disable font embedding
-        Environment.SetEnvironmentVariable("SPIRE_EMBED_FONTS", "false");
-        Environment.SetEnvironmentVariable("SPIRE_MINIMAL_FONTS", "true");
-
-        // Set basic font handling
-        Environment.SetEnvironmentVariable("SPIRE_DEFAULT_FONT", "Arial");
-        Environment.SetEnvironmentVariable("SPIRE_IGNORE_MISSING_FONTS", "true");
-
-        Console.WriteLine("✅ Spire.Doc font bypass configured");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"⚠️ Font bypass configuration warning: {ex.Message}");
-    }
-
-    // 🚀 REGISTER CUSTOM PDF SERVICE WITH FONT BYPASS
-    builder.Services.Configure<Dictionary<string, object>>(options =>
-    {
-        options["FontBypass"] = true;
-        options["MinimalFonts"] = true;
-        options["IgnoreFontErrors"] = true;
-    });
-
-    // Override PDF service với font-safe configuration
-    builder.Services.AddSingleton<Action<object>>(serviceProvider =>
-    {
-        return (doc) =>
-        {
-            try
-            {
-                // Reflection để set font bypass trên Spire.Doc objects
-                var docType = doc.GetType();
-                var fontProperty = docType.GetProperty("FontSettings");
-                if (fontProperty != null)
-                {
-                    var fontSettings = fontProperty.GetValue(doc);
-                    if (fontSettings != null)
-                    {
-                        var fontSettingsType = fontSettings.GetType();
-                        var bypassMethod = fontSettingsType.GetMethod("SetFontBypass") ??
-                                         fontSettingsType.GetMethod("DisableFontValidation");
-                        bypassMethod?.Invoke(fontSettings, new object[] { true });
-                    }
-                }
-                Console.WriteLine("✅ Applied font bypass to document");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"⚠️ Font bypass reflection failed: {ex.Message}");
-            }
-        };
-    });
-
-    // Pre-cache fonts - với timeout ngắn hơn
-    try
-    {
-        var process = new System.Diagnostics.Process()
-        {
-            StartInfo = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "fc-cache",
-                Arguments = "-fv",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            }
-        };
-        process.Start();
-        process.WaitForExit(5000); // Giảm xuống 5 giây
-
-        if (process.ExitCode == 0)
-        {
-            Console.WriteLine("✅ Font cache refreshed successfully");
-        }
-        else
-        {
-            Console.WriteLine($"⚠️ Font cache refresh exit code: {process.ExitCode}");
-        }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"⚠️ Font cache refresh failed: {ex.Message}");
-    }
 }
 
 // Cấu hình CORS
