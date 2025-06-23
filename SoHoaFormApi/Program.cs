@@ -8,6 +8,7 @@ using System.Security.Claims;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+Environment.SetEnvironmentVariable("TZ", "Asia/Ho_Chi_Minh");
 
 // Add services to the container.
 builder.Services.AddControllers();
