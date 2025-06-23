@@ -48,10 +48,44 @@ builder.Services.AddScoped<IPdfExportService, PdfExportService>();
 
 if (builder.Environment.IsProduction())
 {
-
+// Font environment setup
     Environment.SetEnvironmentVariable("FONTCONFIG_PATH", "/etc/fonts");
+    Environment.SetEnvironmentVariable("FONTCONFIG_FILE", "/etc/fonts/fonts.conf");
     Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
+    
+    // .NET Drawing support
     AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
+    AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
+    
+    // Spire specific font settings
+    Environment.SetEnvironmentVariable("SPIRE_FONT_PATH", "/usr/share/fonts/truetype/dejavu:/usr/share/fonts/truetype/liberation");
+    Environment.SetEnvironmentVariable("DEFAULT_SYSTEM_FONT", "DejaVu Sans");
+    
+    // Pre-cache fonts
+    Task.Run(() =>
+    {
+        try
+        {
+            var process = new System.Diagnostics.Process()
+            {
+                StartInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "fc-cache",
+                    Arguments = "-fv",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+            process.Start();
+            process.WaitForExit();
+            Console.WriteLine("✅ Font cache refreshed");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ Font cache refresh failed: {ex.Message}");
+        }
+    });
+
 
     builder.WebHost.UseUrls("http://*:80");
 }
