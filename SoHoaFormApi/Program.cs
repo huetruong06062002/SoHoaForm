@@ -48,7 +48,7 @@ builder.Services.AddScoped<IPdfExportService, PdfExportService>();
 
 if (builder.Environment.IsProduction())
 {
-// Font environment setup
+ // Font environment setup
     Environment.SetEnvironmentVariable("FONTCONFIG_PATH", "/etc/fonts");
     Environment.SetEnvironmentVariable("FONTCONFIG_FILE", "/etc/fonts/fonts.conf");
     Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
@@ -57,35 +57,63 @@ if (builder.Environment.IsProduction())
     AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
     AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
     
-    // Spire specific font settings
-    Environment.SetEnvironmentVariable("SPIRE_FONT_PATH", "/usr/share/fonts/truetype/dejavu:/usr/share/fonts/truetype/liberation");
-    Environment.SetEnvironmentVariable("DEFAULT_SYSTEM_FONT", "DejaVu Sans");
-    
-    // Pre-cache fonts
-    Task.Run(() =>
+    // 🎯 SPIRE.DOC FONT CONFIGURATION - CRITICAL FIX
+    try
     {
-        try
+        // Set font directory cho Spire.Doc
+        var fontPaths = new[]
         {
-            var process = new System.Diagnostics.Process()
+            "/usr/share/fonts/truetype/dejavu",
+            "/usr/share/fonts/truetype/liberation", 
+            "/usr/share/fonts/truetype/noto",
+            "/etc/fonts"
+        };
+        
+        Environment.SetEnvironmentVariable("SPIRE_FONT_PATH", string.Join(":", fontPaths));
+        Environment.SetEnvironmentVariable("DEFAULT_SYSTEM_FONT", "DejaVu Sans");
+        
+        // Force load fonts into Spire.Doc
+        Environment.SetEnvironmentVariable("SPIRE_DOC_FONT_DIR", "/usr/share/fonts/truetype/dejavu");
+        Environment.SetEnvironmentVariable("SPIRE_FALLBACK_FONT", "DejaVu Sans");
+        
+        Console.WriteLine("✅ Spire.Doc font paths configured");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"⚠️ Font configuration warning: {ex.Message}");
+    }
+    
+    // Pre-cache fonts - SYNC instead of async
+    try
+    {
+        var process = new System.Diagnostics.Process()
+        {
+            StartInfo = new System.Diagnostics.ProcessStartInfo
             {
-                StartInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "fc-cache",
-                    Arguments = "-fv",
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
-            };
-            process.Start();
-            process.WaitForExit();
-            Console.WriteLine("✅ Font cache refreshed");
-        }
-        catch (Exception ex)
+                FileName = "fc-cache",
+                Arguments = "-fv",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            }
+        };
+        process.Start();
+        process.WaitForExit(10000); // 10 second timeout
+        
+        if (process.ExitCode == 0)
         {
-            Console.WriteLine($"⚠️ Font cache refresh failed: {ex.Message}");
+            Console.WriteLine("✅ Font cache refreshed successfully");
         }
-    });
-
+        else
+        {
+            Console.WriteLine($"⚠️ Font cache refresh exit code: {process.ExitCode}");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"⚠️ Font cache refresh failed: {ex.Message}");
+    }
 
     builder.WebHost.UseUrls("http://*:80");
 }
