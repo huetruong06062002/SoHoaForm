@@ -25,6 +25,7 @@ namespace SoHoaFormApi.Controllers
         private readonly SoHoaFormContext _context;
         private readonly IWebHostEnvironment _environment;
         private readonly IWordReaderService _wordReaderService;
+        private readonly IPdfExportService _pdfExportService;
 
         public UserController(
             IUserService userService
@@ -32,6 +33,7 @@ namespace SoHoaFormApi.Controllers
             , IWebHostEnvironment environment
             , IWordReaderService wordReaderService
             , IAdminService adminService
+            , IPdfExportService pdfExportService
         )
         {
             _userService = userService;
@@ -39,6 +41,7 @@ namespace SoHoaFormApi.Controllers
             _environment = environment;
             _wordReaderService = wordReaderService;
             _adminService = adminService;
+            _pdfExportService = pdfExportService;
         }
 
         [HttpGet("")]
@@ -569,5 +572,86 @@ namespace SoHoaFormApi.Controllers
             }
         }
 
+        [HttpGet("form/{formId}/export-pdf")]
+        public async Task<IActionResult> ExportFormToPdf(Guid formId)
+        {
+            try
+            {
+                var result = await _pdfExportService.GenerateFormPdfWithDataAsync(formId);
+
+                if (result.StatusCode != 200)
+                {
+                    return StatusCode(result.StatusCode, new
+                    {
+                        error = result.Message,
+                        statusCode = result.StatusCode
+                    });
+                }
+
+                var response = result.Data;
+
+                // Trả về file PDF để download
+                return File(
+                    response.PdfContent,
+                    "application/pdf",
+                    response.FileName
+                );
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    error = $"Error generating PDF: {ex.Message}",
+                    statusCode = 500
+                });
+            }
+        }
+
+        [HttpGet("form/{formId}/export-pdf-info")]
+        public async Task<IActionResult> GetExportPdfInfo(Guid formId)
+        {
+            try
+            {
+                var result = await _pdfExportService.GenerateFormPdfWithDataAsync(formId);
+
+                if (result.StatusCode != 200)
+                {
+                    return StatusCode(result.StatusCode, result);
+                }
+
+                // Trả về thông tin PDF (không bao gồm binary content)
+                var response = result.Data;
+                var info = new
+                {
+                    response.FormId,
+                    response.FormName,
+                    response.CategoryName,
+                    response.FileName,
+                    response.FileSize,
+                    response.FieldCount,
+                    response.GeneratedAt,
+                    DownloadUrl = $"/api/user/form/{formId}/export-pdf",
+                    HasData = response.FieldCount > 0
+                };
+
+                return Ok(new HTTPResponseClient<object>
+                {
+                    StatusCode = 200,
+                    Message = "PDF info generated successfully",
+                    Data = info,
+                    DateTime = DateTime.Now
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new HTTPResponseClient<object>
+                {
+                    StatusCode = 500,
+                    Message = $"Error: {ex.Message}",
+                    Data = null,
+                    DateTime = DateTime.Now
+                });
+            }
+        }
     }
 }

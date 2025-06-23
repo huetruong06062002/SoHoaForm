@@ -2,7 +2,10 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Spin, Switch, DatePicker, App } from 'antd';
 import mammoth from 'mammoth';
-import html2pdf from 'html2pdf.js';
+
+import { saveAs } from 'file-saver';
+import Docxtemplater from 'docxtemplater';
+import PizZip from 'pizzip';
 import formService from '../services/formService';
 import AppLayout from '../components/layout/AppLayout';
 import './PreviewFormPage.css';
@@ -2260,205 +2263,49 @@ const PreviewFormPage = () => {
     }
   };
 
-  const handleExportPDF = async () => {
+    const handleExportPDF = async () => {
     try {
-      console.log('Creating PDF from current DOM state...');
-
-      // Lấy tất cả giá trị hiện tại từ DOM gốc trước
-      const originalInputs = containerRef.current.querySelectorAll('.form-input');
-      const inputValues = new Map();
+      console.log('📄 Starting Word file export...');
       
-      originalInputs.forEach((input, index) => {
-        const fieldName = input.dataset.fieldName;
-        const fieldType = input.dataset.fieldType;
-        
-        let value = '';
-        let isChecked = false;
-        let selectedText = '';
-        
-        switch (fieldType?.toLowerCase()) {
-          case 'c': // checkbox
-            isChecked = input.checked;
-            value = isChecked ? 'checked' : 'unchecked';
-            break;
-          case 's': // select
-            value = input.value;
-            selectedText = input.options[input.selectedIndex]?.text || '';
-            break;
-          case 'dt': // date
-            value = input.value || '';
-            break;
-          case 'd': // number hoặc date
-            value = input.value || '';
-            // Kiểm tra nếu là date field
-            if (input.type === 'date' || fieldName?.toLowerCase().includes('date')) {
-              // Đánh dấu là date field
-              inputValues.set(index, { 
-                fieldName, 
-                fieldType: 'dt', // Override thành dt để xử lý như date
-                value, 
-                isChecked, 
-                selectedText 
-              });
-              return; // Skip phần set bên dưới
-            }
-            break;
-          case 't': // text
-          case 'f': // formula
-          default:
-            value = input.value || '';
-            break;
-        }
-        
-        inputValues.set(index, {
-          fieldName,
-          fieldType,
-          value,
-          isChecked,
-          selectedText
-        });
-        
-        console.log(`Stored input ${index}: ${fieldName} (${fieldType}) = ${value}`, { isChecked, selectedText });
-      });
-
-      // Tạo HTML content từ DOM hiện tại
-      let printContentHTML = containerRef.current.innerHTML;
-      
-      // Xử lý để làm sạch content cho PDF
-      printContentHTML = printContentHTML.replace(/style="[^"]*"/g, '');
-      
-      // Thay thế input elements bằng giá trị đã lưu
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = printContentHTML;
-      
-      const tempInputs = tempDiv.querySelectorAll('.form-input');
-      tempInputs.forEach((input, index) => {
-        const inputData = inputValues.get(index);
-        if (!inputData) return;
-        
-        const { fieldType, value, isChecked, selectedText } = inputData;
-        let replacement = '';
-        
-        console.log(`Processing input ${index}: ${inputData.fieldName} (${fieldType})`, { value, isChecked, selectedText });
-        
-        switch (fieldType?.toLowerCase()) {
-          case 'c': // checkbox
-            if (isChecked) {
-              replacement = '<span style="font-size: 16px; color: #000; font-weight: bold;">☑</span>';
-            } else {
-              replacement = '<span style="font-size: 16px; color: #000;">☐</span>';
-            }
-            console.log(`Checkbox replacement: ${replacement}`);
-            break;
-          case 's': // select
-            replacement = `<span style="border-bottom: 1px solid #000; min-width: 100px; display: inline-block; padding: 2px 4px; font-weight: bold;">${selectedText || value || '_____________'}</span>`;
-            break;
-          case 'dt': // date
-            let dateValue = value;
-            if (dateValue) {
-              try {
-                // Parse date và format thành dd/mm/yyyy
-                const date = new Date(dateValue + 'T00:00:00'); // Thêm time để tránh timezone issues
-                const day = date.getDate().toString().padStart(2, '0');
-                const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                const year = date.getFullYear();
-                dateValue = `${day}/${month}/${year}`;
-                console.log(`Date conversion: ${value} -> ${dateValue}`);
-              } catch (e) {
-                console.log('Date parse error:', e);
-                // Keep original value if parse fails
-              }
-            }
-            replacement = `<span style="border-bottom: 1px solid #000; min-width: 120px; display: inline-block; padding: 2px 4px; font-weight: bold;">${dateValue || '_____________'}</span>`;
-            break;
-          case 'f': // formula
-            replacement = `<span style="color: #1890ff; font-weight: bold; background-color: #f0f9ff; padding: 2px 6px; border-radius: 3px; border-bottom: 1px solid #000; min-width: 80px; display: inline-block; text-align: center;">${value || '0'}</span>`;
-            break;
-          case 'd': // number
-            // Kiểm tra nếu fieldName chứa "date" thì xử lý như date
-            if (inputData.fieldName?.toLowerCase().includes('date')) {
-              let dateValue = value;
-              if (dateValue) {
-                try {
-                  const date = new Date(dateValue + 'T00:00:00');
-                  const day = date.getDate().toString().padStart(2, '0');
-                  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                  const year = date.getFullYear();
-                  dateValue = `${day}/${month}/${year}`;
-                  console.log(`Date field (type d) conversion: ${value} -> ${dateValue}`);
-                } catch (e) {
-                  console.log('Date parse error for field type d:', e);
-                }
-              }
-              replacement = `<span style="border-bottom: 1px solid #000; min-width: 120px; display: inline-block; padding: 2px 4px; font-weight: bold;">${dateValue || '_____________'}</span>`;
-            } else {
-              replacement = `<span style="border-bottom: 1px solid #000; min-width: 100px; display: inline-block; padding: 2px 4px; font-weight: bold;">${value || '_____________'}</span>`;
-            }
-            break;
-          case 't': // text
-          default:
-            replacement = `<span style="border-bottom: 1px solid #000; min-width: 100px; display: inline-block; padding: 2px 4px; font-weight: bold;">${value || '_____________'}</span>`;
-            break;
-        }
-        
-        // Thay thế input bằng span
-        const span = document.createElement('span');
-        span.innerHTML = replacement;
-        input.parentNode.replaceChild(span, input);
-      });
-      
-      // Lấy HTML đã xử lý
-      printContentHTML = tempDiv.innerHTML;
-
-      // Kiểm tra xem có header không và thêm nếu cần
-      const hasVietJetContent = printContentHTML.toLowerCase().includes('vietjet') ||
-        printContentHTML.includes('VJC-VJAA') ||
-        printContentHTML.includes('CABIN HEALTH');
-
-      if (!hasVietJetContent) {
-        console.log('No VietJet header found in Word content, adding fallback header...');
-
-        // Lấy thông tin form để tạo header động
-        const formName = formInfo?.formName || 'FORM';
-        const formCode = formInfo?.formCode || 'VJC-VJAA-IF-XXX';
-
-        const currentDate = new Date().toLocaleDateString('en-GB');
-        const vietjetHeader = `
-          <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; margin-bottom: 20px;">
-            <tr>
-              <td style="width: 20%; border-right: 1px solid #000; padding: 15px; text-align: center; vertical-align: middle;">
-                <div style="font-family: Arial, sans-serif;">
-                  <div style="color: #e31e24; font-weight: bold; font-size: 16px;">vietjet</div>
-                  <div style="background: #e31e24; color: white; font-weight: bold; font-size: 12px; padding: 2px 4px; margin-top: 2px;">Air</div>
-                  <div style="font-size: 10px; color: #e31e24; margin-top: 2px;">.com</div>
-                </div>
-              </td>
-              <td style="width: 60%; border-right: 1px solid #000; padding: 15px; text-align: center; vertical-align: middle;">
-                <div style="font-weight: bold; font-size: 16px; color: #000; font-family: Arial, sans-serif;">
-                  COMPETENCY CHECK FORM
-                </div>
-              </td>
-              <td style="width: 20%; padding: 8px; vertical-align: top;">
-                <div style="font-size: 10px; line-height: 1.4; font-family: Arial, sans-serif;">
-                  <div style="font-weight: bold; margin-bottom: 5px;">VJC-VJAA-IF-032</div>
-                  <div style="margin-bottom: 5px;">Iss03/Rev01</div>
-                  <div>${currentDate}</div>
-                </div>
-              </td>
-            </tr>
-          </table>
-        `;
-
-        printContentHTML = vietjetHeader + printContentHTML;
-        console.log('Added dynamic VietJet header based on form info');
-      } else {
-        console.log('VietJet header found in original content');
+      if (!savedFormData?.userFillFormId) {
+        message.error('Không tìm thấy userFillFormId để xuất file');
+        return;
       }
 
-      console.log('Final content preview:', printContentHTML.substring(0, 500));
+      // Gọi API để lấy Word file đã điền dữ liệu
+      console.log('📄 Fetching filled Word file from server...');
+      const wordBlob = await formService.getFilledWordFile(savedFormData.userFillFormId);
+      
+      // Tạo URL để download
+      const url = window.URL.createObjectURL(wordBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${(formInfo?.formName || 'Form').replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.docx`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up URL object
+      window.URL.revokeObjectURL(url);
+      
+      console.log('✅ Word file export completed successfully!');
+      message.success('Đã xuất file Word thành công!');
 
-      // Xử lý patterns chưa được thay thế
-      const remainingPatterns = printContentHTML.match(/\{[^}]+\}|\[[^\]]+\]/g);
+    } catch (error) {
+      console.error('🚨 Error exporting Word file:', error);
+      message.error('Có lỗi xảy ra khi xuất file: ' + error.message);
+    }
+  };
+
+  // Function helper để phóng to PDF preview (giữ lại cho tương lai)
+  const handlePDFPreview = async () => {
+    try {
+      console.log('Creating PDF preview...');
+      
+      // Backup old logic for PDF preview if needed
+      const remainingPatterns = ['pattern1', 'pattern2']; // dummy
       if (remainingPatterns) {
         remainingPatterns.forEach(pattern => {
           const underlineField = `<span style="border-bottom: 1px solid #000; min-width: 100px; display: inline-block; padding: 2px 4px;">_____________</span>`;
@@ -2953,7 +2800,7 @@ const PreviewFormPage = () => {
           <div className="form-actions">
             <div className="action-buttons">
               <Button type="primary" className="save-btn" onClick={handleSave}>Lưu dữ liệu</Button>
-              <Button className="export-btn" onClick={handleExportPDF}>Xuất PDF</Button>
+                              <Button className="export-btn" onClick={handleExportPDF}>Xuất Word</Button>
               <div className="mode-switch">
                 <Switch
                   checked={isWordMode}
@@ -2972,7 +2819,7 @@ const PreviewFormPage = () => {
           <div className="bottom-actions">
             <Button type="primary" onClick={handleComplete}>Hoàn thành cấu hình</Button>
             <Button type="primary" className="save-btn" onClick={handleSave}>Lưu dữ liệu</Button>
-            <Button type="primary" className="export-btn" onClick={handleExportPDF}>Xuất PDF</Button>
+                            <Button type="primary" className="export-btn" onClick={handleExportPDF}>Xuất Word</Button>
           </div>
         </Spin>
       </div>

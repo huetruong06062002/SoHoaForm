@@ -43,6 +43,7 @@ builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IWordReaderService, WordReaderService>();
 builder.Services.AddScoped<IFileService, FileService>();
+builder.Services.AddScoped<IPdfExportService, PdfExportService>();
 
 if (builder.Environment.IsProduction())
 {

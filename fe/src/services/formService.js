@@ -127,6 +127,28 @@ const formService = {
     return response.data;
   },
 
+  // API để lấy Word template file
+  getWordTemplate: async (formId) => {
+    const response = await apiClient.get(`/User/form/${formId}/word-file`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+
+  // API để lấy data mới nhất của form
+  getLatestFormData: async (formId) => {
+    const response = await apiClient.get(`/User/fill-form/latest/${formId}`);
+    return response.data;
+  },
+
+  // API để lấy PDF từ userFillFormId
+  getFormPDF: async (userFillFormId) => {
+    const response = await apiClient.get(`/User/user-fill-form/${userFillFormId}/pdf`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+
   // Hàm xử lý Word document với dữ liệu thực
   processWordWithFieldValues: async (wordBlob, fieldValues) => {
     try {
