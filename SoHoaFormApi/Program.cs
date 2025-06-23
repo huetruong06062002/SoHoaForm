@@ -48,6 +48,11 @@ builder.Services.AddScoped<IPdfExportService, PdfExportService>();
 
 if (builder.Environment.IsProduction())
 {
+
+    Environment.SetEnvironmentVariable("FONTCONFIG_PATH", "/etc/fonts");
+    Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
+    AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
+
     builder.WebHost.UseUrls("http://*:80");
 }
 // Cấu hình CORS
