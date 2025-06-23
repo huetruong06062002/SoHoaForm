@@ -273,11 +273,13 @@ const FormConfigPage = () => {
         `isUpperCase_${record.formFieldId}`
       );
       const options = form.getFieldValue(`options_${record.formFieldId}`);
+      const formula = form.getFieldValue(`formula_${record.formFieldId}`);
 
-      console.log("Current values:", { isRequired, isUpperCase, options });
+      console.log("Current values:", { isRequired, isUpperCase, options, formula });
       console.log("Original values:", {
         originalRequired: record.isRequired,
         originalUpperCase: record.isUpperCase,
+        originalFormula: record.formula,
       });
 
       // Kiểm tra nếu không có thay đổi nào
@@ -285,7 +287,8 @@ const FormConfigPage = () => {
         isRequired === record.isRequired &&
         ((record.fieldType !== "Text" && record.fieldType !== "Textarea") ||
           isUpperCase === record.isUpperCase) &&
-        (record.fieldType !== "Select" || !options || options.trim() === record.formula)
+        (record.fieldType !== "Select" || !options || options.trim() === record.formula) &&
+        (record.fieldType !== "Formula" || !formula || formula.trim() === record.formula)
       ) {
         message.info("Không có thay đổi nào để lưu");
         return;
@@ -328,7 +331,6 @@ const FormConfigPage = () => {
       // Gọi API updateSelectOptions nếu là field Select và có thay đổi options
       if (record.fieldType === "Select" && options && options.trim() !== record.formula) {
         console.log("Updating select options...");
-        // Format options: split by newline, trim each option, add quotes, 
         if (!options) {
           message.warning("Vui lòng nhập các lựa chọn");
           return;
@@ -349,6 +351,30 @@ const FormConfigPage = () => {
         console.log("Select options updated successfully:", selectResponse);
       }
 
+      // Gọi API updateFormula nếu là field Formula và có thay đổi formula
+      if (record.fieldType === "Formula" && formula && formula.trim() !== record.formula) {
+        console.log("Updating formula...");
+        if (!formula) {
+          message.warning("Vui lòng nhập công thức");
+          return;
+        }
+        console.log("formula", formula);
+
+        const formulaResponse = await formService.updateFormula(
+          formId,
+          record.fieldId,
+          {
+            formula: formula.trim(),
+            description: ""
+          }
+        );
+        if (formulaResponse.statusCode !== 200) {
+          message.error("Lỗi khi cập nhật công thức");
+          return;
+        }
+        console.log("Formula updated successfully:", formulaResponse);
+      }
+
       message.success("Cập nhật cấu hình thành công");
 
       // Cập nhật lại data trong state
@@ -365,7 +391,9 @@ const FormConfigPage = () => {
                     .filter(opt => opt)
                     .map(opt => `"${opt}"`)
                     .join(',')
-                  : field.formula,
+                  : record.fieldType === "Formula" && formula ?
+                    formula.trim()
+                    : field.formula,
                 options: record.fieldType === "Select" && options ? 
                   options.split('\n')
                     .map(opt => opt.trim())
@@ -394,6 +422,98 @@ const FormConfigPage = () => {
       } else {
         message.error("Đã có lỗi xảy ra khi lưu cấu hình");
       }
+    }
+  };
+
+  const handleSaveAllConfigs = async () => {
+    try {
+      setLoading(true);
+      let hasChanges = false;
+
+      // Lưu lần lượt cấu hình cho từng field
+      for (const field of fields) {
+        const isRequired = form.getFieldValue(`isRequired_${field.formFieldId}`);
+        const isUpperCase = form.getFieldValue(`isUpperCase_${field.formFieldId}`);
+        const formula = form.getFieldValue(`formula_${field.formFieldId}`);
+        const options = form.getFieldValue(`options_${field.formFieldId}`);
+        const depVars = form.getFieldValue(`dependentVariables_${field.formFieldId}`);
+
+        // Kiểm tra có thay đổi nào không
+        const hasRequiredChange = isRequired !== field.isRequired;
+        const hasUpperCaseChange = (field.fieldType === "Text" || field.fieldType === "Textarea") && isUpperCase !== field.isUpperCase;
+        const hasFormulaChange = field.fieldType === "Formula" && formula && formula.trim() !== field.formula;
+        const hasOptionsChange = field.fieldType === "Select" && options && options.trim() !== field.formula;
+        const hasBooleanChange = field.fieldType === "Boolean" && depVars && depVars.trim() !== field.formula;
+
+        if (hasRequiredChange || hasUpperCaseChange || hasFormulaChange || hasOptionsChange || hasBooleanChange) {
+          hasChanges = true;
+
+          // Cập nhật isRequired nếu có thay đổi
+          if (hasRequiredChange) {
+            const requiredResponse = await formService.toggleRequired(formId, field.fieldId);
+            if (requiredResponse.statusCode !== 200) {
+              throw new Error(`Lỗi khi cập nhật trạng thái bắt buộc nhập cho trường ${field.fieldName}`);
+            }
+          }
+
+          // Cập nhật isUpperCase nếu có thay đổi
+          if (hasUpperCaseChange) {
+            const uppercaseResponse = await formService.toggleUppercase(formId, field.fieldId);
+            if (uppercaseResponse.statusCode !== 200) {
+              throw new Error(`Lỗi khi cập nhật trạng thái chữ hoa cho trường ${field.fieldName}`);
+            }
+          }
+
+          // Cập nhật formula cho Formula fields
+          if (hasFormulaChange) {
+            const formulaResponse = await formService.updateFormula(formId, field.fieldId, {
+              formula: formula.trim(),
+              description: "",
+            });
+            if (formulaResponse.statusCode !== 200) {
+              throw new Error(`Lỗi khi cập nhật công thức cho trường ${field.fieldName}`);
+            }
+          }
+
+          // Cập nhật options cho Select fields
+          if (hasOptionsChange) {
+            const selectResponse = await formService.updateSelectOptions(formId, field.fieldId, {
+              options
+            });
+            if (selectResponse.statusCode !== 200) {
+              throw new Error(`Lỗi khi cập nhật danh sách lựa chọn cho trường ${field.fieldName}`);
+            }
+          }
+
+          // Cập nhật formula cho Boolean fields
+          if (hasBooleanChange) {
+            const booleanResponse = await formService.updateBooleanFormula(formId, field.fieldId, {
+              formula: depVars.trim(),
+            });
+            if (booleanResponse.statusCode !== 200) {
+              throw new Error(`Lỗi khi cập nhật biến phụ thuộc cho trường ${field.fieldName}`);
+            }
+          }
+        }
+      }
+
+      if (!hasChanges) {
+        message.info("Không có thay đổi nào để lưu");
+        return;
+      }
+
+      message.success("Đã lưu tất cả cấu hình thành công");
+      
+      // Clear tất cả config changes
+      setConfigChanges({});
+      
+      // Refresh form data
+      await fetchFormConfig();
+    } catch (error) {
+      console.error("Error saving all configs:", error);
+      message.error(error.message || "Đã có lỗi xảy ra khi lưu tất cả cấu hình");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -603,50 +723,34 @@ const FormConfigPage = () => {
                   transition={{ delay: 0.1 }}
                   style={{ width: "100%" }}
                 >
-                  <div style={{ marginBottom: "8px" }}>
-                    <div
+                  <div style={{ marginBottom: "16px" }}>
+                    <label
                       style={{
                         fontWeight: "500",
                         marginBottom: "4px",
-                        cursor: "pointer",
-                        userSelect: "none",
-                      }}
-                      onClick={(e) => {
-                        const inputWrapper = e.currentTarget.nextElementSibling;
-                        if (inputWrapper) {
-                          const input =
-                            inputWrapper.querySelector(".ant-input");
-                          if (input) {
-                            input.focus();
-                          }
-                        }
+                        display: "block",
                       }}
                     >
                       Công thức:
-                      {!isTemplatePattern(record.formula) && (
-                        <div style={{ fontSize: "12px", color: "#1890ff", marginTop: "4px" }}>
-                          Giá trị hiện tại sẽ được hiển thị trong input. Bạn có thể chỉnh sửa nếu cần.
-                        </div>
-                      )}
-                    </div>
+                    </label>
                     <Form.Item
                       name={`formula_${record.formFieldId}`}
-                      style={{ marginBottom: "8px" }}
+                      style={{ marginBottom: 0 }}
                     >
-                      <Input placeholder="Nhập công thức (ví dụ: [so1] * [so2])" />
+                      <Input
+                        placeholder="Nhập công thức"
+                        onChange={(e) => {
+                          setConfigChanges((prev) => ({
+                            ...prev,
+                            [record.formFieldId]: true,
+                          }));
+                        }}
+                      />
                     </Form.Item>
-                    <Button
-                      type="primary"
-                      size="small"
-                      onClick={() => handleSaveFormula(record)}
-                      style={{
-                        height: "28px",
-                        fontSize: "12px",
-                        padding: "4px 12px",
-                      }}
-                    >
-                      Lưu công thức
-                    </Button>
+                    <div style={{ marginTop: "4px", color: "#666" }}>
+                      <InfoCircleOutlined style={{ marginRight: "4px" }} />
+                      Ví dụ các biến có thể dùng: {getRandomFieldsExample(record)}
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -793,7 +897,12 @@ const FormConfigPage = () => {
                     }}
                   >
                     <span>Danh sách biến ({fields.length})</span>
-                    <Button type="primary" size="small">
+                    <Button 
+                      type="primary" 
+                      size="small"
+                      onClick={handleSaveAllConfigs}
+                      loading={loading}
+                    >
                       Lưu tất cả
                     </Button>
                   </div>
