@@ -59,184 +59,49 @@ builder.Services.AddScoped<IPdfExportService, PdfExportService>();
 
 if (builder.Environment.IsProduction())
 {
-      // 🎯 FONT CONFIGURATION WITH CORRECT PATHS
+    Console.WriteLine("🚀 Production Ubuntu - Ultra simple font bypass...");
+    
+    // CHỈ SET CÁC BIẾN CƠ BẢN NHẤT
+    Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
+    Environment.SetEnvironmentVariable("SPIRE_IGNORE_MISSING_FONTS", "true");
+    Environment.SetEnvironmentVariable("SPIRE_DISABLE_FONT_VALIDATION", "true");
+    
+    // Cài libgdiplus cho Linux (cần thiết cho .NET graphics)
     try
     {
-        // Verify fonts exist first
-        var msttcorefontsPath = "/usr/share/fonts/truetype/msttcorefonts";
-        var arialExists = File.Exists(Path.Combine(msttcorefontsPath, "Arial.ttf")) || 
-                         File.Exists(Path.Combine(msttcorefontsPath, "arial.ttf"));
-        var timesExists = File.Exists(Path.Combine(msttcorefontsPath, "Times_New_Roman.ttf")) ||
-                         File.Exists(Path.Combine(msttcorefontsPath, "times.ttf"));
-        
-        Console.WriteLine($"🔍 Checking fonts:");
-        Console.WriteLine($"  Arial exists: {arialExists}");
-        Console.WriteLine($"  Times exists: {timesExists}");
-        
-        if (arialExists && timesExists)
+        Console.WriteLine("📦 Installing libgdiplus for Linux...");
+        var installCmd = "apt-get update && apt-get install -y libgdiplus";
+        var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
         {
-            Console.WriteLine("✅ Fonts confirmed - configuring Spire.Doc");
-            
-            // Font environment setup
-            Environment.SetEnvironmentVariable("FONTCONFIG_PATH", "/etc/fonts");
-            Environment.SetEnvironmentVariable("FONTCONFIG_FILE", "/etc/fonts/fonts.conf");
-            Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
-            
-            // .NET Drawing support
-            AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
-            AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
-            
-            // Spire.Doc font configuration
-            Environment.SetEnvironmentVariable("SPIRE_DEFAULT_FONT", "Arial");
-            Environment.SetEnvironmentVariable("SPIRE_FONT_PATH", msttcorefontsPath);
-            Environment.SetEnvironmentVariable("SPIRE_FALLBACK_FONTS", "Arial;Times New Roman;DejaVu Sans");
-            Environment.SetEnvironmentVariable("SPIRE_IGNORE_MISSING_FONTS", "false");
-            
-            // Enable font validation since we have fonts
-            Environment.SetEnvironmentVariable("SPIRE_ENABLE_FONT_VALIDATION", "true");
-            
-            Console.WriteLine($"✅ Font path set to: {msttcorefontsPath}");
-        }
-        else
+            FileName = "/bin/bash",
+            Arguments = $"-c \"{installCmd}\"",
+            UseShellExecute = false,
+            CreateNoWindow = true
+        });
+        
+        if (process != null)
         {
-            Console.WriteLine("❌ Fonts not found - enabling bypass mode");
-            Environment.SetEnvironmentVariable("SPIRE_IGNORE_MISSING_FONTS", "true");
-            Environment.SetEnvironmentVariable("SPIRE_DISABLE_FONT_VALIDATION", "true");
+            process.WaitForExit(30000);
+            Console.WriteLine("✅ libgdiplus installation attempted");
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"⚠️ Font configuration error: {ex.Message}");
+        Console.WriteLine($"⚠️ Could not install libgdiplus: {ex.Message}");
     }
-
-    // Font cache refresh để đảm bảo fonts được nhận diện
-    try
-    {
-        Console.WriteLine("🔄 Refreshing font cache...");
-        var process = new System.Diagnostics.Process()
-        {
-            StartInfo = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "fc-cache",
-                Arguments = "-fv /usr/share/fonts/truetype/msttcorefonts",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            }
-        };
-        
-        process.Start();
-        var output = process.StandardOutput.ReadToEnd();
-        var error = process.StandardError.ReadToEnd();
-        process.WaitForExit(10000);
-        
-        Console.WriteLine($"📋 fc-cache output: {output}");
-        if (!string.IsNullOrEmpty(error))
-        {
-            Console.WriteLine($"⚠️ fc-cache error: {error}");
-        }
-        
-        if (process.ExitCode == 0)
-        {
-            Console.WriteLine("✅ Font cache refreshed successfully");
-        }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"⚠️ Font cache refresh failed: {ex.Message}");
-    }
+    
+    Console.WriteLine("✅ Production Ubuntu font bypass completed");
     builder.WebHost.UseUrls("http://*:80");
 }
 else
 {
-    // 🎯 FONT CONFIGURATION WITH CORRECT PATHS
-    try
-    {
-        // Verify fonts exist first
-        var msttcorefontsPath = "/usr/share/fonts/truetype/msttcorefonts";
-        var arialExists = File.Exists(Path.Combine(msttcorefontsPath, "Arial.ttf")) || 
-                         File.Exists(Path.Combine(msttcorefontsPath, "arial.ttf"));
-        var timesExists = File.Exists(Path.Combine(msttcorefontsPath, "Times_New_Roman.ttf")) ||
-                         File.Exists(Path.Combine(msttcorefontsPath, "times.ttf"));
-        
-        Console.WriteLine($"🔍 Checking fonts:");
-        Console.WriteLine($"  Arial exists: {arialExists}");
-        Console.WriteLine($"  Times exists: {timesExists}");
-        
-        if (arialExists && timesExists)
-        {
-            Console.WriteLine("✅ Fonts confirmed - configuring Spire.Doc");
-            
-            // Font environment setup
-            Environment.SetEnvironmentVariable("FONTCONFIG_PATH", "/etc/fonts");
-            Environment.SetEnvironmentVariable("FONTCONFIG_FILE", "/etc/fonts/fonts.conf");
-            Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
-            
-            // .NET Drawing support
-            AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
-            AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
-            
-            // Spire.Doc font configuration
-            Environment.SetEnvironmentVariable("SPIRE_DEFAULT_FONT", "Arial");
-            Environment.SetEnvironmentVariable("SPIRE_FONT_PATH", msttcorefontsPath);
-            Environment.SetEnvironmentVariable("SPIRE_FALLBACK_FONTS", "Arial;Times New Roman;DejaVu Sans");
-            Environment.SetEnvironmentVariable("SPIRE_IGNORE_MISSING_FONTS", "false");
-            
-            // Enable font validation since we have fonts
-            Environment.SetEnvironmentVariable("SPIRE_ENABLE_FONT_VALIDATION", "true");
-            
-            Console.WriteLine($"✅ Font path set to: {msttcorefontsPath}");
-        }
-        else
-        {
-            Console.WriteLine("❌ Fonts not found - enabling bypass mode");
-            Environment.SetEnvironmentVariable("SPIRE_IGNORE_MISSING_FONTS", "true");
-            Environment.SetEnvironmentVariable("SPIRE_DISABLE_FONT_VALIDATION", "true");
-        }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"⚠️ Font configuration error: {ex.Message}");
-    }
-
-    // Font cache refresh để đảm bảo fonts được nhận diện
-    try
-    {
-        Console.WriteLine("🔄 Refreshing font cache...");
-        var process = new System.Diagnostics.Process()
-        {
-            StartInfo = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "fc-cache",
-                Arguments = "-fv /usr/share/fonts/truetype/msttcorefonts",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            }
-        };
-        
-        process.Start();
-        var output = process.StandardOutput.ReadToEnd();
-        var error = process.StandardError.ReadToEnd();
-        process.WaitForExit(10000);
-        
-        Console.WriteLine($"📋 fc-cache output: {output}");
-        if (!string.IsNullOrEmpty(error))
-        {
-            Console.WriteLine($"⚠️ fc-cache error: {error}");
-        }
-        
-        if (process.ExitCode == 0)
-        {
-            Console.WriteLine("✅ Font cache refreshed successfully");
-        }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"⚠️ Font cache refresh failed: {ex.Message}");
-    }
+    Console.WriteLine("🔧 Development - Simple font bypass...");
+    
+    // Development cũng bypass font để tránh lỗi
+    Environment.SetEnvironmentVariable("SPIRE_IGNORE_MISSING_FONTS", "true");
+    Environment.SetEnvironmentVariable("SPIRE_DISABLE_FONT_VALIDATION", "true");
+    
+    Console.WriteLine("✅ Development font bypass completed");
 }
 
 // Cấu hình CORS
