@@ -52,67 +52,34 @@ Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "fal
 
 if (builder.Environment.IsProduction())
 {
-    Console.WriteLine("🚀 Production Ubuntu - Setting up fonts for Spire.Doc...");
-
-    try
+    Console.WriteLine("🚀 Production environment - Font setup...");
+    
+    // Chỉ cần set biến môi trường
+    Environment.SetEnvironmentVariable("FONTCONFIG_PATH", "/etc/fonts");
+    AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
+    AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
+    
+    // Kiểm tra fonts có sẵn
+    var commonFonts = new[]
     {
-        // Định nghĩa các đường dẫn font (ưu tiên chữ thường theo chuẩn Linux)
-        var fontPaths = new[] { "/usr/share/fonts/truetype/msttcorefonts/arial.ttf" };
-        string arialPath = fontPaths.FirstOrDefault(path => File.Exists(path));
-
-        if (arialPath != null)
-        {
-            Console.WriteLine($"✅ Found Arial font: {arialPath}");
-
-            // Cấu hình fontconfig cho Spire.Doc
-            Environment.SetEnvironmentVariable("FONTCONFIG_PATH", "/etc/fonts");
-            Environment.SetEnvironmentVariable("FONTCONFIG_FILE", "/etc/fonts/fonts.conf");
-
-            // Bật hỗ trợ .NET Drawing trên Linux
-            AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
-            AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
-
-            // Thiết lập font cho Spire.Doc (nếu hỗ trợ)
-            // Lưu ý: Spire.Doc cần cấu hình FontSettings nếu cần
-            // Ví dụ: Spire.Doc.Document.FontSettings.SetFontSubstitution("Arial", arialPath);
-
-            Console.WriteLine("✅ Font configuration completed");
-        }
-        else
-        {
-            Console.WriteLine("❌ Arial font not found, using fallback font (DejaVu Sans)");
-            // Fallback sang font mặc định của Ubuntu
-            AppContext.SetSwitch("System.Drawing.Common.EnableFallbackFonts", true);
-        }
-
-        // Refresh font cache (chạy không đồng bộ, tránh block thread)
-        var process = new System.Diagnostics.Process
-        {
-            StartInfo = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "fc-cache",
-                Arguments = "-fv /usr/share/fonts/truetype/msttcorefonts",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true
-            }
-        };
-        process.Start();
-        process.BeginOutputReadLine(); // Đọc output không đồng bộ
-        Console.WriteLine("✅ Font cache refresh started (async)");
-    }
-    catch (Exception ex)
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+    };
+    
+    foreach (var font in commonFonts)
     {
-        Console.WriteLine($"⚠️ Font setup error: {ex.Message}");
+        if (File.Exists(font))
+        {
+            Console.WriteLine($"✅ Found font: {font}");
+        }
     }
-
+    
+    Console.WriteLine("✅ Font setup completed");
     builder.WebHost.UseUrls("http://*:80");
 }
 else
 {
     Console.WriteLine("🔧 Development environment");
-
-    // Bật hỗ trợ .NET Drawing trong môi trường dev
     AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
     AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
 }
