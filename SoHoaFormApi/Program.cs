@@ -9,17 +9,7 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 Environment.SetEnvironmentVariable("TZ", "Asia/Ho_Chi_Minh");
-// BYPASS tất cả font validation
-Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
-Environment.SetEnvironmentVariable("SPIRE_IGNORE_MISSING_FONTS", "true");
-Environment.SetEnvironmentVariable("SPIRE_DISABLE_FONT_VALIDATION", "true");
-Environment.SetEnvironmentVariable("SPIRE_USE_SYSTEM_FONTS", "false");
-Environment.SetEnvironmentVariable("SPIRE_FORCE_DEFAULT_FONT", "true");
 
-// Đặt font mặc định là system default
-Environment.SetEnvironmentVariable("SPIRE_DEFAULT_FONT", "");
-Environment.SetEnvironmentVariable("SPIRE_ARIAL_FONT", "/usr/share/fonts/truetype/msttcorefonts/Arial.ttf");
-Environment.SetEnvironmentVariable("SPIRE_TIMES_FONT", "/usr/share/fonts/truetype/msttcorefonts/Times_New_Roman.ttf");
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -57,51 +47,74 @@ builder.Services.AddScoped<IWordReaderService, WordReaderService>();
 builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<IPdfExportService, PdfExportService>();
 
+// Bật hỗ trợ toàn cục hóa (globalization)
+Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
+
 if (builder.Environment.IsProduction())
 {
-    Console.WriteLine("🚀 Production Ubuntu - Ultra simple font bypass...");
-    
-    // CHỈ SET CÁC BIẾN CƠ BẢN NHẤT
-    Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
-    Environment.SetEnvironmentVariable("SPIRE_IGNORE_MISSING_FONTS", "true");
-    Environment.SetEnvironmentVariable("SPIRE_DISABLE_FONT_VALIDATION", "true");
-    
-    // Cài libgdiplus cho Linux (cần thiết cho .NET graphics)
+    Console.WriteLine("🚀 Production Ubuntu - Setting up fonts for Spire.Doc...");
+
     try
     {
-        Console.WriteLine("📦 Installing libgdiplus for Linux...");
-        var installCmd = "apt-get update && apt-get install -y libgdiplus";
-        var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        // Định nghĩa các đường dẫn font (ưu tiên chữ thường theo chuẩn Linux)
+        var fontPaths = new[] { "/usr/share/fonts/truetype/msttcorefonts/arial.ttf" };
+        string arialPath = fontPaths.FirstOrDefault(path => File.Exists(path));
+
+        if (arialPath != null)
         {
-            FileName = "/bin/bash",
-            Arguments = $"-c \"{installCmd}\"",
-            UseShellExecute = false,
-            CreateNoWindow = true
-        });
-        
-        if (process != null)
-        {
-            process.WaitForExit(30000);
-            Console.WriteLine("✅ libgdiplus installation attempted");
+            Console.WriteLine($"✅ Found Arial font: {arialPath}");
+
+            // Cấu hình fontconfig cho Spire.Doc
+            Environment.SetEnvironmentVariable("FONTCONFIG_PATH", "/etc/fonts");
+            Environment.SetEnvironmentVariable("FONTCONFIG_FILE", "/etc/fonts/fonts.conf");
+
+            // Bật hỗ trợ .NET Drawing trên Linux
+            AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
+            AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
+
+            // Thiết lập font cho Spire.Doc (nếu hỗ trợ)
+            // Lưu ý: Spire.Doc cần cấu hình FontSettings nếu cần
+            // Ví dụ: Spire.Doc.Document.FontSettings.SetFontSubstitution("Arial", arialPath);
+
+            Console.WriteLine("✅ Font configuration completed");
         }
+        else
+        {
+            Console.WriteLine("❌ Arial font not found, using fallback font (DejaVu Sans)");
+            // Fallback sang font mặc định của Ubuntu
+            AppContext.SetSwitch("System.Drawing.Common.EnableFallbackFonts", true);
+        }
+
+        // Refresh font cache (chạy không đồng bộ, tránh block thread)
+        var process = new System.Diagnostics.Process
+        {
+            StartInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "fc-cache",
+                Arguments = "-fv /usr/share/fonts/truetype/msttcorefonts",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true
+            }
+        };
+        process.Start();
+        process.BeginOutputReadLine(); // Đọc output không đồng bộ
+        Console.WriteLine("✅ Font cache refresh started (async)");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"⚠️ Could not install libgdiplus: {ex.Message}");
+        Console.WriteLine($"⚠️ Font setup error: {ex.Message}");
     }
-    
-    Console.WriteLine("✅ Production Ubuntu font bypass completed");
+
     builder.WebHost.UseUrls("http://*:80");
 }
 else
 {
-    Console.WriteLine("🔧 Development - Simple font bypass...");
-    
-    // Development cũng bypass font để tránh lỗi
-    Environment.SetEnvironmentVariable("SPIRE_IGNORE_MISSING_FONTS", "true");
-    Environment.SetEnvironmentVariable("SPIRE_DISABLE_FONT_VALIDATION", "true");
-    
-    Console.WriteLine("✅ Development font bypass completed");
+    Console.WriteLine("🔧 Development environment");
+
+    // Bật hỗ trợ .NET Drawing trong môi trường dev
+    AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
+    AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
 }
 
 // Cấu hình CORS
