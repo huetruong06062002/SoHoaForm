@@ -16,6 +16,9 @@ public interface IFormCategoryRepository : IRepository<FormCategory>
     public Task<List<FormCategory>> GetChildCategoriesByParentIdAsync(Guid? parentId);
 
     public Task<FormCategory> GetCategoryWithRolePermission(Guid categoryId);
+
+    Task<bool> IsCategoryNameExistsAsync(string categoryName, Guid? parentCategoryId = null);
+    Task<bool> IsCategoryNameExistsAsync(string categoryName, Guid? parentCategoryId, Guid excludeCategoryId);
 }
 
 public class FormCategoryRepository : Repository<FormCategory>, IFormCategoryRepository
@@ -54,16 +57,16 @@ public class FormCategoryRepository : Repository<FormCategory>, IFormCategoryRep
 
     }
 
-  public async Task<FormCategory> GetCategoryWithRolePermission(Guid categoryId)
-  {
-    return await _context.FormCategories
-                    .Include(c => c.InverseParentCategory)
-                    .Include(c => c.Forms)
-                    .Include(c => c.RoleCategoryPermissions)
-                    .FirstOrDefaultAsync(c => c.Id == categoryId);
-  }
+    public async Task<FormCategory> GetCategoryWithRolePermission(Guid categoryId)
+    {
+        return await _context.FormCategories
+                        .Include(c => c.InverseParentCategory)
+                        .Include(c => c.Forms)
+                        .Include(c => c.RoleCategoryPermissions)
+                        .FirstOrDefaultAsync(c => c.Id == categoryId);
+    }
 
-  public async Task<List<FormCategory>> GetChildCategoriesByParentIdAsync(Guid? parentId)
+    public async Task<List<FormCategory>> GetChildCategoriesByParentIdAsync(Guid? parentId)
     {
         return await _context.FormCategories
           .Include(c => c.InverseParentCategory)
@@ -87,4 +90,25 @@ public class FormCategoryRepository : Repository<FormCategory>, IFormCategoryRep
                .Where(c => c.ParentCategoryId == null)
                .ToListAsync();
     }
+
+    /// <summary>
+/// Kiểm tra tên category đã tồn tại trong cùng parent category chưa
+/// </summary>
+public async Task<bool> IsCategoryNameExistsAsync(string categoryName, Guid? parentCategoryId = null)
+{
+    return await _context.FormCategories
+        .AnyAsync(fc => fc.CategoryName.ToLower() == categoryName.ToLower() 
+                   && fc.ParentCategoryId == parentCategoryId);
+}
+
+/// <summary>
+/// Kiểm tra tên category đã tồn tại (exclude một category cụ thể - dùng cho update)
+/// </summary>
+public async Task<bool> IsCategoryNameExistsAsync(string categoryName, Guid? parentCategoryId, Guid excludeCategoryId)
+{
+    return await _context.FormCategories
+        .AnyAsync(fc => fc.CategoryName.ToLower() == categoryName.ToLower() 
+                   && fc.ParentCategoryId == parentCategoryId 
+                   && fc.Id != excludeCategoryId);
+}
 }

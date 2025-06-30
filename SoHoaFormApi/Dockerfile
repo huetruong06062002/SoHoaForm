@@ -7,7 +7,6 @@ RUN apt-get update && apt-get install -y \
     fontconfig \
     fonts-dejavu-core \
     fonts-liberation \
-    ttf-mscorefonts-installer \
     libgdiplus \
     && fc-cache -fv \
     && ln -sf /usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf /usr/share/fonts/truetype/liberation/Arial.ttf \

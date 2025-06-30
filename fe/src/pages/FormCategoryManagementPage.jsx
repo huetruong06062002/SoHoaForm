@@ -1,20 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Typography, Card, Table, Button, Space, Modal, Form, Input, App, Row, Col, Tag, Divider } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { Typography, Card, Table, Button, Space, Modal, Form, Input, App, Row, Col, Tag, Divider, Select } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ExclamationCircleOutlined, CaretRightOutlined, FolderOutlined, FileOutlined } from '@ant-design/icons';
 import apiService from '../services/apiService';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { Search } = Input;
+const { Option } = Select;
 
 export default function FormCategoryManagementPage() {
   const { message, modal } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState([]);
-  const [pagination, setPagination] = useState({
-    current: 1,
-    pageSize: 10,
-    total: 0
-  });
+  const [allCategories, setAllCategories] = useState([]); // Lưu tất cả danh mục để chọn parent
+  const [expandedKeys, setExpandedKeys] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -24,37 +22,21 @@ export default function FormCategoryManagementPage() {
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      // Giả định API endpoint, bạn cần điều chỉnh theo backend thực tế
-      const response = await apiService.crud.getAll('/FormCategory', {
-        searchTerm: searchText,
-        pageNumber: pagination.current,
-        pageSize: pagination.pageSize
-      });
+      const response = await apiService.formCategory.getAll();
       
       console.log('API Response:', response);
       
       if (response && response.data) {
-        if (Array.isArray(response.data)) {
-          setCategories(response.data);
-          setPagination(prev => ({
-            ...prev,
-            total: response.data.length
-          }));
-        } else if (response.data.items) {
-          setCategories(response.data.items);
-          setPagination(prev => ({
-            ...prev,
-            total: response.data.totalCount || 0
-          }));
-        } else if (response.data.categories) {
-          setCategories(response.data.categories);
-          setPagination(prev => ({
-            ...prev,
-            current: response.data.pageNumber || prev.current,
-            pageSize: response.data.pageSize || prev.pageSize,
-            total: response.data.totalCount || 0
-          }));
-        }
+        // Lưu tất cả danh mục
+        setAllCategories(response.data);
+        
+        // Chuẩn bị dữ liệu cho bảng
+        const processedData = processData(response.data);
+        setCategories(processedData);
+        
+        // Mở rộng các danh mục có con
+        const keys = findCategoriesWithChildren(response.data);
+        setExpandedKeys(keys);
       } else {
         setCategories([]);
       }
@@ -67,27 +49,85 @@ export default function FormCategoryManagementPage() {
     }
   };
 
+  // Xử lý dữ liệu để hiển thị theo cấu trúc cây
+  const processData = (data) => {
+    return data.map(item => {
+      const newItem = { ...item, key: item.id };
+      
+      if (item.children && item.children.length > 0) {
+        newItem.children = processData(item.children);
+      }
+      
+      return newItem;
+    });
+  };
+
+  // Tìm các danh mục có con để mở rộng mặc định
+  const findCategoriesWithChildren = (data) => {
+    let keys = [];
+    
+    data.forEach(item => {
+      if (item.children && item.children.length > 0) {
+        keys.push(item.id);
+        keys = [...keys, ...findCategoriesWithChildren(item.children)];
+      }
+    });
+    
+    return keys;
+  };
+
   useEffect(() => {
     fetchCategories();
-  }, [pagination.current, pagination.pageSize]);
-
-  useEffect(() => {
-    const delaySearch = setTimeout(() => {
-      setPagination(prev => ({ ...prev, current: 1 }));
-      fetchCategories();
-    }, 500);
-    
-    return () => clearTimeout(delaySearch);
-  }, [searchText]);
-
-  // Xử lý thay đổi phân trang
-  const handleTableChange = (pagination, filters, sorter) => {
-    setPagination(pagination);
-  };
+  }, []);
 
   // Xử lý tìm kiếm
   const handleSearch = (value) => {
     setSearchText(value);
+    
+    if (!value) {
+      fetchCategories();
+      return;
+    }
+    
+    // Tìm kiếm trong danh mục
+    const searchInCategories = (categories, keyword) => {
+      const result = [];
+      
+      categories.forEach(category => {
+        if (category.categoryName.toLowerCase().includes(keyword.toLowerCase())) {
+          // Nếu tìm thấy, thêm vào kết quả
+          result.push({ ...category, key: category.id });
+        }
+        
+        // Tìm kiếm trong danh mục con
+        if (category.children && category.children.length > 0) {
+          const childResults = searchInCategories(category.children, keyword);
+          if (childResults.length > 0) {
+            // Nếu có kết quả từ danh mục con, thêm danh mục cha và kết quả con
+            const found = result.find(r => r.id === category.id);
+            if (!found) {
+              result.push({
+                ...category,
+                key: category.id,
+                children: childResults
+              });
+            } else {
+              // Nếu danh mục cha đã có, chỉ thêm con
+              found.children = childResults;
+            }
+          }
+        }
+      });
+      
+      return result;
+    };
+    
+    const searchResults = searchInCategories(allCategories, value);
+    setCategories(searchResults);
+    
+    // Mở rộng tất cả kết quả tìm kiếm
+    const allKeys = searchResults.map(item => item.id);
+    setExpandedKeys(allKeys);
   };
 
   // Xử lý thêm/sửa danh mục
@@ -100,15 +140,20 @@ export default function FormCategoryManagementPage() {
   const handleEdit = (category) => {
     setSelectedCategory(category);
     form.setFieldsValue({
-      name: category.name,
-      description: category.description,
-      code: category.code
+      categoryName: category.categoryName,
+      parentCategoryId: category.parentCategoryId,
+      description: category.description
     });
     setModalVisible(true);
   };
 
   // Xử lý xóa danh mục
-  const handleDelete = (id) => {
+  const handleDelete = (id, hasChildren) => {
+    if (hasChildren) {
+      message.warning('Không thể xóa danh mục có danh mục con');
+      return;
+    }
+    
     modal.confirm({
       title: 'Xác nhận xóa',
       icon: <ExclamationCircleOutlined />,
@@ -119,8 +164,7 @@ export default function FormCategoryManagementPage() {
       onOk: async () => {
         try {
           setLoading(true);
-          // Giả định API endpoint, bạn cần điều chỉnh theo backend thực tế
-          const response = await apiService.crud.delete('/FormCategory', id);
+          const response = await apiService.formCategory.delete(id);
           
           if (response) {
             message.success('Xóa danh mục biểu mẫu thành công');
@@ -141,21 +185,30 @@ export default function FormCategoryManagementPage() {
       const values = await form.validateFields();
       setLoading(true);
       
+      // Chuẩn bị dữ liệu gửi lên API
+      const categoryData = {
+        categoryName: values.categoryName,
+        parentCategoryId: values.parentCategoryId || null
+      };
+      
+      console.log('Sending data to API:', categoryData);
+      
       if (selectedCategory) {
         // Cập nhật danh mục
-        const response = await apiService.crud.update('/FormCategory', selectedCategory.id, values);
+        const response = await apiService.formCategory.update(selectedCategory.id, categoryData);
         if (response) {
           message.success('Cập nhật danh mục biểu mẫu thành công');
         }
       } else {
         // Tạo mới danh mục
-        const response = await apiService.crud.create('/FormCategory', values);
+        const response = await apiService.formCategory.create(categoryData);
         if (response) {
           message.success('Thêm danh mục biểu mẫu thành công');
         }
       }
       
       setModalVisible(false);
+      form.resetFields();
       fetchCategories();
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -165,25 +218,60 @@ export default function FormCategoryManagementPage() {
     }
   };
 
+  // Xử lý mở rộng/thu gọn danh mục
+  const handleExpand = (expanded, record) => {
+    if (expanded) {
+      setExpandedKeys([...expandedKeys, record.id]);
+    } else {
+      setExpandedKeys(expandedKeys.filter(key => key !== record.id));
+    }
+  };
+
   // Cấu hình cột cho bảng
   const columns = [
     {
-      title: 'Mã danh mục',
-      dataIndex: 'code',
-      key: 'code',
-      width: '15%'
-    },
-    {
       title: 'Tên danh mục',
-      dataIndex: 'name',
-      key: 'name',
-      width: '25%'
+      dataIndex: 'categoryName',
+      key: 'categoryName',
+      width: '40%',
+      render: (text, record) => (
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          {record.children && record.children.length > 0 ? (
+            <FolderOutlined style={{ marginRight: 8, color: '#1890ff' }} />
+          ) : (
+            <FileOutlined style={{ marginRight: 8, color: '#52c41a' }} />
+          )}
+          <span>{text}</span>
+          {record.hasChildren && (
+            <Tag color="blue" style={{ marginLeft: 8 }}>
+              {record.childrenCount} danh mục con
+            </Tag>
+          )}
+        </div>
+      )
     },
     {
-      title: 'Mô tả',
-      dataIndex: 'description',
-      key: 'description',
-      width: '40%'
+      title: 'Đường dẫn',
+      dataIndex: 'path',
+      key: 'path',
+      width: '30%',
+      render: (path) => {
+        if (!path) return '-';
+        
+        return path.split(' > ').map((part, index, array) => (
+          <span key={index}>
+            {part}
+            {index < array.length - 1 && <span style={{ margin: '0 4px', color: '#1890ff' }}>&gt;</span>}
+          </span>
+        ));
+      }
+    },
+    {
+      title: 'Số biểu mẫu',
+      dataIndex: 'formsCount',
+      key: 'formsCount',
+      width: '10%',
+      render: (count) => count || 0
     },
     {
       title: 'Hành động',
@@ -203,7 +291,9 @@ export default function FormCategoryManagementPage() {
             danger
             size="small"
             icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record.id)}
+            onClick={() => handleDelete(record.id, record.hasChildren)}
+            disabled={record.hasChildren}
+            title={record.hasChildren ? "Không thể xóa danh mục có danh mục con" : ""}
           >
             Xóa
           </Button>
@@ -211,6 +301,82 @@ export default function FormCategoryManagementPage() {
       ),
     },
   ];
+
+  // Hàm lấy danh sách danh mục có thể chọn làm parent (tránh chọn chính nó hoặc con của nó)
+  const getAvailableParentCategories = () => {
+    if (!selectedCategory) return allCategories;
+    
+    // Lọc ra các danh mục không phải là chính nó hoặc con của nó
+    const getChildrenIds = (category) => {
+      let ids = [category.id];
+      if (category.children && category.children.length > 0) {
+        category.children.forEach(child => {
+          ids = [...ids, ...getChildrenIds(child)];
+        });
+      }
+      return ids;
+    };
+    
+    // Tìm danh mục hiện tại trong allCategories
+    const findCategory = (categories, id) => {
+      for (const category of categories) {
+        if (category.id === id) return category;
+        if (category.children && category.children.length > 0) {
+          const found = findCategory(category.children, id);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    
+    const currentCategory = findCategory(allCategories, selectedCategory.id);
+    if (!currentCategory) return allCategories;
+    
+    const excludedIds = getChildrenIds(currentCategory);
+    
+    // Làm phẳng tất cả danh mục và loại bỏ các ID đã loại trừ
+    const flattenCategories = (categories, excluded) => {
+      let result = [];
+      categories.forEach(category => {
+        if (!excluded.includes(category.id)) {
+          result.push(category);
+        }
+        if (category.children && category.children.length > 0) {
+          result = [...result, ...flattenCategories(category.children, excluded)];
+        }
+      });
+      return result;
+    };
+    
+    return flattenCategories(allCategories, excludedIds);
+  };
+
+  // Chuẩn bị options cho dropdown chọn parent
+  const renderCategoryOptions = (categories, level = 0) => {
+    const result = [];
+    
+    categories.forEach(category => {
+      // Thêm indent để thể hiện cấp độ
+      const indent = '—'.repeat(level);
+      const prefix = level > 0 ? indent + ' ' : '';
+      
+      result.push(
+        <Option key={category.id} value={category.id}>
+          {(category.children && category.children.length > 0) ? 
+            <FolderOutlined style={{ marginRight: 8, color: '#1890ff' }} /> : 
+            <FileOutlined style={{ marginRight: 8, color: '#52c41a' }} />}
+          {prefix + category.categoryName}
+        </Option>
+      );
+      
+      // Đệ quy với các danh mục con
+      if (category.children && category.children.length > 0) {
+        result.push(...renderCategoryOptions(category.children, level + 1));
+      }
+    });
+    
+    return result;
+  };
 
   return (
     <App>
@@ -245,13 +411,35 @@ export default function FormCategoryManagementPage() {
             dataSource={categories}
             rowKey="id"
             loading={loading}
+            expandable={{
+              expandedRowKeys: expandedKeys,
+              onExpand: handleExpand,
+              expandIcon: ({ expanded, onExpand, record }) => 
+                record.children && record.children.length > 0 ? (
+                  expanded ? (
+                    <Button 
+                      type="text" 
+                      icon={<CaretRightOutlined rotate={90} />} 
+                      size="small"
+                      onClick={e => onExpand(record, e)}
+                      style={{ marginRight: 8 }}
+                    />
+                  ) : (
+                    <Button 
+                      type="text" 
+                      icon={<CaretRightOutlined />} 
+                      size="small"
+                      onClick={e => onExpand(record, e)}
+                      style={{ marginRight: 8 }}
+                    />
+                  )
+                ) : <span style={{ width: 24, display: 'inline-block' }}></span>
+            }}
             pagination={{
-              ...pagination,
               showSizeChanger: true,
               showQuickJumper: true,
-              showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} danh mục`
+              showTotal: (total) => `Tổng số ${total} danh mục`
             }}
-            onChange={handleTableChange}
           />
         </Card>
 
@@ -269,15 +457,7 @@ export default function FormCategoryManagementPage() {
             layout="vertical"
           >
             <Form.Item
-              name="code"
-              label="Mã danh mục"
-              rules={[{ required: true, message: 'Vui lòng nhập mã danh mục' }]}
-            >
-              <Input placeholder="Nhập mã danh mục" />
-            </Form.Item>
-            
-            <Form.Item
-              name="name"
+              name="categoryName"
               label="Tên danh mục"
               rules={[{ required: true, message: 'Vui lòng nhập tên danh mục' }]}
             >
@@ -285,10 +465,18 @@ export default function FormCategoryManagementPage() {
             </Form.Item>
             
             <Form.Item
-              name="description"
-              label="Mô tả"
+              name="parentCategoryId"
+              label="Danh mục cha"
             >
-              <Input.TextArea placeholder="Nhập mô tả danh mục" rows={4} />
+              <Select
+                placeholder="Chọn danh mục cha (không bắt buộc)"
+                allowClear
+                showSearch
+                optionFilterProp="children"
+                style={{ width: '100%' }}
+              >
+                {renderCategoryOptions(getAvailableParentCategories())}
+              </Select>
             </Form.Item>
           </Form>
         </Modal>

@@ -33,6 +33,26 @@ public class FormCategoryService : IFormCategoryService
     try
     {
       await _unitOfWork.BeginTransaction();
+       // ✅ KIỂM TRA TRÙNG TÊN CATEGORY
+        var isDuplicateName = await _unitOfWork._formCategoryRepository
+            .IsCategoryNameExistsAsync(request.CategoryName.Trim(), request.ParentCategoryId);
+
+        if (isDuplicateName)
+        {
+            await _unitOfWork.RollBack();
+            
+            var parentInfo = request.ParentCategoryId.HasValue 
+                ? $" trong category cha có ID {request.ParentCategoryId}" 
+                : " ở cấp root";
+
+            return new HTTPResponseClient<CreateCategoryResponse>
+            {
+                StatusCode = 400,
+                Message = $"Tên category '{request.CategoryName}' đã tồn tại{parentInfo}",
+                Data = null,
+                DateTime = DateTime.Now,
+            };
+        }
 
       // Kiểm tra tên category đã tồn tại chưa (trong cùng parent)
       var existingCategory = await _unitOfWork._formCategoryRepository
