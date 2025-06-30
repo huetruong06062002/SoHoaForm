@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
+using SoHoaFormApi.Infrastructure.Authorization;
 using SoHoaFormApi.Models.ViewModel.Request;
 //using SoHoaFormApi.Models;
 
@@ -12,7 +13,7 @@ namespace SoHoaFormApi.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "admin")]
     public class AdminController : ControllerBase
     {
         private readonly IAdminService _adminService;
@@ -21,13 +22,9 @@ namespace SoHoaFormApi.Controllers
         {
             _adminService = adminService;
         }
-        [HttpGet("")]
-        public async Task<IActionResult> TestAdmin()
-        {
-            return Ok("123");
-        }
 
         [HttpPost("forms")]
+        [RequirePermission("CREATE_FORM")]
         public async Task<ActionResult> CreateForm([FromForm] CreateFormRequest request)
         {
             if (!ModelState.IsValid)
@@ -60,7 +57,7 @@ namespace SoHoaFormApi.Controllers
 
 
         [HttpPut("form/{formId}/field/{fieldId}/formula")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "admin")]
         public async Task<IActionResult> UpdateFormula(Guid formId, Guid fieldId, [FromBody] UpdateFormulaRequest request)
         {
             try
@@ -93,7 +90,8 @@ namespace SoHoaFormApi.Controllers
 
 
         [HttpDelete("forms/{formId}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "admin")]
+        [RequirePermissionAndCategoryStrict("DELETE_FORM", "formId")]
         public async Task<IActionResult> DeleteForm(Guid formId)
         {
             try
@@ -121,7 +119,7 @@ namespace SoHoaFormApi.Controllers
 
 
         [HttpPut("form/{formId}/field/{fieldId}/select-options")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "admin")]
         public async Task<IActionResult> UpdateSelectOptions(Guid formId, Guid fieldId, [FromBody] UpdateSelectOptionsRequest request)
         {
             try
@@ -154,7 +152,7 @@ namespace SoHoaFormApi.Controllers
 
 
         [HttpPut("form/{formId}/field/{fieldId}/boolean-formula")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "admin")]
         public async Task<IActionResult> UpdateBooleanFormula(Guid formId, Guid fieldId, [FromBody] UpdateBooleanFormulaRequest request)
         {
             try
@@ -187,7 +185,7 @@ namespace SoHoaFormApi.Controllers
 
 
         [HttpPut("form/{formId}/field/{fieldId}/toggle-required")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "admin")]
         public async Task<IActionResult> ToggleFieldRequired(Guid formId, Guid fieldId)
         {
             try
@@ -214,7 +212,7 @@ namespace SoHoaFormApi.Controllers
         }
 
         [HttpPut("form/{formId}/field/{fieldId}/toggle-uppercase")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "admin")]
         public async Task<IActionResult> ToggleFieldUpperCase(Guid formId, Guid fieldId)
         {
             try

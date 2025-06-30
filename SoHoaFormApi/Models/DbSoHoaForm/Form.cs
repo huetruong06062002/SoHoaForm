@@ -19,6 +19,8 @@ public partial class Form
 
     public DateTime? CreatedAt { get; set; }
 
+    public DateTime? TimeExpired { get; set; }
+
     public virtual FormCategory? Category { get; set; }
 
     public virtual ICollection<FormField> FormFields { get; set; } = new List<FormField>();

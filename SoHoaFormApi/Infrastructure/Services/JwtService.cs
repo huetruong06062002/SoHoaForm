@@ -1,24 +1,23 @@
+using Microsoft.IdentityModel.Tokens;
+using SoHoaFormApi.Models.DbSoHoaForm;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using SoHoaFormApi.Models.DbSoHoaForm;
 
 namespace SoHoaFormApi.Infrastructure.Services
 {
     public class JwtAuthService
     {
-        private readonly string? _key;
-        private readonly string? _issuer;
-        private readonly string? _audience;
+        private readonly string _key;
+        private readonly string _issuer;
+        private readonly string _audience;
         private readonly SoHoaFormContext _context;
 
         public JwtAuthService(IConfiguration configuration, SoHoaFormContext context)
         {
-            _key = configuration["jwt:Secret-Key"];
-            _issuer = configuration["jwt:Issuer"];
-            _audience = configuration["jwt:Audience"];
+            _key = configuration["jwt:Secret-Key"] ?? throw new ArgumentNullException("Secret-Key is missing");
+            _issuer = configuration["jwt:Issuer"] ?? "";
+            _audience = configuration["jwt:Audience"] ?? "";
             _context = context;
         }
 
@@ -30,11 +29,12 @@ namespace SoHoaFormApi.Infrastructure.Services
             // Tạo danh sách các claims cho token
             var claims = new List<Claim>
             {
-                new Claim("UserName", userLogin.Name ?? ""),
-                new Claim(JwtRegisteredClaimNames.Sub, userLogin.Name ?? ""),
+                new Claim("UserName", userLogin.UserName ?? ""),
+                new Claim("UserId", userLogin.Id.ToString()),
+                new Claim(JwtRegisteredClaimNames.Sub, userLogin.UserName ?? ""),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(JwtRegisteredClaimNames.Iat, DateTime.UtcNow.ToString()),
-                new Claim("UserId", userLogin.Id.ToString())
+                new Claim(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+                new Claim("Name", userLogin.Name ?? "")
             };
 
             // Add role vào token
@@ -42,6 +42,7 @@ namespace SoHoaFormApi.Infrastructure.Services
             if (userRole != null)
             {
                 claims.Add(new Claim(ClaimTypes.Role, userRole.RoleName));
+                claims.Add(new Claim("RoleName", userRole.RoleName));
             }
 
             // Tạo khóa bí mật để ký token
@@ -105,7 +106,7 @@ namespace SoHoaFormApi.Infrastructure.Services
                 var tokenHandler = new JwtSecurityTokenHandler();
                 var key = Encoding.ASCII.GetBytes(_key);
 
-                var validationParameters = new TokenValidationParameters
+                tokenHandler.ValidateToken(token, new TokenValidationParameters
                 {
                     ValidateIssuerSigningKey = true,
                     IssuerSigningKey = new SymmetricSecurityKey(key),
@@ -115,10 +116,12 @@ namespace SoHoaFormApi.Infrastructure.Services
                     ValidAudience = _audience,
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.Zero
-                };
+                }, out SecurityToken validatedToken);
 
-                var principal = tokenHandler.ValidateToken(token, validationParameters, out _);
-                return principal;
+                var jwtToken = (JwtSecurityToken)validatedToken;
+                var userId = jwtToken.Claims.First(x => x.Type == "UserId").Value;
+                
+                return new ClaimsPrincipal(new ClaimsIdentity(jwtToken.Claims, "jwt"));
             }
             catch
             {

@@ -32,10 +32,25 @@ const AppLayout = ({ children }) => {
           fontWeight: 400,
           fontSize: '14px'
         }}>
-          Vai trò: {user?.role === 'admin' ? 'Quản trị viên' : 'Người dùng'}
+          Vai trò: {user?.roleName === 'admin' ? 'Quản trị viên' : 'Người dùng'}
         </div>
       ),
     },
+    // Chỉ hiển thị "Trang quản lý" cho admin
+    ...(user?.roleName === 'admin' ? [{
+      key: 'admin-dashboard',
+      label: (
+        <div style={{
+          padding: '5px 16px',
+          color: 'rgba(0, 0, 0, 0.88)',
+          fontWeight: 400,
+          fontSize: '14px'
+        }}>
+          Trang quản lý
+        </div>
+      ),
+      onClick: () => navigate('/admin-dashboard'),
+    }] : []),
     {
       key: 'logout',
       label: (
@@ -105,7 +120,7 @@ const AppLayout = ({ children }) => {
               Điền form
             </div>)}
             {/* Chỉ hiển thị "Quản lý form" cho admin */}
-            {user?.role === 'admin' && (
+            {user?.roleName === 'admin' && (
               <div
                 style={{
                   color: 'white',
@@ -139,7 +154,7 @@ const AppLayout = ({ children }) => {
               }}>
                 <Space>
                   <Avatar size="small" icon={<UserOutlined />} />
-                  Vai trò: {user.role === 'admin' ? 'Quản trị viên' : 'Người dùng'}
+                  Vai trò: {user.roleName === 'admin' ? 'Quản trị viên' : 'Người dùng'}
                   <DownOutlined style={{ fontSize: '12px' }} />
                 </Space>
               </div>

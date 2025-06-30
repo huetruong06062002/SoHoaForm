@@ -1,8 +1,11 @@
+using System.Linq.Expressions;
+using Microsoft.EntityFrameworkCore;
 using SoHoaFormApi.Models.DbSoHoaForm;
 
 public interface IUserFillFormHistoryRepository : IRepository<UserFillFormHistory>
 {
-    // Add custom methods for UserFillFormHistory here if needed
+
+    
 }
 
 public class UserFillFormHistoryRepository : Repository<UserFillFormHistory>, IUserFillFormHistoryRepository
@@ -10,4 +13,6 @@ public class UserFillFormHistoryRepository : Repository<UserFillFormHistory>, IU
     public UserFillFormHistoryRepository(SoHoaFormContext context) : base(context)
     {
     }
+
+   
 }

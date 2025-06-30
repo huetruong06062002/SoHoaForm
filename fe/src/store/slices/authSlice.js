@@ -13,8 +13,12 @@ export const loginAsync = createAsyncThunk(
       localStorage.setItem('authToken', data.token);
       localStorage.setItem('userInfo', JSON.stringify({
         userId: data.userId,
-        role: data.role,
-        message: data.message,
+        userName: data.userName,
+        name: data.name,
+        roleName: data.roleName,
+        permissions: data.permissions,
+        categoryPermissions: data.categoryPermissions,
+        expiresAt: data.expiresAt
       }));
       
       return data;
@@ -78,8 +82,12 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
         state.user = {
           userId: action.payload.userId,
-          role: action.payload.role,
-          message: action.payload.message,
+          userName: action.payload.userName,
+          name: action.payload.name,
+          roleName: action.payload.roleName,
+          permissions: action.payload.permissions,
+          categoryPermissions: action.payload.categoryPermissions,
+          expiresAt: action.payload.expiresAt
         };
         state.token = action.payload.token;
         state.error = null;

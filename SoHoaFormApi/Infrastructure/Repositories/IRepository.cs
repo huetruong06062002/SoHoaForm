@@ -6,10 +6,10 @@ using SoHoaFormApi.Models.DbSoHoaForm;
 public interface IRepository<T> where T : class
 {
     Task<IEnumerable<T>> GetAllAsync();
-    Task<T?> GetByIdAsync(int id);
+    Task<T?> GetByIdAsync(Guid id);
     Task AddAsync(T entity);
     void Update(T entity);
-    Task DeleteAsync(int id);
+    Task DeleteAsync(Guid id);
     Task<T?> SingleOrDefaultAsync(Expression<Func<T, bool>> predicate);
     Task<IEnumerable<T>> WhereAsync(Expression<Func<T, bool>> predicate);
 }
@@ -31,7 +31,7 @@ public class Repository<T> : IRepository<T> where T : class
     }
 
 
-    public async Task<T?> GetByIdAsync(int id)
+    public async Task<T?> GetByIdAsync(Guid id)
         => await _dbSet.FindAsync(id);
 
     public async Task AddAsync(T entity)
@@ -44,7 +44,7 @@ public class Repository<T> : IRepository<T> where T : class
         _dbSet.Update(entity);
     }
 
-    public async Task DeleteAsync(int id)
+    public async Task DeleteAsync(Guid id)
     {
         var entity = await _dbSet.FindAsync(id);
         if (entity is not null)

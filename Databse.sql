@@ -26,6 +26,15 @@ CREATE TABLE [User] (
     FOREIGN KEY (RoleId) REFERENCES Roles(Id)
 );
 
+-- Bảng UseRole
+Create TABLE [UserRole] (
+	Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+	RoleId UNIQUEIDENTIFIER,
+	UserId UNIQUEIDENTIFIER,
+	FOREIGN KEY (RoleId) REFERENCES Roles(Id),
+	FOREIGN KEY (UserId) REFERENCES [User](Id)
+)
+
 -- Bảng Form
 CREATE TABLE Form (
     Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
@@ -88,26 +97,121 @@ CREATE TABLE UserFillFormHistory (
     DateFinish DATETIME,
     Status NVARCHAR(50),
     FOREIGN KEY (UserFillFormId) REFERENCES UserFillForm(Id)
-);
+)
 
+
+-- Bảng Permissions
+CREATE TABLE Permissions (
+	 Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+	 PermissionName NVARCHAR(50)
+)
+
+
+-- Bảng RolePermission
+CREATE TABLE RolePermission(
+	Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+	RoleId UNIQUEIDENTIFIER,
+	PermissionId UNIQUEIDENTIFIER,
+	FOREIGN KEY (RoleId) REFERENCES Roles(Id),
+	FOREIGN KEY (PermissionId) REFERENCES Permissions(Id),
+
+)
+
+-- Bảng RoleCategoryPermission
+CREATE TABLE RoleCategoryPermission (
+	Id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+	RoleId UNIQUEIDENTIFIER,
+	FormCategoryId UNIQUEIDENTIFIER,
+	CanAcess BIT DEFAULT 0,
+	FOREIGN KEY (RoleId) REFERENCES Roles(Id),
+	FOREIGN KEY (FormCategoryId) REFERENCES FormCategory(Id),
+)
+
+
+ALTER TABLE FormCategory
+ADD ParentCategoryId UNIQUEIDENTIFIER;
+
+
+
+ALTER TABLE FormCategory
+ADD FOREIGN KEY (ParentCategoryId) REFERENCES FormCategory(Id);
+
+
+ALTER TABLE Form
+ADD TimeExpired DATETIME;
+
+
+ALTER TABLE [User]
+ADD [UserName] NVARCHAR(50);
+
+ALTER TABLE [User]
+ADD [PassWord] NVARCHAR(255);
+
+
+ALTER TABLE [Roles]
+ADD [UserId] UNIQUEIDENTIFIER;
+
+
+
+ALTER TABLE [Roles]
+ADD [DateCreated] DateTime
+
+ALTER TABLE [User]
+ADD [DateCreated] DateTime
+
+ALTER TABLE [UserRole]
+ADD [DateCreated] DateTime
 
 
 BEGIN TRANSACTION;
-DELETE FROM [Form];
-DELETE FROM [FormCategory];
-COMMIT TRANSACTION;
+
+-- Bước 1: Xóa dữ liệu từ UserFillFormHistory
+DELETE FROM UserFillFormHistory;
+
+-- Bước 2: Xóa dữ liệu từ UserFillForm
+DELETE FROM UserFillForm;
+
+-- Bước 3: Xóa dữ liệu từ FormField
+DELETE FROM FormField;
+
+-- Bước 4: Xóa dữ liệu từ PDF
+DELETE FROM PDF;
+
+-- Bước 5: Xóa dữ liệu từ RolePermission
+DELETE FROM RolePermission;
+
+-- Bước 6: Xóa dữ liệu từ RoleCategoryPermission
+DELETE FROM RoleCategoryPermission;
+
+-- Bước 7: Xóa dữ liệu từ Form và FormField
+DELETE FROM Form;
+DELETE FROM FormField;
+
+-- Bước 8: Xóa dữ liệu từ User
+DELETE FROM [User];
+
+-- Bước 9: Xóa dữ liệu từ Permissions
+DELETE FROM Permissions;
+
+-- Bước 10: Xóa dữ liệu từ Roles
+DELETE FROM Roles;
+
+-- Bước 11: Xóa dữ liệu từ UserRole
+DELETE FROM UserRole
 
 
-BEGIN TRANSACTION;
--- Delete from dependent tables first
+-- Kiểm tra nếu tất cả lệnh thành công, commit giao dịch
+IF @@ERROR = 0
+BEGIN
+    COMMIT TRANSACTION;
+    PRINT 'All data deleted successfully.';
+END
+ELSE
+BEGIN
+    ROLLBACK TRANSACTION;
+    PRINT 'An error occurred. Transaction rolled back.';
+END;
 
-
-DELETE FROM [FormField];
-DELETE FROM [Form];
--- Delete from reference tables last
-DELETE FROM [Field];
-DELETE FROM [FormCategory];
-COMMIT TRANSACTION;
 
 
 SELECT * FROM [FormField] WHERE FormId = '807eef00-f015-4e5a-b994-acec95bd2aba' 

@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Security.Claims;
 using Microsoft.OpenApi.Models;
+using SoHoaFormApi.Infrastructure.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 Environment.SetEnvironmentVariable("TZ", "Asia/Ho_Chi_Minh");
@@ -34,6 +35,10 @@ builder.Services.AddScoped<IPdfRepository, PdfRepository>();
 builder.Services.AddScoped<IUserFillFormRepository, UserFillFormRepository>();
 builder.Services.AddScoped<IUserFillFormHistoryRepository, UserFillFormHistoryRepository>();
 
+builder.Services.AddScoped<IPermissionsRepository, PermissionsRepository>();
+builder.Services.AddScoped<IRoleCategoryPermissionRepository, RoleCategoryPermissionRepository>();
+builder.Services.AddScoped<IRolePermissionsRepository, RolePermissionsRepository>();
+builder.Services.AddScoped<IUserRoleRepository, UserRoleRepository>();
 
 
 //Đăng kí unit of work
@@ -46,6 +51,13 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IWordReaderService, WordReaderService>();
 builder.Services.AddScoped<IFileService, FileService>();
 builder.Services.AddScoped<IPdfExportService, PdfExportService>();
+builder.Services.AddScoped<IRoleService, RoleService>();
+builder.Services.AddScoped<IRoleCategoryPermissionService, RoleCategoryPermissionService>();
+builder.Services.AddScoped<IPermissionService, PermissionService>();
+builder.Services.AddScoped<IFormCategoryService, FormCategoryService>();
+builder.Services.AddScoped<IUserManagementService, UserManagementService>();
+
+
 
 // Bật hỗ trợ toàn cục hóa (globalization)
 Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
@@ -185,27 +197,20 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-async Task SeedBasicData(SoHoaFormContext context)
-{
-    // Seed Roles nếu chưa có
-    if (!context.Roles.Any())
-    {
-        context.Roles.AddRange(
-            new Role { Id = Guid.NewGuid(), RoleName = "admin" },
-            new Role { Id = Guid.NewGuid(), RoleName = "user" }
-        );
-        await context.SaveChangesAsync();
-    }
-}
-
 app.UseHttpsRedirection();
 
-// Sửa thứ tự middleware - CORS phải đặt trước Authentication
-app.UseCors("allowOrigin"); // Sửa tên policy cho đúng
+// 🆕 Sử dụng Data Seeding Middleware
+app.UseDataSeeding();
+
+
+//CORS phải đặt trước Authentication
+app.UseCors("allowOrigin");
 
 app.UseAuthentication(); // Authentication phải đặt trước Authorization
 app.UseAuthorization();
 
 app.MapControllers();
+
+
 
 app.Run();

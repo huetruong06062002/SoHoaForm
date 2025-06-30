@@ -136,7 +136,7 @@ const MainLayout = ({ children }) => {
             <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
               <Avatar icon={<UserOutlined />} />
               <span>
-                {user?.role === 'admin' ? 'Admin' : 'User'} ({user?.role})
+                {user?.roleName === 'admin' ? 'Admin' : 'User'} ({user?.roleName})
               </span>
             </div>
           </Dropdown>

@@ -11,21 +11,23 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { loading, error } = useSelector((state) => state.auth);
-  const [role, setRole] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
 
   const handleSubmit = async () => {
-    if (!role) {
+    if (!username || !password) {
       message.error('Vui lòng nhập đầy đủ thông tin!');
       return;
     }
 
     try {
       const result = await dispatch(loginAsync({
-        role: role
+        username: username,
+        password: password
       })).unwrap();
 
       if (result) {
-        message.success('Đăng nhập thành công!');
+        message.success(`Đăng nhập thành công! Chào mừng ${result.name}`);
         navigate('/');
       }
     } catch (err) {
@@ -82,10 +84,27 @@ const LoginPage = () => {
                 Tên đăng nhập
               </Text>
               <Input
-                placeholder="Nhập admin hoặc user"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
+                placeholder="Nhập tên đăng nhập"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 style={{ height: '40px' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '24px' }}>
+              <Text style={{ 
+                display: 'block', 
+                marginBottom: '8px',
+                color: '#333'
+              }}>
+                Mật khẩu
+              </Text>
+              <Input.Password
+                placeholder="Nhập mật khẩu"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{ height: '40px' }}
+                onPressEnter={handleSubmit}
               />
             </div>
 

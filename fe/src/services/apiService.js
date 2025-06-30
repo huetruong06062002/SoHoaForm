@@ -29,6 +29,87 @@ export const apiService = {
     },
   },
 
+  // User Management API
+  userManagement: {
+    getUsers: async (params = {}) => {
+      const response = await apiClient.get('/UserManagement', { params });
+      return response.data;
+    },
+    
+    searchUsers: async (searchTerm = '', pageNumber = 1, pageSize = 10) => {
+      try {
+        console.log(`Calling search API with: searchTerm=${searchTerm}, pageNumber=${pageNumber}, pageSize=${pageSize}`);
+        const response = await apiClient.get('/UserManagement/search', { 
+          params: { 
+            searchTerm, 
+            pageNumber, 
+            pageSize 
+          } 
+        });
+        return response.data;
+      } catch (error) {
+        console.error('Error in searchUsers:', error);
+        // Nếu endpoint search không tồn tại, thử dùng endpoint getAll
+        if (error.response && error.response.status === 404) {
+          console.log('Search endpoint not found, falling back to getAll');
+          const response = await apiClient.get('/UserManagement', {
+            params: { pageNumber, pageSize }
+          });
+          return response.data;
+        }
+        throw error;
+      }
+    },
+    
+    getUserById: async (id) => {
+      const response = await apiClient.get(`/UserManagement/${id}`);
+      return response.data;
+    },
+    
+    createUser: async (userData) => {
+      const response = await apiClient.post('/UserManagement', userData);
+      return response.data;
+    },
+    
+    updateUser: async (id, userData) => {
+      const response = await apiClient.put(`/UserManagement/${id}`, userData);
+      return response.data;
+    },
+    
+    deleteUser: async (id) => {
+      try {
+        const response = await apiClient.delete(`/UserManagement/${id}`);
+        return response.data;
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        throw error;
+      }
+    },
+    
+    deleteUserRole: async (userId, roleId) => {
+      const response = await apiClient.delete(`/UserManagement/${userId}/roles/${roleId}`);
+      return response.data;
+    },
+
+    assignRoleToUser: async (userId, roleId) => {
+      const response = await apiClient.post(`/UserManagement/${userId}/roles/${roleId}`);
+      return response.data;
+    },
+  },
+
+  // Role API
+  roles: {
+    getAll: async () => {
+      const response = await apiClient.get('/Role');
+      return response.data;
+    },
+    
+    getById: async (id) => {
+      const response = await apiClient.get(`/Role/${id}`);
+      return response.data;
+    },
+  },
+
   // Generic CRUD operations
   crud: {
     getAll: async (endpoint, params = {}) => {

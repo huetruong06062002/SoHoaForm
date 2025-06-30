@@ -856,7 +856,7 @@ const FormConfigPage = () => {
   ];
 
   // Kiểm tra quyền admin
-  if (user?.role !== "admin") {
+  if (user?.roleName !== "admin") {
     return (
       <AppLayout>
         <div style={{ padding: "24px" }}>

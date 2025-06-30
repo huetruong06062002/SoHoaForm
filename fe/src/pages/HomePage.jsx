@@ -78,7 +78,7 @@ const HomePage = () => {
           maxWidth: '1000px'
         }}>
           {/* Admin Card - Quản lý biểu mẫu */}
-          {user?.role === 'admin' && (
+          {user?.roleName === 'admin' && (
             <motion.div
               variants={cardVariants}
               initial="initial"
