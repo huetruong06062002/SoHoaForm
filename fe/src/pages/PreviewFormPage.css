@@ -1100,3 +1100,70 @@ input[type="checkbox"] {
 {
   display: block!important;
 }
+
+/* Styles for radio buttons */
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+}
+
+.radio-group > div {
+  display: flex;
+  align-items: center;
+  margin-bottom: 2px;
+  white-space: nowrap;
+}
+
+.radio-input {
+  margin: 0 auto !important;
+  display: block !important;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  vertical-align: middle !important;
+  position: relative !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  cursor: pointer !important;
+  -webkit-appearance: radio !important;
+  appearance: radio !important;
+}
+
+/* Fix radio buttons in table cells */
+.form-content td .radio-input {
+  margin: 0 auto !important;
+  padding: 0 !important;
+  display: block !important;
+  position: relative !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+}
+
+/* Print styles for radio buttons */
+@media print {
+  .radio-input {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    border: 1px solid #000;
+    border-radius: 50%;
+    width: 12px !important;
+    height: 12px !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    display: block !important;
+    position: relative !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+  }
+  
+  .radio-input:checked {
+    background-color: #000;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px #000;
+  }
+}

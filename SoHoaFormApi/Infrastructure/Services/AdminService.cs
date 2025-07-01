@@ -328,6 +328,7 @@ public class AdminService : IAdminService
       if (formula.Contains("{t_")) return "Text";           // t_ = text
       if (formula.Contains("{n_")) return "Number";         // n_ = number
       if (formula.Contains("{b_")) return "Boolean";        // b_ = boolean
+      if (formula.Contains("{rd_")) return "Radio";           // rd_ = radio
     }
 
     var name = fieldName.ToLower();
@@ -339,6 +340,7 @@ public class AdminService : IAdminService
     if (name.StartsWith("d_")) return "Date";        // d_ = date
     if (name.StartsWith("c_") || name.StartsWith("b_")) return "Boolean"; // c_/b_ = boolean
     if (name.StartsWith("s_")) return "Select";      // s_ = select/dropdown
+     if (name.StartsWith("rd_")) return "Radio";      // rd_ = radio 
 
     // 1. Phân tích Number fields trước 
     if (name.Contains("score") || name.Contains("duration") ||
@@ -377,7 +379,8 @@ public class AdminService : IAdminService
 
     if (name.Contains("checkbox") || name.Contains("check")) return "Checkbox";
     if (name.Contains("select") || name.Contains("dropdown")) return "Dropdown";
-
+      if (name.Contains("radio") || name.Contains("option")) return "Radio";
+      
     return "Text"; //Mặc định là Text nếu không xác định được type
   }
 

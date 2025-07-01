@@ -124,6 +124,15 @@ const PreviewFormPage = () => {
             value = input.checked ? 1 : 0;
             console.log(`Checkbox ${fieldName} value: ${input.checked} -> ${value}`);
             break;
+          case 'rd': // radio
+            // For radio buttons, only include checked ones
+            if (input.type === 'radio') {
+              value = input.checked ? 'true' : '';
+              if (input.checked) {
+                console.log(`Radio ${fieldName} is checked with value: ${value}`);
+              }
+            }
+            break;
           case 'n': // number
             const numberValue = parseFloat(input.value);
             value = isNaN(numberValue) ? 0 : numberValue;
@@ -210,6 +219,12 @@ const PreviewFormPage = () => {
             input.checked = boolValue;
             console.log(`Checkbox ${fieldName}: ${savedField.value} -> ${boolValue}`);
             break;
+          case 'rd': // radio
+            // For radio buttons, check if the saved value is true
+            const isChecked = savedField.value === 'true' || savedField.value === true || savedField.value === '1' || savedField.value === 1;
+            input.checked = isChecked;
+            console.log(`Radio ${fieldName}: Set checked = ${isChecked}`);
+            break;
           case 's': // select
             input.value = savedField.value;
             break;
@@ -228,6 +243,8 @@ const PreviewFormPage = () => {
       }
     });
 
+    // No special handling needed for radio buttons anymore
+
     // Cập nhật formula fields sau khi populate
     setTimeout(() => updateFormulaFields(), 200);
   };
@@ -244,6 +261,8 @@ const PreviewFormPage = () => {
     if (fieldType === 'Boolean' || fieldType === 'boolean') internalFieldType = 'c';
     if (fieldType === 'Date' || fieldType === 'date') internalFieldType = 'dt';
     if (fieldType === 'Select' || fieldType === 'select') internalFieldType = 's';
+    if (fieldType === 'Radio' || fieldType === 'radio') internalFieldType = 'rd';
+    if (fieldType === 'rd') internalFieldType = 'rd'; // Handle case when pattern is {rd_field}
 
     // Xử lý pattern từ placeholder {type_field}
     if (typeof fieldType === 'string' && fieldType.length === 1) {
@@ -415,6 +434,26 @@ const PreviewFormPage = () => {
         element.style.color = '#1890ff';
         element.style.textAlign = 'center';
         break;
+      
+      case 'rd': // radio
+        // For radio buttons, we create a simple radio input without label
+        const radioInput = document.createElement('input');
+        radioInput.type = 'radio';
+        radioInput.name = fieldName;
+        radioInput.value = 'true';
+        radioInput.className = 'form-input radio-input';
+        radioInput.id = `${fieldName}-radio`;
+        radioInput.style.margin = '0 auto';
+        radioInput.style.padding = '0';
+        radioInput.style.display = 'block';
+        radioInput.style.width = '16px';
+        radioInput.style.height = '16px';
+        radioInput.style.minWidth = '16px';
+        radioInput.style.verticalAlign = 'middle';
+        radioInput.dataset.fieldType = 'rd';
+        radioInput.dataset.fieldName = fieldName;
+        
+        return radioInput;
 
       default:
         // Mặc định là text input
@@ -1983,6 +2022,17 @@ const PreviewFormPage = () => {
           value = input.checked;
           console.log(`  Checkbox value: ${value}`);
           break;
+        case 'rd': // radio
+          if (input.type === 'radio') {
+            value = input.checked ? input.value : '';
+            console.log(`  Radio input value: "${value}" (checked: ${input.checked})`);
+          } else if (input.classList.contains('radio-group')) {
+            // For radio group containers, find checked radio
+            const checkedRadio = input.querySelector('input[type="radio"]:checked');
+            value = checkedRadio ? checkedRadio.value : '';
+            console.log(`  Radio group value: "${value}" (has selection: ${!!checkedRadio})`);
+          }
+          break;
         case 's': // select
           value = input.value;
           console.log(`  Select value: "${value}" (selectedIndex: ${input.selectedIndex})`);
@@ -2196,7 +2246,18 @@ const PreviewFormPage = () => {
             value = input.checked ? 'true' : 'false';
             fieldType = 'c';
             break;
-          case 's': // select
+          case 'rd': // radio
+            // For individual radio buttons
+            if (input.type === 'radio') {
+              // Only include checked radio buttons
+              value = input.checked ? 'true' : 'false';
+              fieldType = 'rd';
+            } else {
+              // Skip other elements that might have 'rd' type but aren't radio buttons
+              return;
+            }
+            break;
+        case 's': // select
             value = input.value || '';
             fieldType = 's';
             break;

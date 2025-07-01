@@ -318,7 +318,7 @@ namespace SoHoaFormApi.Infrastructure.Services
                 if (fieldValues.Any())
                 {
                     await Task.Run(() => FillWordTemplateWithOffice(doc, fieldValues));
-                    await Task.Run(() => AddDataToWordDocumentWithOffice(doc, form, fieldValues));
+                    // await Task.Run(() => AddDataToWordDocumentWithOffice(doc, form, fieldValues));
                 }
 
                 var tempPdfPath = Path.Combine(Path.GetTempPath(), $"temp_office_export_{Guid.NewGuid()}.pdf");
@@ -415,7 +415,8 @@ namespace SoHoaFormApi.Infrastructure.Services
                     var matches = regex.Matches(documentText);
 
                     var processedPlaceholders = new HashSet<string>();
-
+                      var checkboxCount = 0;
+        var radioCount = 0;
                     foreach (System.Text.RegularExpressions.Match match in matches)
                     {
                         var placeholder = match.Value; // Full placeholder như {c_Purser}
@@ -426,6 +427,18 @@ namespace SoHoaFormApi.Infrastructure.Services
                             continue;
 
                         Console.WriteLine($"🔍 Found placeholder: {placeholder}");
+
+                         // ✅ KIỂM TRA XEM CÓ PHẢI CHECKBOX HOẶC RADIO KHÔNG
+            if (fieldKey.StartsWith("c_") || fieldKey.StartsWith("b_"))
+            {
+                checkboxCount++;
+                Console.WriteLine($"  ☑ This is a checkbox field #{checkboxCount}");
+            }
+            else if (fieldKey.StartsWith("rd_"))
+            {
+                radioCount++;
+                Console.WriteLine($"  📻 This is a radio field #{radioCount}");
+            }
 
                         // 2. PHÂN TÍCH LOẠI PLACEHOLDER - LUÔN LẤY GIÁ TRỊ THAY THẾ
                         var replacementValue = GetReplacementValue(fieldKey, fieldDict);
@@ -438,7 +451,7 @@ namespace SoHoaFormApi.Infrastructure.Services
                     }
 
                
-
+                       Console.WriteLine($"📊 Processing summary: {checkboxCount} checkbox fields, {radioCount} radio fields found");
                     Console.WriteLine("✅ Dynamic checkbox logic fill completed with Office");
                 }
                 catch (Exception ex)
@@ -701,7 +714,7 @@ namespace SoHoaFormApi.Infrastructure.Services
                 // Chỉ add data table nếu có data
                 if (fieldValues?.Any() == true)
                 {
-                    await Task.Run(() => AddDataToWordDocumentWithSpire(document, form, fieldValues));
+                    // await Task.Run(() => AddDataToWordDocumentWithSpire(document, form, fieldValues));
                 }
 
                 using (var stream = new MemoryStream())
@@ -976,7 +989,7 @@ namespace SoHoaFormApi.Infrastructure.Services
                     // 2. PHÂN TÍCH LOẠI PLACEHOLDER - LUÔN LẤY GIÁ TRỊ THAY THẾ
                     var replacementValue = GetReplacementValue(fieldKey, fieldDict);
 
-                    // THAY ĐỖI: Luôn thay thế, không kiểm tra IsNullOrEmpty
+                    // Luôn thay thế, không kiểm tra IsNullOrEmpty
                     var replaceCount = document.Replace(placeholder, replacementValue, true, true);
 
                     if (replaceCount > 0)
@@ -988,7 +1001,7 @@ namespace SoHoaFormApi.Infrastructure.Services
                         Console.WriteLine($"  ⚠️ Could not replace {placeholder}");
 
                         // ✅ THÊM FALLBACK CHO CHECKBOX
-                        if (fieldKey.StartsWith("c_") || fieldKey.StartsWith("b_"))
+                        if (fieldKey.StartsWith("c_") || fieldKey.StartsWith("b_") || fieldKey.StartsWith("rd_"))
                         {
                             var manualCount = ForceManualReplace(document, placeholder, replacementValue);
                             if (manualCount > 0)
@@ -1041,6 +1054,35 @@ namespace SoHoaFormApi.Infrastructure.Services
 
                     var result = isChecked ? "☑" : "☐";
                     Console.WriteLine($"  ✅ Checkbox result: {value} → {result} (isChecked: {isChecked})");
+                    return result;
+                }
+                else if (fieldKey.StartsWith("rd_"))
+                {
+                    // Radio box field
+                    var actualFieldName = fieldKey.Substring(3); // Bỏ "rd_"
+                    Console.WriteLine($"  📻 Radio field: {actualFieldName}");
+
+                    var value = fieldDict.GetValueOrDefault(actualFieldName, "false");
+                    Console.WriteLine($"  📊 Raw radio value: '{value}'");
+
+                    bool isSelected = false;
+
+                    // Kiểm tra nhiều format cho radio selection
+                    if (bool.TryParse(value, out var boolValue))
+                    {
+                        isSelected = boolValue;
+                    }
+                    else if (value.ToLower() == "true" || value == "1" || value.ToLower() == "yes" || value.ToLower() == "selected")
+                    {
+                        isSelected = true;
+                    }
+                    else if (value.ToLower() == "false" || value == "0" || value.ToLower() == "no" || string.IsNullOrEmpty(value))
+                    {
+                        isSelected = false;
+                    }
+
+                    var result = isSelected ? "●" : "○"; // Radio selected: ● , unselected: ○
+                    Console.WriteLine($"  ✅ Radio result: {value} → {result} (isSelected: {isSelected})");
                     return result;
                 }
                 else if (fieldKey.StartsWith("t_"))
@@ -1319,6 +1361,30 @@ namespace SoHoaFormApi.Infrastructure.Services
                         var checkboxResult = isChecked ? "☑" : "☐";
                         Console.WriteLine($"  ☑ Checkbox formatted: {value} → {checkboxResult} (isChecked: {isChecked})");
                         return checkboxResult;
+
+
+                    case "radio":
+            case "radiobox":
+            case "rd":
+            case "r":
+                bool isSelected = false;
+                
+                if (bool.TryParse(value, out var radioBoolValue))
+                {
+                    isSelected = radioBoolValue;
+                }
+                else if (value.ToLower() == "true" || value == "1" || value.ToLower() == "yes" || value.ToLower() == "selected")
+                {
+                    isSelected = true;
+                }
+                else if (value.ToLower() == "false" || value == "0" || value.ToLower() == "no" || string.IsNullOrEmpty(value))
+                {
+                    isSelected = false;
+                }
+                
+                var radioResult = isSelected ? "●" : "○"; // Radio selected: ● , unselected: ○
+                Console.WriteLine($"  📻 Radio formatted: {value} → {radioResult} (isSelected: {isSelected})");
+                return radioResult;    
 
                     case "select":
                     case "dropdown":
