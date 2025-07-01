@@ -1,125 +1,95 @@
-import { useState } from 'react';
-import { Typography, Card, Table, Tag, Button, Space, Divider, Modal, Form, Input, Select, Switch } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { useState, useEffect } from 'react';
+import { Typography, Card, Table, Tag, Button, Space, Divider, Modal, Form, Input, Select, Switch, message, App, Badge, Tooltip, Popover } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined, AppstoreOutlined, EyeOutlined } from '@ant-design/icons';
+import apiService from '../services/apiService';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 const { TextArea } = Input;
 
 const PermissionManagementPage = () => {
+  const { message: messageApi } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingFeature, setEditingFeature] = useState(null);
+  const [editingPermission, setEditingPermission] = useState(null);
   const [form] = Form.useForm();
+  const [permissions, setPermissions] = useState([]);
+  const [rolesModalVisible, setRolesModalVisible] = useState(false);
+  const [selectedPermission, setSelectedPermission] = useState(null);
 
-  // Mô phỏng dữ liệu chức năng
-  const features = [
-    {
-      id: 1,
-      name: 'Quản lý người dùng',
-      code: 'user_management',
-      description: 'Quản lý tài khoản người dùng và phân quyền',
-      module: 'admin',
-      status: 'active',
-      requiredPermission: 'manage_users',
-    },
-    {
-      id: 2,
-      name: 'Quản lý vai trò',
-      code: 'role_management',
-      description: 'Quản lý vai trò và phân quyền hệ thống',
-      module: 'admin',
-      status: 'active',
-      requiredPermission: 'manage_roles',
-    },
-    {
-      id: 3,
-      name: 'Tạo form mới',
-      code: 'create_form',
-      description: 'Tạo mới biểu mẫu',
-      module: 'form',
-      status: 'active',
-      requiredPermission: 'create_form',
-    },
-    {
-      id: 4,
-      name: 'Xuất báo cáo',
-      code: 'export_report',
-      description: 'Xuất báo cáo thống kê',
-      module: 'report',
-      status: 'inactive',
-      requiredPermission: 'export_report',
-    },
-    {
-      id: 5,
-      name: 'Gửi thông báo',
-      code: 'send_notification',
-      description: 'Gửi thông báo cho người dùng',
-      module: 'notification',
-      status: 'active',
-      requiredPermission: 'send_notification',
-    },
-  ];
+  // Fetch permissions data from API
+  const fetchPermissions = async () => {
+    setLoading(true);
+    try {
+      const response = await apiService.crud.getAll('/Permission');
+      
+      if (response && response.data) {
+        console.log('API Permissions Response:', response);
+        setPermissions(response.data);
+      } else {
+        setPermissions([]);
+      }
+    } catch (error) {
+      console.error('Error fetching permissions:', error);
+      messageApi.error('Không thể tải danh sách quyền hạn');
+      setPermissions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Danh sách module
-  const modules = [
-    { label: 'Admin', value: 'admin' },
-    { label: 'Form', value: 'form' },
-    { label: 'Báo cáo', value: 'report' },
-    { label: 'Thông báo', value: 'notification' },
-    { label: 'Tài liệu', value: 'document' },
-  ];
+  // Load permissions when component mounts
+  useEffect(() => {
+    fetchPermissions();
+  }, []);
 
-  // Danh sách quyền hạn
-  const permissions = [
-    { label: 'Quản lý người dùng', value: 'manage_users' },
-    { label: 'Quản lý vai trò', value: 'manage_roles' },
-    { label: 'Tạo form', value: 'create_form' },
-    { label: 'Chỉnh sửa form', value: 'edit_form' },
-    { label: 'Xóa form', value: 'delete_form' },
-    { label: 'Xuất báo cáo', value: 'export_report' },
-    { label: 'Gửi thông báo', value: 'send_notification' },
-  ];
-
-  // Cấu hình cột cho bảng chức năng
+  // Cấu hình cột cho bảng quyền hạn
   const columns = [
-    { title: 'Tên chức năng', dataIndex: 'name', key: 'name' },
-    { title: 'Mã', dataIndex: 'code', key: 'code' },
-    { title: 'Mô tả', dataIndex: 'description', key: 'description', ellipsis: true },
     { 
-      title: 'Module', 
-      dataIndex: 'module', 
-      key: 'module',
-      render: (module) => {
-        const moduleObj = modules.find(m => m.value === module);
-        return (
-          <Tag color="blue">
-            {moduleObj ? moduleObj.label : module}
-          </Tag>
-        );
-      }
+      title: 'Tên quyền hạn',
+      dataIndex: 'permissionName',
+      key: 'name',
+      render: (text) => <span style={{ fontWeight: 500 }}>{text}</span>
     },
     { 
-      title: 'Quyền yêu cầu', 
-      dataIndex: 'requiredPermission', 
-      key: 'requiredPermission',
-      render: (permission) => {
-        const permObj = permissions.find(p => p.value === permission);
-        return (
-          <Tag color="purple">
-            {permObj ? permObj.label : permission}
-          </Tag>
-        );
-      }
+      title: 'Số vai trò được chỉ định',
+      key: 'rolePermissionsCount',
+      dataIndex: 'rolePermissionsCount',
+      render: (count, record) => (
+        <Badge 
+          count={count} 
+          overflowCount={99}
+          style={{ 
+            backgroundColor: count > 0 ? '#1890ff' : '#d9d9d9',
+            cursor: 'pointer' 
+          }}
+          onClick={() => handleViewRoles(record)}
+        />
+      )
     },
     {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status) => (
-        <Tag color={status === 'active' ? 'success' : 'default'}>
-          {status === 'active' ? 'Hoạt động' : 'Không hoạt động'}
-        </Tag>
+      title: 'Vai trò đã gán',
+      key: 'assignedRoles',
+      dataIndex: 'assignedRoles',
+      render: (roles, record) => (
+        <Space size={[0, 4]} wrap>
+          {roles?.slice(0, 2).map(role => (
+            <Tag color="blue" key={role.id} style={{ margin: '2px' }}>
+              {role.roleName}
+            </Tag>
+          ))}
+          {roles?.length > 2 && (
+            <Tooltip title="Xem tất cả vai trò">
+              <Tag 
+                color="processing" 
+                style={{ cursor: 'pointer' }}
+                onClick={() => handleViewRoles(record)}
+              >
+                +{roles.length - 2}
+              </Tag>
+            </Tooltip>
+          )}
+        </Space>
       ),
     },
     {
@@ -129,9 +99,21 @@ const PermissionManagementPage = () => {
         <Space size="small">
           <Button 
             type="primary" 
+            ghost
+            size="small" 
+            icon={<EyeOutlined />}
+            onClick={() => handleViewRoles(record)}
+            style={{ borderRadius: '4px', color: '#1890ff', borderColor: '#1890ff' }}
+          >
+            Chi tiết
+          </Button>
+          <Button 
+            type="primary" 
+            ghost
             size="small" 
             icon={<EditOutlined />}
             onClick={() => handleEdit(record)}
+            style={{ borderRadius: '4px', color: '#52c41a', borderColor: '#52c41a' }}
           >
             Sửa
           </Button>
@@ -140,6 +122,7 @@ const PermissionManagementPage = () => {
             size="small" 
             icon={<DeleteOutlined />}
             onClick={() => handleDelete(record.id)}
+            style={{ borderRadius: '4px' }}
           >
             Xóa
           </Button>
@@ -148,129 +131,205 @@ const PermissionManagementPage = () => {
     },
   ];
 
-  // Xử lý thêm/sửa chức năng
+  // Xử lý xem chi tiết vai trò đã gán
+  const handleViewRoles = (permission) => {
+    setSelectedPermission(permission);
+    setRolesModalVisible(true);
+  };
+
+  // Xử lý thêm/sửa quyền hạn
   const handleAddEdit = () => {
-    setEditingFeature(null);
+    setEditingPermission(null);
     form.resetFields();
     setModalVisible(true);
   };
 
-  const handleEdit = (feature) => {
-    setEditingFeature(feature);
+  const handleEdit = (permission) => {
+    setEditingPermission(permission);
     form.setFieldsValue({
-      name: feature.name,
-      code: feature.code,
-      description: feature.description,
-      module: feature.module,
-      requiredPermission: feature.requiredPermission,
-      status: feature.status === 'active',
+      permissionName: permission.permissionName,
     });
     setModalVisible(true);
   };
 
-  const handleDelete = (id) => {
-    // Xử lý xóa chức năng
-    console.log('Xóa chức năng:', id);
+  const handleDelete = async (id) => {
+    try {
+      setLoading(true);
+      const response = await apiService.crud.delete('/Permission', id);
+      
+      if (response) {
+        messageApi.success('Xóa quyền hạn thành công');
+        fetchPermissions(); // Refresh the list
+      }
+    } catch (error) {
+      console.error('Error deleting permission:', error);
+      messageApi.error('Có lỗi xảy ra khi xóa quyền hạn');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSubmit = () => {
-    form.validateFields().then(values => {
-      const formattedValues = {
-        ...values,
-        status: values.status ? 'active' : 'inactive',
-      };
-      console.log('Form values:', formattedValues);
-      // Lưu dữ liệu chức năng mới hoặc cập nhật chức năng
-      setModalVisible(false);
-    }).catch(err => {
-      console.error('Validation failed:', err);
-    });
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields();
+      
+      setLoading(true);
+      
+      if (editingPermission) {
+        // Update existing permission
+        try {
+          console.log(`Updating permission: ${editingPermission.id} with values:`, values);
+          const response = await apiService.crud.update('/Permission', editingPermission.id, values);
+          console.log('Update response:', response);
+          messageApi.success('Cập nhật quyền hạn thành công');
+          setModalVisible(false);
+          fetchPermissions(); // Refresh the list
+        } catch (updateError) {
+          console.error('Error updating permission:', updateError);
+          messageApi.error('Có lỗi xảy ra khi cập nhật quyền hạn');
+        }
+      } else {
+        // Create new permission
+        try {
+          await apiService.crud.create('/Permission', values);
+          messageApi.success('Thêm quyền hạn mới thành công');
+          setModalVisible(false);
+          fetchPermissions(); // Refresh the list
+        } catch (createError) {
+          console.error('Error creating permission:', createError);
+          messageApi.error('Có lỗi xảy ra khi thêm quyền hạn mới');
+        }
+      }
+    } catch (formError) {
+      console.error('Form validation error:', formError);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // Columns for the roles table in detail modal
+  const rolesColumns = [
+    {
+      title: 'Tên vai trò',
+      dataIndex: 'roleName',
+      key: 'roleName',
+      render: (text) => <Text strong>{text}</Text>
+    },
+    {
+      title: 'ID',
+      dataIndex: 'id',
+      key: 'id',
+      render: (id) => <Text style={{ fontSize: '12px', color: '#888' }}>{id}</Text>
+    }
+  ];
 
   return (
-    <div style={{ padding: '24px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
-        <Title level={4}>Quản lý chức năng</Title>
-        <Button 
-          type="primary" 
-          icon={<PlusOutlined />} 
-          onClick={handleAddEdit}
+    <App>
+      <div style={{ padding: '24px', backgroundColor: '#f5f7fa', minHeight: '100vh' }}>
+        <Card bordered={false} style={{ borderRadius: '8px', boxShadow: '0 2px 10px rgba(0, 0, 0, 0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <Title level={4} style={{ margin: 0, fontWeight: 600 }}>Quản lý quyền hạn</Title>
+            <Button 
+              type="primary" 
+              icon={<PlusOutlined />} 
+              onClick={handleAddEdit}
+              style={{ borderRadius: '6px', fontWeight: 500, height: '38px' }}
+            >
+              Thêm quyền hạn mới
+            </Button>
+          </div>
+
+          <Table 
+            columns={columns} 
+            dataSource={permissions} 
+            rowKey="id" 
+            loading={loading}
+            pagination={{ 
+              pageSize: 10,
+              showSizeChanger: true,
+              showQuickJumper: true,
+              showTotal: (total) => `Tổng số ${total} quyền hạn`,
+              style: { marginTop: '16px' }
+            }}
+            style={{ 
+              borderRadius: '8px', 
+              overflow: 'hidden' 
+            }}
+            size="middle"
+            className="custom-permission-table"
+          />
+        </Card>
+
+        {/* Modal thêm/sửa quyền hạn */}
+        <Modal
+          title={editingPermission ? "Chỉnh sửa quyền hạn" : "Thêm quyền hạn mới"}
+          open={modalVisible}
+          onOk={handleSubmit}
+          onCancel={() => setModalVisible(false)}
+          width={500}
+          okText={editingPermission ? "Cập nhật" : "Thêm mới"}
+          cancelText="Hủy"
+          style={{ top: 20 }}
         >
-          Thêm chức năng mới
-        </Button>
+          <Form
+            form={form}
+            layout="vertical"
+          >
+            <Form.Item
+              name="permissionName"
+              label="Tên quyền hạn"
+              rules={[{ required: true, message: 'Vui lòng nhập tên quyền hạn' }]}
+            >
+              <Input 
+                placeholder="Nhập tên quyền hạn (VD: VIEW_FORM, CREATE_USER)" 
+                size="large" 
+                style={{ textTransform: 'uppercase' }}
+              />
+            </Form.Item>
+          </Form>
+        </Modal>
+        
+        {/* Modal xem chi tiết vai trò đã gán */}
+        <Modal
+          title={
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <UserOutlined style={{ marginRight: '8px', fontSize: '18px' }} />
+              <span>Vai trò được gán quyền: {selectedPermission?.permissionName}</span>
+            </div>
+          }
+          open={rolesModalVisible}
+          onCancel={() => setRolesModalVisible(false)}
+          footer={[
+            <Button key="close" type="primary" onClick={() => setRolesModalVisible(false)}>
+              Đóng
+            </Button>
+          ]}
+          width={600}
+        >
+          {selectedPermission?.assignedRoles?.length > 0 ? (
+            <Table 
+              dataSource={selectedPermission.assignedRoles} 
+              columns={rolesColumns} 
+              rowKey="id"
+              pagination={false}
+              style={{ marginTop: '16px' }}
+              size="middle"
+            />
+          ) : (
+            <div style={{ textAlign: 'center', padding: '30px 0', color: '#999' }}>
+              <UserOutlined style={{ fontSize: '32px', marginBottom: '16px', display: 'block' }} />
+              <p>Không có vai trò nào được gán quyền này</p>
+            </div>
+          )}
+        </Modal>
       </div>
-
-      <Card bordered={false}>
-        <Table 
-          columns={columns} 
-          dataSource={features} 
-          rowKey="id" 
-          loading={loading}
-          pagination={{ pageSize: 10 }}
-        />
-      </Card>
-
-      <Modal
-        title={editingFeature ? "Chỉnh sửa chức năng" : "Thêm chức năng mới"}
-        open={modalVisible}
-        onOk={handleSubmit}
-        onCancel={() => setModalVisible(false)}
-        width={600}
-      >
-        <Form
-          form={form}
-          layout="vertical"
-          initialValues={{ status: true }}
-        >
-          <Form.Item
-            name="name"
-            label="Tên chức năng"
-            rules={[{ required: true, message: 'Vui lòng nhập tên chức năng' }]}
-          >
-            <Input placeholder="Nhập tên chức năng" />
-          </Form.Item>
-          
-          <Form.Item
-            name="code"
-            label="Mã chức năng"
-            rules={[{ required: true, message: 'Vui lòng nhập mã chức năng' }]}
-          >
-            <Input placeholder="Nhập mã chức năng (không dấu, không khoảng trắng)" />
-          </Form.Item>
-          
-          <Form.Item
-            name="description"
-            label="Mô tả"
-          >
-            <TextArea placeholder="Mô tả chức năng" rows={3} />
-          </Form.Item>
-          
-          <Form.Item
-            name="module"
-            label="Module"
-            rules={[{ required: true, message: 'Vui lòng chọn module' }]}
-          >
-            <Select placeholder="Chọn module" options={modules} />
-          </Form.Item>
-          
-          <Form.Item
-            name="requiredPermission"
-            label="Quyền yêu cầu"
-            rules={[{ required: true, message: 'Vui lòng chọn quyền yêu cầu' }]}
-          >
-            <Select placeholder="Chọn quyền yêu cầu" options={permissions} />
-          </Form.Item>
-          
-          <Form.Item
-            name="status"
-            label="Trạng thái"
-            valuePropName="checked"
-          >
-            <Switch checkedChildren="Hoạt động" unCheckedChildren="Không hoạt động" />
-          </Form.Item>
-        </Form>
-      </Modal>
-    </div>
+      <style jsx global>{`
+        .custom-permission-table .ant-table-thead > tr > th {
+          background-color: #f5f7fa;
+          font-weight: 600;
+        }
+      `}</style>
+    </App>
   );
 };
 

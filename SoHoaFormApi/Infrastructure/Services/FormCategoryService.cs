@@ -33,26 +33,26 @@ public class FormCategoryService : IFormCategoryService
     try
     {
       await _unitOfWork.BeginTransaction();
-       // ✅ KIỂM TRA TRÙNG TÊN CATEGORY
-        var isDuplicateName = await _unitOfWork._formCategoryRepository
-            .IsCategoryNameExistsAsync(request.CategoryName.Trim(), request.ParentCategoryId);
+      // ✅ KIỂM TRA TRÙNG TÊN CATEGORY
+      var isDuplicateName = await _unitOfWork._formCategoryRepository
+          .IsCategoryNameExistsAsync(request.CategoryName.Trim(), request.ParentCategoryId);
 
-        if (isDuplicateName)
+      if (isDuplicateName)
+      {
+        await _unitOfWork.RollBack();
+
+        var parentInfo = request.ParentCategoryId.HasValue
+            ? $" trong category cha có ID {request.ParentCategoryId}"
+            : " ở cấp root";
+
+        return new HTTPResponseClient<CreateCategoryResponse>
         {
-            await _unitOfWork.RollBack();
-            
-            var parentInfo = request.ParentCategoryId.HasValue 
-                ? $" trong category cha có ID {request.ParentCategoryId}" 
-                : " ở cấp root";
-
-            return new HTTPResponseClient<CreateCategoryResponse>
-            {
-                StatusCode = 400,
-                Message = $"Tên category '{request.CategoryName}' đã tồn tại{parentInfo}",
-                Data = null,
-                DateTime = DateTime.Now,
-            };
-        }
+          StatusCode = 400,
+          Message = $"Tên category '{request.CategoryName}' đã tồn tại{parentInfo}",
+          Data = null,
+          DateTime = DateTime.Now,
+        };
+      }
 
       // Kiểm tra tên category đã tồn tại chưa (trong cùng parent)
       var existingCategory = await _unitOfWork._formCategoryRepository
@@ -310,63 +310,77 @@ public class FormCategoryService : IFormCategoryService
 
   public async Task<HTTPResponseClient<FormCategoryDto>> GetCategoryByIdAsync(Guid categoryId)
   {
-     try
-            {
-                var category = await _unitOfWork._formCategoryRepository
-                    .GetCategoryWithDetailsAsync(categoryId);
+    try
+    {
+      var category = await _unitOfWork._formCategoryRepository
+          .GetCategoryWithDetailsAsync(categoryId);
 
-                if (category == null)
-                {
-                    return new HTTPResponseClient<FormCategoryDto>
-                    {
-                        StatusCode = 404,
-                        Message = "Không tìm thấy category",
-                        Data = null,
-                        DateTime = DateTime.Now
-                    };
-                }
+      if (category == null)
+      {
+        return new HTTPResponseClient<FormCategoryDto>
+        {
+          StatusCode = 404,
+          Message = "Không tìm thấy category",
+          Data = null,
+          DateTime = DateTime.Now
+        };
+      }
 
-                var categoryDto = new FormCategoryDto
-                {
-                    Id = category.Id,
-                    CategoryName = category.CategoryName,
-                    ParentCategoryId = category.ParentCategoryId,
-                    ParentCategoryName = category.ParentCategory?.CategoryName,
-                    ChildrenCount = category.InverseParentCategory.Count,
-                    FormsCount = category.Forms.Count,
-                    RolePermissionsCount = category.RoleCategoryPermissions.Count,
-                    Level = HelperClass.GetCategoryLevel(category),
-                    Path = HelperClass.GetCategoryPath(category),
-                    HasChildren = category.InverseParentCategory.Any(),
-                    IsRoot = category.ParentCategoryId == null,
-                    Children = category.InverseParentCategory.Select(child => new FormCategoryDto
-                    {
-                        Id = child.Id,
-                        CategoryName = child.CategoryName,
-                        ParentCategoryId = child.ParentCategoryId,
-                        ChildrenCount = child.InverseParentCategory.Count,
-                        FormsCount = child.Forms.Count
-                    }).ToList()
-                };
+      // ✅ Map forms trong category
+      var formsInCategory = category.Forms?.Select(form => new FormInCategoryDto
+      {
+        Id = form.Id,
+        Name = form.Name ?? "",
+        Status = form.Status ?? "Unknown",
+        WordFilePath = form.WordFilePath,
+        HasWordFile = !string.IsNullOrEmpty(form.WordFilePath),
+        CreatedAt = form.CreatedAt,
+        FieldsCount = form.FormFields?.Count ?? 0,
+        UserFillFormsCount = form.UserFillForms?.Count ?? 0
+      }).ToList() ?? new List<FormInCategoryDto>();
 
-                return new HTTPResponseClient<FormCategoryDto>
-                {
-                    StatusCode = 200,
-                    Message = "Lấy thông tin category thành công",
-                    Data = categoryDto,
-                    DateTime = DateTime.Now
-                };
-            }
-            catch (Exception ex)
-            {
-                return new HTTPResponseClient<FormCategoryDto>
-                {
-                    StatusCode = 500,
-                    Message = $"Lỗi khi lấy thông tin category: {ex.Message}",
-                    Data = null,
-                    DateTime = DateTime.Now
-                };
-            }
+      var categoryDto = new FormCategoryDto
+      {
+        Id = category.Id,
+        CategoryName = category.CategoryName,
+        ParentCategoryId = category.ParentCategoryId,
+        ParentCategoryName = category.ParentCategory?.CategoryName,
+        ChildrenCount = category.InverseParentCategory.Count,
+        FormsCount = category.Forms.Count,
+        RolePermissionsCount = category.RoleCategoryPermissions.Count,
+        Level = HelperClass.GetCategoryLevel(category),
+        Path = HelperClass.GetCategoryPath(category),
+        HasChildren = category.InverseParentCategory.Any(),
+        IsRoot = category.ParentCategoryId == null,
+        Forms = formsInCategory,
+        Children = category.InverseParentCategory.Select(child => new FormCategoryDto
+        {
+          Id = child.Id,
+          CategoryName = child.CategoryName,
+          ParentCategoryId = child.ParentCategoryId,
+          ChildrenCount = child.InverseParentCategory.Count,
+          FormsCount = child.Forms.Count
+        }).ToList()
+      };
+
+      return new HTTPResponseClient<FormCategoryDto>
+      {
+        StatusCode = 200,
+        Message = "Lấy thông tin category thành công",
+        Data = categoryDto,
+        DateTime = DateTime.Now
+      };
+    }
+    catch (Exception ex)
+    {
+      return new HTTPResponseClient<FormCategoryDto>
+      {
+        StatusCode = 500,
+        Message = $"Lỗi khi lấy thông tin category: {ex.Message}",
+        Data = null,
+        DateTime = DateTime.Now
+      };
+    }
   }
 
   public async Task<HTTPResponseClient<List<FormCategoryTreeDto>>> GetCategoryTreeAsync()

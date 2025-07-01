@@ -19,5 +19,7 @@ namespace SoHoaFormApi.Models.DTO
         public bool HasChildren { get; set; }
         public bool IsRoot { get; set; }
         public List<FormCategoryDto> Children { get; set; } = new List<FormCategoryDto>();
+
+        public List<FormInCategoryDto> Forms { get; set; } = new List<FormInCategoryDto>();
     }
 }

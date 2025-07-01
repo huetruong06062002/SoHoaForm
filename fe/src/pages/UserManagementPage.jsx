@@ -85,13 +85,20 @@ export default function UserManagementPage() {
   // Fetch roles from API
   const fetchRoles = async () => {
     try {
+      setLoading(true);
       const response = await apiService.roles.getAll();
       if (response && response.data) {
-        setAvailableRoles(response.data);
+        setAvailableRoles(Array.isArray(response.data) ? response.data : []);
+        console.log('Available roles:', response.data);
+      } else {
+        setAvailableRoles([]);
       }
     } catch (error) {
       console.error("Error fetching roles:", error);
       message.error("Không thể tải danh sách vai trò");
+      setAvailableRoles([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -132,7 +139,7 @@ export default function UserManagementPage() {
 
   // Xử lý tìm kiếm
   const handleSearch = (value) => {
-    setSearchText(value);
+    setSearchText(value.trim());
   };
 
   // Cấu hình cột cho bảng người dùng
@@ -220,13 +227,6 @@ export default function UserManagementPage() {
             onClick={() => handleEdit(record)}
           >
             Sửa
-          </Button>
-          <Button 
-            size="small" 
-            icon={<LockOutlined />}
-            onClick={() => handleResetPassword(record.id)}
-          >
-            Đổi MK
           </Button>
           <Button 
             danger 
@@ -326,20 +326,28 @@ export default function UserManagementPage() {
     setSelectedUser(null);
     form.resetFields();
     form.setFieldsValue({
-      roleId: null,
       assignRole: false
     });
+    
+    // Make sure we have the latest roles available
+    fetchRoles();
+    
     setModalVisible(true);
   };
 
   const handleEdit = (user) => {
     setSelectedUser(user);
+    
+    // Make sure we have the latest roles available
+    fetchRoles();
+    
     form.setFieldsValue({
       userName: user.userName,
       name: user.name,
       roleId: user.roleId,
-      assignRole: !!user.roleId
+      // Don't set password - it should be blank for security reasons
     });
+    
     setModalVisible(true);
   };
 
@@ -382,18 +390,34 @@ export default function UserManagementPage() {
       const values = await form.validateFields();
       setLoading(true);
       
-      // Prepare the user data
-      const userData = {
-        name: values.name,
-        userName: values.userName,
-        password: values.password,
-        roleId: values.assignRole ? values.roleId : null
-      };
-      
       if (selectedUser) {
+        // For editing user, prepare user data with all required fields
+        const userData = {
+          name: values.name,
+          userName: values.userName,
+          roleId: values.roleId
+        };
+        
+        // Only include password if provided
+        if (values.password) {
+          userData.password = values.password;
+        }
+        
         await apiService.userManagement.updateUser(selectedUser.id, userData);
         message.success('Cập nhật người dùng thành công');
       } else {
+        // For creating a new user, prepare full user data
+        const userData = {
+          name: values.name,
+          userName: values.userName,
+          password: values.password
+        };
+        
+        // Only include roleId if assignRole is checked
+        if (values.assignRole && values.roleId) {
+          userData.roleId = values.roleId;
+        }
+        
         const response = await apiService.userManagement.createUser(userData);
         if (response) {
           message.success(response.message || 'Thêm người dùng thành công');
@@ -536,16 +560,17 @@ export default function UserManagementPage() {
 
         <Card variant="outlined" style={{ marginBottom: '16px' }}>
           <Row gutter={16} style={{ marginBottom: '16px' }}>
-            <Col xs={24} sm={12} md={8} lg={6}>
-              <Search
-                placeholder="Tìm kiếm người dùng"
-                allowClear
-                enterButton={<Button icon={<SearchOutlined />}>Tìm kiếm</Button>}
-                onSearch={handleSearch}
-                onChange={(e) => setSearchText(e.target.value)}
-                value={searchText}
-              />
-            </Col>
+                      <Col xs={24} sm={18} md={12} lg={12}>
+            <Search
+              placeholder="Tìm kiếm người dùng"
+              allowClear
+              enterButton={<Button icon={<SearchOutlined />}>Tìm kiếm</Button>}
+              onSearch={handleSearch}
+              onChange={(e) => setSearchText(e.target.value)}
+              value={searchText}
+              style={{ width: '100%' }}
+            />
+          </Col>
           </Row>
           
           <Table 
@@ -566,7 +591,7 @@ export default function UserManagementPage() {
 
         {/* Modal thêm/sửa người dùng */}
         <Modal
-          title={selectedUser ? "Chỉnh sửa người dùng" : "Thêm người dùng mới"}
+          title={selectedUser ? "Chỉnh sửa vai trò người dùng" : "Thêm người dùng mới"}
           open={modalVisible}
           onOk={handleSubmit}
           onCancel={() => setModalVisible(false)}
@@ -577,64 +602,121 @@ export default function UserManagementPage() {
             form={form}
             layout="vertical"
           >
-            <Form.Item
-              name="userName"
-              label="Tên đăng nhập"
-              rules={[{ required: true, message: 'Vui lòng nhập tên đăng nhập' }]}
-            >
-              <Input placeholder="Nhập tên đăng nhập" disabled={!!selectedUser} />
-            </Form.Item>
-            
-            {!selectedUser && (
-              <Form.Item
-                name="password"
-                label="Mật khẩu"
-                rules={[{ required: !selectedUser, message: 'Vui lòng nhập mật khẩu' }]}
-              >
-                <Input.Password placeholder="Nhập mật khẩu" />
-              </Form.Item>
+            {!selectedUser ? (
+              // Form for adding a new user
+              <>
+                <Form.Item
+                  name="userName"
+                  label="Tên đăng nhập"
+                  rules={[{ required: true, message: 'Vui lòng nhập tên đăng nhập' }]}
+                >
+                  <Input placeholder="Nhập tên đăng nhập" />
+                </Form.Item>
+                
+                <Form.Item
+                  name="password"
+                  label="Mật khẩu"
+                  rules={[{ required: true, message: 'Vui lòng nhập mật khẩu' }]}
+                >
+                  <Input.Password placeholder="Nhập mật khẩu" />
+                </Form.Item>
+                
+                <Form.Item
+                  name="name"
+                  label="Họ và tên"
+                  rules={[{ required: true, message: 'Vui lòng nhập họ và tên' }]}
+                >
+                  <Input placeholder="Nhập họ và tên" />
+                </Form.Item>
+                
+                <Divider orientation="left" plain>Vai trò người dùng</Divider>
+                
+                <Form.Item
+                  name="assignRole"
+                  valuePropName="checked"
+                >
+                  <Checkbox>Gán vai trò khi tạo</Checkbox>
+                </Form.Item>
+                
+                <Form.Item
+                  noStyle
+                  shouldUpdate={(prevValues, currentValues) => prevValues.assignRole !== currentValues.assignRole}
+                >
+                  {({ getFieldValue }) => 
+                    getFieldValue('assignRole') ? (
+                      <Form.Item
+                        name="roleId"
+                        label="Vai trò"
+                        rules={[{ required: getFieldValue('assignRole'), message: 'Vui lòng chọn vai trò' }]}
+                      >
+                        <Select 
+                          placeholder="Chọn vai trò" 
+                          loading={loading}
+                          options={availableRoles.map(role => ({
+                            label: role.roleName,
+                            value: role.id
+                          }))}
+                          optionFilterProp="label"
+                          showSearch
+                          filterOption={(input, option) =>
+                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                          }
+                          style={{ width: '100%' }}
+                        />
+                      </Form.Item>
+                    ) : null
+                  }
+                </Form.Item>
+              </>
+            ) : (
+              // Form for editing user with all required fields
+              <>
+                <Form.Item
+                  name="userName"
+                  label={<span style={{ color: '#ff4d4f' }}>* Tên đăng nhập</span>}
+                  rules={[{ required: true, message: 'Vui lòng nhập tên đăng nhập' }]}
+                >
+                  <Input placeholder="Nhập tên đăng nhập" disabled={true} />
+                </Form.Item>
+
+                <Form.Item
+                  name="name"
+                  label={<span style={{ color: '#ff4d4f' }}>* Họ và tên</span>}
+                  rules={[{ required: true, message: 'Vui lòng nhập họ và tên' }]}
+                >
+                  <Input placeholder="Nhập họ và tên" />
+                </Form.Item>
+
+                <Form.Item
+                  name="password"
+                  label="Mật khẩu"
+                  tooltip="Để trống nếu không muốn thay đổi mật khẩu"
+                >
+                  <Input.Password placeholder="Nhập mật khẩu mới nếu muốn thay đổi" />
+                </Form.Item>
+                
+                <Form.Item
+                  name="roleId"
+                  label={<span style={{ color: '#ff4d4f' }}>* Vai trò</span>}
+                  rules={[{ required: true, message: 'Vui lòng chọn vai trò' }]}
+                >
+                  <Select 
+                    placeholder="Chọn vai trò" 
+                    loading={loading}
+                    options={availableRoles.map(role => ({
+                      label: role.roleName,
+                      value: role.id
+                    }))}
+                    optionFilterProp="label"
+                    showSearch
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
+                    style={{ width: '100%' }}
+                  />
+                </Form.Item>
+              </>
             )}
-            
-            <Form.Item
-              name="name"
-              label="Họ và tên"
-              rules={[{ required: true, message: 'Vui lòng nhập họ và tên' }]}
-            >
-              <Input placeholder="Nhập họ và tên" />
-            </Form.Item>
-            
-            <Form.Item
-              name="assignRole"
-              valuePropName="checked"
-            >
-              <Divider orientation="left" plain><hr/></Divider>
-              <Checkbox>Gán vai trò khi tạo</Checkbox>
-            </Form.Item>
-            
-            <Form.Item
-              noStyle
-              shouldUpdate={(prevValues, currentValues) => prevValues.assignRole !== currentValues.assignRole}
-            >
-              {({ getFieldValue }) => 
-                getFieldValue('assignRole') ? (
-                  <Form.Item
-                    name="roleId"
-                    label="Vai trò"
-                    rules={[{ required: true, message: 'Vui lòng chọn vai trò' }]}
-                  >
-                    <Select 
-                      placeholder="Chọn vai trò" 
-                      loading={loading}
-                      options={availableRoles.map(role => ({
-                        label: role.roleName,
-                        value: role.id
-                      }))}
-                      optionFilterProp="label"
-                    />
-                  </Form.Item>
-                ) : null
-              }
-            </Form.Item>
           </Form>
         </Modal>
 
@@ -836,7 +918,7 @@ export default function UserManagementPage() {
                 <Descriptions.Item label="ID" span={2}>{selectedRole.id}</Descriptions.Item>
                 <Descriptions.Item label="Tên vai trò">{selectedRole.roleName}</Descriptions.Item>
                 <Descriptions.Item label="Số lượng quyền">{selectedRole.permissionCount}</Descriptions.Item>
-                <Descriptions.Item label="Số lượng phân loại">{selectedRole.categoryPermissionCount}</Descriptions.Item>
+                <Descriptions.Item label="Số lượng danh mục được quyền">{selectedRole.categoryPermissionCount}</Descriptions.Item>
               </Descriptions>
 
               <Divider orientation="left">Danh sách quyền</Divider>

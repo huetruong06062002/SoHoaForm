@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Typography, Card, Table, Button, Space, Modal, Form, Input, App, Row, Col, Tag, Divider, Select } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ExclamationCircleOutlined, CaretRightOutlined, FolderOutlined, FileOutlined } from '@ant-design/icons';
+import { Typography, Card, Table, Button, Space, Modal, Form, Input, App, Row, Col, Tag, Divider, Select, List, Descriptions, Spin } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ExclamationCircleOutlined, CaretDownOutlined, FolderOutlined, EyeOutlined, FileTextOutlined } from '@ant-design/icons';
 import apiService from '../services/apiService';
 
 const { Title, Text } = Typography;
@@ -17,6 +17,9 @@ export default function FormCategoryManagementPage() {
   const [searchText, setSearchText] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [form] = Form.useForm();
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+  const [categoryDetails, setCategoryDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
   // Fetch danh mục biểu mẫu
   const fetchCategories = async () => {
@@ -227,6 +230,24 @@ export default function FormCategoryManagementPage() {
     }
   };
 
+  // Xử lý xem chi tiết danh mục
+  const handleViewDetails = async (id) => {
+    try {
+      setLoadingDetails(true);
+      const response = await apiService.formCategory.getById(id);
+      
+      if (response && response.data) {
+        setCategoryDetails(response.data);
+        setDetailsModalVisible(true);
+      }
+    } catch (error) {
+      console.error('Error fetching category details:', error);
+      message.error('Có lỗi xảy ra khi tải thông tin chi tiết danh mục');
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
   // Cấu hình cột cho bảng
   const columns = [
     {
@@ -236,11 +257,23 @@ export default function FormCategoryManagementPage() {
       width: '40%',
       render: (text, record) => (
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          {record.children && record.children.length > 0 ? (
-            <FolderOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-          ) : (
-            <FileOutlined style={{ marginRight: 8, color: '#52c41a' }} />
-          )}
+          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', marginRight: 8 }}>
+            {record.children && record.children.length > 0 ? (
+              <FolderOutlined style={{ color: '#1890ff', fontSize: '16px', marginRight: 4 }} />
+            ) : (
+              <FolderOutlined style={{ color: '#52c41a', fontSize: '16px', marginRight: 4 }} />
+            )}
+            {record.children && record.children.length > 0 && (
+              <div style={{ cursor: 'pointer' }} 
+                   onClick={() => handleExpand(!expandedKeys.includes(record.id), record)}>
+                {expandedKeys.includes(record.id) ? (
+                  <CaretDownOutlined style={{ fontSize: '12px' }} />
+                ) : (
+                  <CaretDownOutlined rotate={-90} style={{ fontSize: '12px' }} />
+                )}
+              </div>
+            )}
+          </div>
           <span>{text}</span>
           {record.hasChildren && (
             <Tag color="blue" style={{ marginLeft: 8 }}>
@@ -276,14 +309,26 @@ export default function FormCategoryManagementPage() {
     {
       title: 'Hành động',
       key: 'action',
-      width: '20%',
+      width: '25%',
       render: (_, record) => (
         <Space size="small">
           <Button
-            type="default"
+            type="primary"
+            ghost
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => handleViewDetails(record.id)}
+            style={{ borderRadius: '4px', color: '#1890ff', borderColor: '#1890ff' }}
+          >
+            Chi tiết
+          </Button>
+          <Button
+            type="primary"
+            ghost
             size="small"
             icon={<EditOutlined />}
             onClick={() => handleEdit(record)}
+            style={{ borderRadius: '4px', color: '#52c41a', borderColor: '#52c41a' }}
           >
             Sửa
           </Button>
@@ -294,6 +339,7 @@ export default function FormCategoryManagementPage() {
             onClick={() => handleDelete(record.id, record.hasChildren)}
             disabled={record.hasChildren}
             title={record.hasChildren ? "Không thể xóa danh mục có danh mục con" : ""}
+            style={{ borderRadius: '4px' }}
           >
             Xóa
           </Button>
@@ -364,7 +410,7 @@ export default function FormCategoryManagementPage() {
         <Option key={category.id} value={category.id}>
           {(category.children && category.children.length > 0) ? 
             <FolderOutlined style={{ marginRight: 8, color: '#1890ff' }} /> : 
-            <FileOutlined style={{ marginRight: 8, color: '#52c41a' }} />}
+            <FolderOutlined style={{ marginRight: 8, color: '#52c41a' }} />}
           {prefix + category.categoryName}
         </Option>
       );
@@ -380,67 +426,64 @@ export default function FormCategoryManagementPage() {
 
   return (
     <App>
-      <div style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px' }}>
-          <Title level={4}>Quản lý danh mục biểu mẫu</Title>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleAddEdit}
-          >
-            Thêm danh mục mới
-          </Button>
-        </div>
+      <div style={{ padding: '24px', backgroundColor: '#f5f7fa', minHeight: '100vh' }}>
+        <Card bordered={false} style={{ borderRadius: '8px', boxShadow: '0 2px 10px rgba(0, 0, 0, 0.05)', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <Title level={4} style={{ margin: 0, fontWeight: 600 }}>Quản lý danh mục biểu mẫu</Title>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleAddEdit}
+              size="middle"
+              style={{ borderRadius: '6px', fontWeight: 500, height: '38px' }}
+            >
+              Thêm danh mục mới
+            </Button>
+          </div>
 
-        <Card variant="outlined" style={{ marginBottom: '16px' }}>
-          <Row gutter={16} style={{ marginBottom: '16px' }}>
-            <Col xs={24} sm={12} md={8} lg={6}>
-              <Search
-                placeholder="Tìm kiếm danh mục"
-                allowClear
-                enterButton={<Button icon={<SearchOutlined />}>Tìm kiếm</Button>}
-                onSearch={handleSearch}
-                onChange={(e) => setSearchText(e.target.value)}
-                value={searchText}
-              />
-            </Col>
-          </Row>
-          
-          <Table
-            columns={columns}
-            dataSource={categories}
-            rowKey="id"
-            loading={loading}
-            expandable={{
-              expandedRowKeys: expandedKeys,
-              onExpand: handleExpand,
-              expandIcon: ({ expanded, onExpand, record }) => 
-                record.children && record.children.length > 0 ? (
-                  expanded ? (
-                    <Button 
-                      type="text" 
-                      icon={<CaretRightOutlined rotate={90} />} 
-                      size="small"
-                      onClick={e => onExpand(record, e)}
-                      style={{ marginRight: 8 }}
-                    />
-                  ) : (
-                    <Button 
-                      type="text" 
-                      icon={<CaretRightOutlined />} 
-                      size="small"
-                      onClick={e => onExpand(record, e)}
-                      style={{ marginRight: 8 }}
-                    />
-                  )
-                ) : <span style={{ width: 24, display: 'inline-block' }}></span>
-            }}
-            pagination={{
-              showSizeChanger: true,
-              showQuickJumper: true,
-              showTotal: (total) => `Tổng số ${total} danh mục`
-            }}
-          />
+          <div style={{ backgroundColor: '#fff', borderRadius: '8px', padding: '16px', marginBottom: '16px' }}>
+            <Row gutter={16} style={{ marginBottom: '20px' }}>
+              <Col xs={24} sm={12} md={8} lg={6}>
+                <Search
+                  placeholder="Tìm kiếm danh mục"
+                  allowClear
+                  enterButton={<Button type="primary" icon={<SearchOutlined />}>Tìm kiếm</Button>}
+                  onSearch={handleSearch}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  value={searchText}
+                  size="large"
+                  style={{ width: '100%', borderRadius: '6px' }}
+                />
+              </Col>
+            </Row>
+            
+            <Table
+              columns={columns}
+              dataSource={categories}
+              rowKey="id"
+              loading={loading}
+              expandable={{
+                expandedRowKeys: expandedKeys,
+                onExpand: handleExpand,
+                expandIcon: () => null
+              }}
+              pagination={{
+                showSizeChanger: true,
+                showQuickJumper: true,
+                showTotal: (total) => `Tổng số ${total} danh mục`,
+                pageSizeOptions: ['10', '20', '50', '100'],
+                position: ['bottomRight'],
+                style: { marginTop: '16px' }
+              }}
+              style={{ 
+                borderRadius: '8px', 
+                overflow: 'hidden'
+              }}
+              rowClassName={(record) => record.id === selectedCategory?.id ? 'ant-table-row-selected' : ''}
+              size="middle"
+              className="custom-category-table"
+            />
+          </div>
         </Card>
 
         {/* Modal thêm/sửa danh mục */}
@@ -451,6 +494,9 @@ export default function FormCategoryManagementPage() {
           onCancel={() => setModalVisible(false)}
           width={600}
           confirmLoading={loading}
+          style={{ top: 20 }}
+          okText={selectedCategory ? "Cập nhật" : "Thêm mới"}
+          cancelText="Hủy"
         >
           <Form
             form={form}
@@ -461,7 +507,7 @@ export default function FormCategoryManagementPage() {
               label="Tên danh mục"
               rules={[{ required: true, message: 'Vui lòng nhập tên danh mục' }]}
             >
-              <Input placeholder="Nhập tên danh mục" />
+              <Input placeholder="Nhập tên danh mục" size="large" />
             </Form.Item>
             
             <Form.Item
@@ -474,13 +520,129 @@ export default function FormCategoryManagementPage() {
                 showSearch
                 optionFilterProp="children"
                 style={{ width: '100%' }}
+                size="large"
               >
                 {renderCategoryOptions(getAvailableParentCategories())}
               </Select>
             </Form.Item>
           </Form>
         </Modal>
+        
+        {/* Modal xem chi tiết danh mục */}
+        <Modal
+          title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FolderOutlined style={{ color: '#1890ff', fontSize: '18px' }} />
+              <span>Chi tiết danh mục biểu mẫu</span>
+            </div>
+          }
+          open={detailsModalVisible}
+          onCancel={() => setDetailsModalVisible(false)}
+          width={700}
+          footer={[
+            <Button key="close" type="primary" onClick={() => setDetailsModalVisible(false)}>
+              Đóng
+            </Button>
+          ]}
+          style={{ top: 20 }}
+        >
+          {loadingDetails ? (
+            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+              <Spin size="large" />
+              <div style={{ marginTop: '16px', color: '#1890ff' }}>Đang tải thông tin chi tiết...</div>
+            </div>
+          ) : categoryDetails ? (
+            <div style={{ padding: '8px 0' }}>
+              <Descriptions 
+                bordered 
+                column={1} 
+                size="middle"
+                labelStyle={{ fontWeight: 500, backgroundColor: '#f5f7fa' }}
+                contentStyle={{ backgroundColor: '#fff' }}
+                style={{ marginBottom: '24px' }}
+              >
+                <Descriptions.Item label="Tên danh mục">{categoryDetails.categoryName}</Descriptions.Item>
+                <Descriptions.Item label="Đường dẫn">{categoryDetails.path}</Descriptions.Item>
+                <Descriptions.Item label="Danh mục cha">{categoryDetails.parentCategoryName || 'Không có'}</Descriptions.Item>
+                <Descriptions.Item label="Số lượng con">{categoryDetails.childrenCount}</Descriptions.Item>
+                <Descriptions.Item label="Số lượng biểu mẫu">{categoryDetails.formsCount}</Descriptions.Item>
+                <Descriptions.Item label="Cấp">{categoryDetails.level}</Descriptions.Item>
+                <Descriptions.Item label="Danh mục gốc">
+                  {categoryDetails.isRoot ? 
+                    <Tag color="green" style={{ margin: 0 }}>Là danh mục gốc</Tag> : 
+                    <Tag color="orange" style={{ margin: 0 }}>Không là danh mục gốc</Tag>}
+                </Descriptions.Item>
+              </Descriptions>
+              
+              {categoryDetails.children && categoryDetails.children.length > 0 && (
+                <>
+                  <Divider orientation="left" style={{ color: '#1890ff', fontWeight: 500 }}>
+                    <FolderOutlined /> Danh mục con ({categoryDetails.children.length})
+                  </Divider>
+                  <List
+                    dataSource={categoryDetails.children}
+                    renderItem={item => (
+                      <List.Item style={{ padding: '12px', borderRadius: '6px', backgroundColor: '#f5f7fa', marginBottom: '8px' }}>
+                        <FolderOutlined style={{ marginRight: 8, color: '#1890ff' }} />
+                        <span style={{ fontWeight: 500 }}>{item.categoryName}</span>
+                      </List.Item>
+                    )}
+                    style={{ marginBottom: '24px' }}
+                  />
+                </>
+              )}
+              
+              {categoryDetails.forms && categoryDetails.forms.length > 0 && (
+                <>
+                  <Divider orientation="left" style={{ color: '#1890ff', fontWeight: 500 }}>
+                    <FileTextOutlined /> Biểu mẫu thuộc danh mục ({categoryDetails.forms.length})
+                  </Divider>
+                  <List
+                    itemLayout="horizontal"
+                    dataSource={categoryDetails.forms}
+                    renderItem={item => (
+                      <List.Item
+                        style={{ padding: '16px', borderRadius: '6px', backgroundColor: '#f5f7fa', marginBottom: '8px' }}
+                        actions={[
+                          <Tag color={item.status === 'Active' ? 'green' : 'red'} style={{ margin: 0 }}>{item.status}</Tag>
+                        ]}
+                      >
+                        <List.Item.Meta
+                          avatar={<FileTextOutlined style={{ fontSize: 24, color: '#1890ff', backgroundColor: '#e6f7ff', padding: '8px', borderRadius: '4px' }} />}
+                          title={<span style={{ fontWeight: 500, fontSize: '16px' }}>{item.name}</span>}
+                          description={
+                            <div style={{ fontSize: '13px', color: '#666' }}>
+                              <div>Số trường: <Tag color="blue" style={{ marginRight: 8 }}>{item.fieldsCount}</Tag></div>
+                              <div style={{ marginTop: '4px' }}>Tạo lúc: {new Date(item.createdAt).toLocaleString()}</div>
+                            </div>
+                          }
+                        />
+                      </List.Item>
+                    )}
+                  />
+                </>
+              )}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '30px', color: '#999' }}>
+              <FileTextOutlined style={{ fontSize: '48px', color: '#ccc', marginBottom: '16px', display: 'block' }} />
+              Không có thông tin chi tiết
+            </div>
+          )}
+        </Modal>
       </div>
+      <style jsx global>{`
+        .custom-category-table .ant-table-thead > tr > th {
+          background-color: #f5f7fa;
+          font-weight: 600;
+        }
+        .ant-table-row-selected > td {
+          background-color: #e6f7ff;
+        }
+        .ant-pagination-item-active {
+          border-color: #1890ff;
+        }
+      `}</style>
     </App>
   );
 } 

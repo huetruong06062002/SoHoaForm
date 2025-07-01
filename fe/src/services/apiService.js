@@ -39,11 +39,20 @@ export const apiService = {
     searchUsers: async (searchTerm = '', pageNumber = 1, pageSize = 10) => {
       try {
         console.log(`Calling search API with: searchTerm=${searchTerm}, pageNumber=${pageNumber}, pageSize=${pageSize}`);
+        // Encode spaces in the search term
+        const encodedSearchTerm = searchTerm ? encodeURIComponent(searchTerm) : '';
         const response = await apiClient.get('/UserManagement/search', { 
           params: { 
-            searchTerm, 
+            searchTerm: encodedSearchTerm, 
             pageNumber, 
             pageSize 
+          },
+          paramsSerializer: {
+            serialize: params => {
+              return Object.entries(params)
+                .map(([key, value]) => `${key}=${value !== undefined ? value : ''}`)
+                .join('&');
+            }
           } 
         });
         return response.data;
@@ -106,6 +115,72 @@ export const apiService = {
     
     getById: async (id) => {
       const response = await apiClient.get(`/Role/${id}`);
+      return response.data;
+    },
+    
+    create: async (roleData) => {
+      const response = await apiClient.post('/Role', roleData);
+      return response.data;
+    },
+    
+    update: async (id, roleData) => {
+      const response = await apiClient.put(`/Role/${id}`, roleData);
+      return response.data;
+    },
+    
+    delete: async (id) => {
+      const response = await apiClient.delete(`/Role/${id}`);
+      return response.data;
+    },
+    
+    assignPermissionToRole: async (roleId, permissionId) => {
+      const response = await apiClient.post(`/Role/${roleId}/permissions`, {
+        permissionId: permissionId
+      });
+      return response.data;
+    },
+    
+    removePermissionFromRole: async (roleId, permissionId) => {
+      const response = await apiClient.delete(`/Role/${roleId}/permissions/${permissionId}`);
+      return response.data;
+    },
+    
+    getCategoryPermissions: async (roleId) => {
+      const response = await apiClient.get(`/RoleCategoryPermission/role/${roleId}`);
+      return response.data;
+    },
+    
+    updateCategoryPermission: async (roleCategoryPermissionId, canAccess) => {
+      const response = await apiClient.put(`/RoleCategoryPermission/${roleCategoryPermissionId}`, {
+        canAccess: canAccess
+      });
+      return response.data;
+    },
+    
+    deleteCategoryPermission: async (roleId, categoryId) => {
+      const response = await apiClient.delete(`/RoleCategoryPermission/role/${roleId}/category/${categoryId}`);
+      return response.data;
+    },
+    
+    assignCategoryToRole: async (roleId, formCategoryId, canAccess = true) => {
+      const response = await apiClient.post('/RoleCategoryPermission', {
+        roleId: roleId,
+        formCategoryId: formCategoryId,
+        canAccess: canAccess
+      });
+      return response.data;
+    },
+  },
+
+  // Permission API
+  permissions: {
+    getAll: async () => {
+      const response = await apiClient.get('/Permission');
+      return response.data;
+    },
+    
+    getById: async (id) => {
+      const response = await apiClient.get(`/Permission/${id}`);
       return response.data;
     },
   },

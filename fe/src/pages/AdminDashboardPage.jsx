@@ -85,13 +85,22 @@ const AdminDashboardPage = () => {
   }, [user, navigate, location]);
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout hasSider style={{ minHeight: '100vh' }}>
       <Sider 
         collapsible 
         collapsed={collapsed} 
         onCollapse={(value) => setCollapsed(value)}
         theme="light"
-        style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}
+        style={{
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          overflow: 'auto',
+          height: '100vh',
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          zIndex: 10
+        }}
         width={250}
       >
         <div style={{ 
@@ -130,8 +139,8 @@ const AdminDashboardPage = () => {
         </div>
       </Sider>
       
-      <Layout>
-        <Content style={{ margin: '0 16px', padding: '24px', background: '#f0f2f5' }}>
+      <Layout style={{ marginLeft: collapsed ? 80 : 250, transition: 'margin-left 0.2s' }}>
+        <Content style={{ margin: '0 16px', padding: '24px', background: '#f0f2f5', overflow: 'auto' }}>
           <div style={{ marginBottom: '24px' }}>
             <Title level={3}>Trang quản lý hệ thống</Title>
             <Text type="secondary">Xin chào, {user?.name || 'Quản trị viên'}. Dưới đây là tổng quan về hệ thống.</Text>

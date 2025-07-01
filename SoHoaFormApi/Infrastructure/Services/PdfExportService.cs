@@ -937,6 +937,12 @@ namespace SoHoaFormApi.Infrastructure.Services
             try
             {
                 Console.WriteLine("🎯 Starting dynamic checkbox logic fill...");
+                Console.WriteLine($"📚 Available fields in dictionary:");
+
+                foreach (var kvp in fieldDict)
+                {
+                    Console.WriteLine($"  - {kvp.Key}: '{kvp.Value}'");
+                }
 
                 // 1. TÌM TẤT CẢ PLACEHOLDER PATTERNS TRONG DOCUMENT
                 var documentText = document.GetText();
@@ -944,7 +950,10 @@ namespace SoHoaFormApi.Infrastructure.Services
                 var regex = new System.Text.RegularExpressions.Regex(placeholderPattern);
                 var matches = regex.Matches(documentText);
 
+                Console.WriteLine($"🔍 Found {matches.Count} placeholders in document");
+
                 var processedPlaceholders = new HashSet<string>();
+                var checkboxCount = 0;
 
                 foreach (System.Text.RegularExpressions.Match match in matches)
                 {
@@ -955,7 +964,14 @@ namespace SoHoaFormApi.Infrastructure.Services
                     if (processedPlaceholders.Contains(placeholder))
                         continue;
 
-                    Console.WriteLine($"🔍 Found placeholder: {placeholder}");
+                    Console.WriteLine($"🔍 Processing placeholder: {placeholder}");
+
+                    // ✅ KIỂM TRA XEM CÓ PHẢI CHECKBOX KHÔNG
+                    if (fieldKey.StartsWith("c_") || fieldKey.StartsWith("b_"))
+                    {
+                        checkboxCount++;
+                        Console.WriteLine($"  ☑ This is a checkbox field #{checkboxCount}");
+                    }
 
                     // 2. PHÂN TÍCH LOẠI PLACEHOLDER - LUÔN LẤY GIÁ TRỊ THAY THẾ
                     var replacementValue = GetReplacementValue(fieldKey, fieldDict);
@@ -970,13 +986,22 @@ namespace SoHoaFormApi.Infrastructure.Services
                     else
                     {
                         Console.WriteLine($"  ⚠️ Could not replace {placeholder}");
+
+                        // ✅ THÊM FALLBACK CHO CHECKBOX
+                        if (fieldKey.StartsWith("c_") || fieldKey.StartsWith("b_"))
+                        {
+                            var manualCount = ForceManualReplace(document, placeholder, replacementValue);
+                            if (manualCount > 0)
+                            {
+                                Console.WriteLine($"  🔧 Manual replacement successful: {manualCount} times");
+                            }
+                        }
                     }
 
                     processedPlaceholders.Add(placeholder);
                 }
 
-
-
+                Console.WriteLine($"📊 Checkbox processing summary: {checkboxCount} checkbox fields found");
                 Console.WriteLine("✅ Dynamic checkbox logic fill completed");
             }
             catch (Exception ex)
@@ -990,11 +1015,33 @@ namespace SoHoaFormApi.Infrastructure.Services
             {
                 // Phân tích prefix để xác định loại field
                 if (fieldKey.StartsWith("c_") || fieldKey.StartsWith("b_"))
-                {
-                    // Checkbox/Boolean field
+                {// Checkbox/Boolean field
                     var actualFieldName = fieldKey.Substring(2); // Bỏ "c_" hoặc "b_"
+                    Console.WriteLine($"  🔍 Checkbox field: {actualFieldName}");
+
                     var value = fieldDict.GetValueOrDefault(actualFieldName, "false");
-                    return value.ToLower() == "true" ? "☑" : "☐";
+                    Console.WriteLine($"  📊 Raw value: '{value}'");
+
+                    // ✅ SỬA LẠI LOGIC CHECKBOX
+                    bool isChecked = false;
+
+                    // Kiểm tra nhiều format
+                    if (bool.TryParse(value, out var boolValue))
+                    {
+                        isChecked = boolValue;
+                    }
+                    else if (value.ToLower() == "true" || value == "1" || value.ToLower() == "yes")
+                    {
+                        isChecked = true;
+                    }
+                    else if (value.ToLower() == "false" || value == "0" || value.ToLower() == "no" || string.IsNullOrEmpty(value))
+                    {
+                        isChecked = false;
+                    }
+
+                    var result = isChecked ? "☑" : "☐";
+                    Console.WriteLine($"  ✅ Checkbox result: {value} → {result} (isChecked: {isChecked})");
+                    return result;
                 }
                 else if (fieldKey.StartsWith("t_"))
                 {
@@ -1234,12 +1281,12 @@ namespace SoHoaFormApi.Infrastructure.Services
             try
             {
                 var value = field.Value?.ToString() ?? "";
-
                 Console.WriteLine($"🔧 Formatting field: {field.FieldName} ({field.FieldType}) = '{value}'");
 
                 switch (field.FieldType?.ToLower())
                 {
-                    case "dt": // Date
+                    case "date":
+                    case "dt":
                         if (DateTime.TryParse(value, out var date))
                         {
                             var formatted = date.ToString("dd/MM/yyyy");
@@ -1249,17 +1296,43 @@ namespace SoHoaFormApi.Infrastructure.Services
                         Console.WriteLine($"  ❌ Could not parse date: {value}");
                         return value;
 
-                    case "c": // Checkbox
-                        var isChecked = value.ToLower() == "true";
+                    case "checkbox":
+                    case "boolean":
+                    case "c":
+                    case "b":
+                        // ✅ SỬA LẠI LOGIC CHECKBOX
+                        bool isChecked = false;
+
+                        if (bool.TryParse(value, out var boolValue))
+                        {
+                            isChecked = boolValue;
+                        }
+                        else if (value.ToLower() == "true" || value == "1" || value.ToLower() == "yes")
+                        {
+                            isChecked = true;
+                        }
+                        else if (value.ToLower() == "false" || value == "0" || value.ToLower() == "no" || string.IsNullOrEmpty(value))
+                        {
+                            isChecked = false;
+                        }
+
                         var checkboxResult = isChecked ? "☑" : "☐";
-                        Console.WriteLine($"  ☑ Checkbox formatted: {value} → {checkboxResult}");
+                        Console.WriteLine($"  ☑ Checkbox formatted: {value} → {checkboxResult} (isChecked: {isChecked})");
                         return checkboxResult;
 
-                    case "s": // Select
+                    case "select":
+                    case "dropdown":
+                    case "s":
                         Console.WriteLine($"  📋 Select value: {value}");
                         return value;
 
-                    case "t": // Text
+                    case "number":
+                    case "n":
+                        Console.WriteLine($"  🔢 Number value: {value}");
+                        return value;
+
+                    case "text":
+                    case "t":
                     default:
                         Console.WriteLine($"  📝 Text value: {value}");
                         return value;
