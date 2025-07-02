@@ -7,15 +7,21 @@ RUN apt-get update && apt-get install -y \
     fontconfig \
     fonts-dejavu-core \
     fonts-liberation \
+    fonts-noto \
+    fonts-noto-cjk \
     libgdiplus \
     && fc-cache -fv \
     && ln -sf /usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf /usr/share/fonts/truetype/liberation/Arial.ttf \
+    && ln -sf /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf /usr/share/fonts/truetype/dejavu/Arial.ttf \
     && rm -rf /var/lib/apt/lists/*
 
 # Set font environment for Arial
 ENV FONTCONFIG_PATH=/etc/fonts
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
-ENV DEFAULT_FONT_FAMILY=Arial
+ENV DEFAULT_FONT_FAMILY="Liberation Sans"
+ENV LC_ALL=C.UTF-8
+ENV LANG=C.UTF-8
+
 
 # Tạo thư mục uploads
 RUN mkdir -p /app/uploads/forms
@@ -35,4 +41,5 @@ FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
+RUN echo "Available fonts:" && fc-list | grep -E "(Liberation|DejaVu|Noto)" | head -5
 ENTRYPOINT ["dotnet", "SoHoaFormApi.dll"]

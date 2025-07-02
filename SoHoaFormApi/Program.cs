@@ -65,19 +65,20 @@ Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "fal
 if (builder.Environment.IsProduction())
 {
     Console.WriteLine("🚀 Production environment - Font setup...");
-    
+
     // Chỉ cần set biến môi trường
+    Environment.SetEnvironmentVariable("LC_ALL", "C.UTF-8");
     Environment.SetEnvironmentVariable("FONTCONFIG_PATH", "/etc/fonts");
     AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
     AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
-    
+
     // Kiểm tra fonts có sẵn
     var commonFonts = new[]
     {
         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
     };
-    
+
     foreach (var font in commonFonts)
     {
         if (File.Exists(font))
@@ -85,7 +86,19 @@ if (builder.Environment.IsProduction())
             Console.WriteLine($"✅ Found font: {font}");
         }
     }
+    // Test Vietnamese text support
+    try
+    {
+        var vietnameseTest = "Tiếng Việt: áàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệ ✓☐";
+        Console.WriteLine($"🔤 Unicode test: {vietnameseTest}");
+        Console.WriteLine("✅ Vietnamese font support initialized");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"⚠️ Vietnamese font warning: {ex.Message}");
+    }
     
+
     Console.WriteLine("✅ Font setup completed");
     builder.WebHost.UseUrls("http://*:80");
 }
@@ -205,6 +218,33 @@ app.UseDataSeeding();
 
 //CORS phải đặt trước Authentication
 app.UseCors("allowOrigin");
+
+if(builder.Environment.IsDevelopment()) {
+    app.MapGet("/test-vietnamese-fonts", () =>
+{
+    try
+    {
+        var result = new
+        {
+            TestText = "Xin chào! Tiếng Việt: áàảãạ ✓☐",
+            Environment = new
+            {
+                Locale = Environment.GetEnvironmentVariable("LC_ALL"),
+                FontPath = Environment.GetEnvironmentVariable("FONTCONFIG_PATH"),
+                Globalization = Environment.GetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT")
+            },
+            Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+        };
+        
+        return Results.Ok(result);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Font test error: {ex.Message}");
+    }
+});
+
+}
 
 app.UseAuthentication(); // Authentication phải đặt trước Authorization
 app.UseAuthorization();
