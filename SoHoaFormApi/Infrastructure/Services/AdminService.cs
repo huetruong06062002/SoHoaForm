@@ -266,8 +266,8 @@ public class AdminService : IAdminService
 
         if (!string.IsNullOrEmpty(fieldName))
         {
-          //Gán isRequired mặc định là true
-          var isRequired = true;
+          //Gán isRequired mặc định là false
+          var isRequired = false;
 
           // Phân tích tên field để xác định type
           var fieldType = DetermineFieldType(fieldName, match.Value);

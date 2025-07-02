@@ -66,12 +66,14 @@ const FormConfigPage = () => {
 
   // Thêm hàm helper để kiểm tra formula pattern
   const isTemplatePattern = (formula) => {
-    return formula && formula.match(/^\{[a-zA-Z]_[a-zA-Z]+\}$/);
+    return formula && formula.match(/^\{[a-zA-Z]_[a-zA-Z0-9]+\}$/);
   };
 
   // Thêm hàm helper để lấy initial value cho formula
   const getInitialFormulaValue = (field) => {
     if (!field.formula) return "";
+    // Nếu là Select và có formula pattern {s_...} thì trả về "C"
+    if (field.fieldType === "Select" && isTemplatePattern(field.formula)) return "C";
     if (isTemplatePattern(field.formula)) return "";
     return field.formula;
   };
@@ -90,7 +92,9 @@ const FormConfigPage = () => {
           // Hiển thị formula hiện tại cho người dùng chỉnh sửa nếu không phải template pattern
           initialValues[`formula_${field.formFieldId}`] = getInitialFormulaValue(field);
           initialValues[`options_${field.formFieldId}`] = 
-            field.fieldType === "Select" ? getInitialFormulaValue(field) : "";
+            field.fieldType === "Select" ? 
+              (isTemplatePattern(field.formula) ? "C" : getInitialFormulaValue(field)) : 
+              "";
           initialValues[`dependentVariables_${field.formFieldId}`] = 
             field.fieldType === "Boolean" ? getInitialFormulaValue(field) : "";
           initialValues[`isRequired_${field.formFieldId}`] = field.isRequired;
@@ -672,7 +676,16 @@ const FormConfigPage = () => {
                       }}
                     >
                       {isTemplatePattern(record.formula) ? (
-                        "Danh sách lựa chọn (mỗi dòng 1 lựa chọn):"
+                        <>
+                          Danh sách lựa chọn (mỗi dòng 1 lựa chọn):
+                          <div style={{ fontSize: "12px", color: "#1890ff", marginTop: "4px" }}>
+                            {record.fieldType === "Select" && isTemplatePattern(record.formula) ? (
+                              "Giá trị mặc định: C"
+                            ) : (
+                              "Thêm các lựa chọn của bạn ở đây"
+                            )}
+                          </div>
+                        </>
                       ) : (
                         <>
                           Danh sách lựa chọn (mỗi dòng 1 lựa chọn):
@@ -688,7 +701,9 @@ const FormConfigPage = () => {
                     >
                       <TextArea
                         rows={4}
-                        placeholder="Nhập mỗi lựa chọn trên một dòng"
+                        placeholder={record.fieldType === "Select" && isTemplatePattern(record.formula) ? 
+                          "C" : 
+                          "Nhập mỗi lựa chọn trên một dòng"}
                       />
                     </Form.Item>
                     <div style={{ marginTop: "16px" }}>
