@@ -61,17 +61,33 @@ builder.Services.AddScoped<IUserManagementService, UserManagementService>();
 
 
 // Bật hỗ trợ toàn cục hóa (globalization)
-Environment.SetEnvironmentVariable("DOTNET_SYSTEM_GLOBALIZATION_INVARIANT", "false");
-
 if (builder.Environment.IsProduction())
-{
-    Console.WriteLine("🚀 Production environment - Font setup...");
+{ Console.WriteLine("🚀 Production environment - Font setup...");
 
-    // Chỉ cần set biến môi trường
+    // **THÊM: GDI+ support cho Linux**
     Environment.SetEnvironmentVariable("LC_ALL", "C.UTF-8");
+    Environment.SetEnvironmentVariable("LANG", "C.UTF-8");
     Environment.SetEnvironmentVariable("FONTCONFIG_PATH", "/etc/fonts");
-    AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
-    AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
+    
+    // **SỬA: System.Drawing setup cho Linux**
+    try
+    {
+        AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
+        AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
+        
+        // **THÊM: Workaround cho GDI+ trên Docker Linux**
+        var gdiWorkaround = Environment.GetEnvironmentVariable("DOTNET_SYSTEM_DRAWING_GRAPHICS_FACTORY");
+        if (string.IsNullOrEmpty(gdiWorkaround))
+        {
+            Environment.SetEnvironmentVariable("DOTNET_SYSTEM_DRAWING_GRAPHICS_FACTORY", "skia");
+        }
+        
+        Console.WriteLine("✅ GDI+ workaround applied");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"⚠️ GDI+ setup warning: {ex.Message}");
+    }
 
     // Kiểm tra fonts có sẵn
     var commonFonts = new[]
@@ -87,6 +103,22 @@ if (builder.Environment.IsProduction())
             Console.WriteLine($"✅ Found font: {font}");
         }
     }
+
+    // **THÊM: Test GDI+ functionality**
+    try
+    {
+        // Test basic System.Drawing operations
+        using (var bitmap = new System.Drawing.Bitmap(1, 1))
+        {
+            Console.WriteLine("✅ System.Drawing operations working");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ System.Drawing test failed: {ex.Message}");
+        Console.WriteLine("This may cause PDF generation issues with Spire.Doc");
+    }
+
     // Test Vietnamese text support
     try
     {
@@ -99,7 +131,6 @@ if (builder.Environment.IsProduction())
         Console.WriteLine($"⚠️ Vietnamese font warning: {ex.Message}");
     }
 
-
     Console.WriteLine("✅ Font setup completed");
     builder.WebHost.UseUrls("http://*:80");
 }
@@ -109,6 +140,7 @@ else
     AppContext.SetSwitch("System.Drawing.EnableUnixSupport", true);
     AppContext.SetSwitch("System.Drawing.Common.EnableXPlatSupport", true);
 }
+
 
 // Cấu hình CORS
 builder.Services.AddCors(option =>
@@ -289,7 +321,120 @@ if (builder.Environment.IsProduction())
 
     return Results.Ok(fontInfo);
 });
+app.MapGet("/debug-gdi-plus", () =>
+{
+    try
+    {
+        var gdiInfo = new
+        {
+            Environment = new
+            {
+                OS = RuntimeInformation.OSDescription,
+                Architecture = RuntimeInformation.OSArchitecture.ToString(),
+                Framework = RuntimeInformation.FrameworkDescription,
+                DotNetVersion = Environment.Version.ToString(),
+                
+                // GDI+ specific environment
+                SystemDrawingFactory = Environment.GetEnvironmentVariable("DOTNET_SYSTEM_DRAWING_GRAPHICS_FACTORY"),
+                XPlatSupport = AppContext.TryGetSwitch("System.Drawing.Common.EnableXPlatSupport", out var xplat) ? xplat : false,
+                UnixSupport = AppContext.TryGetSwitch("System.Drawing.EnableUnixSupport", out var unix) ? unix : false,
+            },
 
+            SystemDrawingTest = TestSystemDrawing(),
+            
+            AvailableFonts = new
+            {
+                DejaVu = File.Exists("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+                Liberation = File.Exists("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
+                Noto = File.Exists("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"),
+            },
+
+            Libraries = new
+            {
+                LibGdi = File.Exists("/usr/lib/x86_64-linux-gnu/libgdiplus.so") || 
+                        File.Exists("/usr/lib/libgdiplus.so") ||
+                        File.Exists("/lib/x86_64-linux-gnu/libgdiplus.so"),
+                
+                // Check for common graphics libraries
+                LibCairo = File.Exists("/usr/lib/x86_64-linux-gnu/libcairo.so.2"),
+                LibFontconfig = File.Exists("/usr/lib/x86_64-linux-gnu/libfontconfig.so.1"),
+            },
+
+            TestResults = new
+            {
+                CanCreateBitmap = TestBitmapCreation(),
+                CanUseFonts = TestFontOperations(),
+                SpireDocCompatible = TestSpireDocCompatibility()
+            }
+        };
+
+        return Results.Ok(gdiInfo);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"GDI+ debug error: {ex.Message}");
+    }
+});
+
+// **THÊM: Test methods**
+static object TestSystemDrawing()
+{
+    try
+    {
+        using var bitmap = new System.Drawing.Bitmap(1, 1);
+        return new { Status = "Success", Message = "System.Drawing is working" };
+    }
+    catch (Exception ex)
+    {
+        return new { Status = "Failed", Message = ex.Message };
+    }
+}
+
+static object TestBitmapCreation()
+{
+    try
+    {
+        using var bitmap = new System.Drawing.Bitmap(100, 100);
+        using var graphics = System.Drawing.Graphics.FromImage(bitmap);
+        graphics.Clear(System.Drawing.Color.White);
+        return new { Status = "Success", Message = "Bitmap creation works" };
+    }
+    catch (Exception ex)
+    {
+        return new { Status = "Failed", Message = ex.Message };
+    }
+}
+
+static object TestFontOperations()
+{
+    try
+    {
+        using var font = new System.Drawing.Font("Arial", 12);
+        return new { Status = "Success", FontName = font.Name, Size = font.Size };
+    }
+    catch (Exception ex)
+    {
+        return new { Status = "Failed", Message = ex.Message };
+    }
+}
+
+static object TestSpireDocCompatibility()
+{
+    try
+    {
+        // Test minimal Spire.Doc operation
+        var doc = new Spire.Doc.Document();
+        var section = doc.AddSection();
+        var para = section.AddParagraph();
+        para.AppendText("Test");
+        
+        return new { Status = "Success", Message = "Spire.Doc basic operations work" };
+    }
+    catch (Exception ex)
+    {
+        return new { Status = "Failed", Message = ex.Message };
+    }
+}
 }
 
 app.UseAuthentication(); // Authentication phải đặt trước Authorization

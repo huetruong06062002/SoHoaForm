@@ -2,7 +2,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 WORKDIR /app
 EXPOSE 80
 
-# Install Arial fonts và other essentials
+# **THÊM: Install GDI+ dependencies cho Linux**
 RUN apt-get update && apt-get install -y \
     fontconfig \
     fonts-dejavu \
@@ -14,14 +14,18 @@ RUN apt-get update && apt-get install -y \
     fonts-noto-ui-core \
     fonts-symbola \
     fonts-unifont \
+    libgdiplus \
+    libc6-dev \
+    libx11-dev \
     && fc-cache -fv \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Set font environment for Arial
+# **THÊM: Set GDI+ environment variables**
 ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
 ENV FONTCONFIG_PATH=/etc/fonts
+ENV DOTNET_SYSTEM_DRAWING_GRAPHICS_FACTORY=skia
 
 # Tạo thư mục uploads
 RUN mkdir -p /app/uploads/forms
@@ -32,6 +36,7 @@ WORKDIR /src
 COPY ["SoHoaFormApi.csproj", "./"]
 RUN dotnet restore "SoHoaFormApi.csproj"
 COPY . .
+WORKDIR "/src"
 RUN dotnet build "SoHoaFormApi.csproj" -c Release -o /app/build
 
 FROM build AS publish
@@ -40,6 +45,4 @@ RUN dotnet publish "SoHoaFormApi.csproj" -c Release -o /app/publish /p:UseAppHos
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-
-RUN echo "Available fonts:" && fc-list | grep -E "(Liberation|DejaVu|Noto)" | head -5
 ENTRYPOINT ["dotnet", "SoHoaFormApi.dll"]
