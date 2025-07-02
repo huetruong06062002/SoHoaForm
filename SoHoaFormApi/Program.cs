@@ -97,7 +97,7 @@ if (builder.Environment.IsProduction())
     {
         Console.WriteLine($"⚠️ Vietnamese font warning: {ex.Message}");
     }
-    
+
 
     Console.WriteLine("✅ Font setup completed");
     builder.WebHost.UseUrls("http://*:80");
@@ -219,7 +219,8 @@ app.UseDataSeeding();
 //CORS phải đặt trước Authentication
 app.UseCors("allowOrigin");
 
-if(builder.Environment.IsDevelopment()) {
+if (builder.Environment.IsProduction())
+{
     app.MapGet("/test-vietnamese-fonts", () =>
 {
     try
@@ -235,7 +236,7 @@ if(builder.Environment.IsDevelopment()) {
             },
             Timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
         };
-        
+
         return Results.Ok(result);
     }
     catch (Exception ex)
