@@ -203,35 +203,18 @@ public class AdminService : IAdminService
           // xác định type
           var fieldType = DetermineFieldType(pattern.Name);
 
-          // Tìm hoặc tạo Field
-          var existingField = await _unitOfWork._fieldRepository
-              .SingleOrDefaultAsync(f => f.Name.ToLower() == pattern.Name.ToLower());
 
-          Field field;
-          if (existingField == null)
+          var field = new Field
           {
-            field = new Field
-            {
-              Id = Guid.NewGuid(),
-              Name = pattern.Name,
-              Type = fieldType, // Sử dụng type đã phân tích
-              Description = GenerateFieldDescription(pattern.Name, fieldType, pattern.Formula),
-              IsRequired = pattern.IsRequired,
-              IsUpperCase = pattern.IsUpperCase
-            };
-            await _unitOfWork._fieldRepository.AddAsync(field);
-          }
-          else
-          {
-            field = existingField;
-            // Cập nhật type nếu cần
-            if (field.Type != fieldType)
-            {
-              field.Type = fieldType;
-              field.Description = GenerateFieldDescription(pattern.Name, fieldType, pattern.Formula);
-              _unitOfWork._fieldRepository.Update(field);
-            }
-          }
+            Id = Guid.NewGuid(), // ✅ Luôn tạo ID mới
+            Name = pattern.Name,
+            Type = fieldType,
+            Description = GenerateFieldDescription(pattern.Name, fieldType, pattern.Formula),
+            IsRequired = pattern.IsRequired,
+            IsUpperCase = pattern.IsUpperCase
+          };
+          await _unitOfWork._fieldRepository.AddAsync(field);
+
 
           // Tạo FormField với order
           var formField = new FormField
@@ -340,7 +323,7 @@ public class AdminService : IAdminService
     if (name.StartsWith("d_")) return "Date";        // d_ = date
     if (name.StartsWith("c_") || name.StartsWith("b_")) return "Boolean"; // c_/b_ = boolean
     if (name.StartsWith("s_")) return "Select";      // s_ = select/dropdown
-     if (name.StartsWith("rd_")) return "Radio";      // rd_ = radio 
+    if (name.StartsWith("rd_")) return "Radio";      // rd_ = radio 
 
     // 1. Phân tích Number fields trước 
     if (name.Contains("score") || name.Contains("duration") ||
@@ -379,8 +362,8 @@ public class AdminService : IAdminService
 
     if (name.Contains("checkbox") || name.Contains("check")) return "Checkbox";
     if (name.Contains("select") || name.Contains("dropdown")) return "Dropdown";
-      if (name.Contains("radio") || name.Contains("option")) return "Radio";
-      
+    if (name.Contains("radio") || name.Contains("option")) return "Radio";
+
     return "Text"; //Mặc định là Text nếu không xác định được type
   }
 

@@ -393,6 +393,16 @@ const ManageFormPage = () => {
                     {'{f_tenbien}'}
                   </code>: biểu thức toán từ công thức
                 </li>
+                <li style={{ marginBottom: '4px' }}>
+                  <code style={{ 
+                    backgroundColor: '#e9ecef', 
+                    padding: '2px 4px', 
+                    borderRadius: '3px',
+                    color: '#d63384'
+                  }}>
+                    {'{rd_tenbien}'}
+                  </code>: kiểu dữ liệu bool (radio)
+                </li>
               </ul>
 
               <div style={{ 
