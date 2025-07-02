@@ -23,6 +23,7 @@ using Cell = Microsoft.Office.Interop.Word.Cell;
 using Spire.Doc;
 using Spire.Doc.Documents;
 using Spire.Doc.Fields;
+using SoHoaFormApi.Models.Helper;
 
 namespace SoHoaFormApi.Infrastructure.Services
 {
@@ -707,6 +708,8 @@ namespace SoHoaFormApi.Infrastructure.Services
 
                 var document = new Spire.Doc.Document();
                 document.LoadFromFile(wordFilePath);
+
+                HelperClass.SetupUnicodeFonts(document);
 
                 // 🎯 LUÔN CLEAN PLACEHOLDER - DÙ CÓ DATA HAY KHÔNG
                 await Task.Run(() => CleanAllPlaceholders(document, fieldValues ?? new List<FieldValueDto>()));

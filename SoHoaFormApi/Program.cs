@@ -7,6 +7,7 @@ using System.Text;
 using System.Security.Claims;
 using Microsoft.OpenApi.Models;
 using SoHoaFormApi.Infrastructure.Extensions;
+using System.Runtime.InteropServices;
 
 var builder = WebApplication.CreateBuilder(args);
 Environment.SetEnvironmentVariable("TZ", "Asia/Ho_Chi_Minh");
@@ -243,6 +244,50 @@ if (builder.Environment.IsProduction())
     {
         return Results.Problem($"Font test error: {ex.Message}");
     }
+});
+    app.MapGet("/debug-unicode-fonts", () =>
+{
+    var fontInfo = new
+    {
+        Environment = new
+        {
+            OS = RuntimeInformation.OSDescription,
+            Locale = Environment.GetEnvironmentVariable("LC_ALL"),
+            FontPath = Environment.GetEnvironmentVariable("FONTCONFIG_PATH"),
+        },
+
+        AvailableFonts = new
+        {
+            DejaVu = File.Exists("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+            DejaVuBold = File.Exists("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+            Liberation = File.Exists("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
+            Noto = File.Exists("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"),
+            NotoSymbols = File.Exists("/usr/share/fonts/truetype/noto/NotoSansSymbols-Regular.ttf"),
+            Symbola = File.Exists("/usr/share/fonts/truetype/symbola/Symbola.ttf"),
+            Unifont = File.Exists("/usr/share/fonts/truetype/unifont/unifont.ttf")
+        },
+
+        UnicodeSymbols = new
+        {
+            CheckboxChecked = "☑",
+            CheckboxUnchecked = "☐",
+            RadioSelected = "●",
+            RadioUnselected = "○",
+            OtherSymbols = "✓✗⚫⚪⬛⬜▣▢●○◉◯"
+        },
+
+        TestVietnamese = "Tiếng Việt: áàảãạăắằẳẵặâấầẩẫậéèẻẽẹ",
+
+        FontCommands = new[]
+        {
+            "fc-list | grep -i dejavu",
+            "fc-list | grep -i noto",
+            "fc-list | grep -i symbol",
+            "fc-cache -fv"
+        }
+    };
+
+    return Results.Ok(fontInfo);
 });
 
 }

@@ -5,23 +5,23 @@ EXPOSE 80
 # Install Arial fonts và other essentials
 RUN apt-get update && apt-get install -y \
     fontconfig \
+    fonts-dejavu \
     fonts-dejavu-core \
+    fonts-dejavu-extra \
     fonts-liberation \
     fonts-noto \
-    fonts-noto-cjk \
-    libgdiplus \
+    fonts-noto-core \
+    fonts-noto-ui-core \
+    fonts-symbola \
+    fonts-unifont \
     && fc-cache -fv \
-    && ln -sf /usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf /usr/share/fonts/truetype/liberation/Arial.ttf \
-    && ln -sf /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf /usr/share/fonts/truetype/dejavu/Arial.ttf \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Set font environment for Arial
-ENV FONTCONFIG_PATH=/etc/fonts
-ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
-ENV DEFAULT_FONT_FAMILY="Liberation Sans"
 ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
-
+ENV FONTCONFIG_PATH=/etc/fonts
 
 # Tạo thư mục uploads
 RUN mkdir -p /app/uploads/forms
