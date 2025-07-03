@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Spin, Typography, App, Space, Tooltip, Modal, Form, Input, Select, Checkbox, DatePicker } from 'antd';
-import { ArrowLeftOutlined, ZoomInOutlined, ZoomOutOutlined, SearchOutlined, DownloadOutlined, EditOutlined } from '@ant-design/icons';
+import { Button, Spin, Typography, App, Space, Tooltip, Modal, Form, Input, Select, Checkbox, DatePicker, message as antMessage } from 'antd';
+import { ArrowLeftOutlined, ZoomInOutlined, ZoomOutOutlined, SearchOutlined, DownloadOutlined, EditOutlined, SaveOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { renderAsync } from 'docx-preview';
 import formService from '../services/formService';
@@ -26,9 +26,11 @@ const ViewFilledFormPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isCompleting, setIsCompleting] = useState(false);
-  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-  const [editForm] = Form.useForm();
+  const [isEditMode, setIsEditMode] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [editForm] = Form.useForm();
+  const [fieldMappings, setFieldMappings] = useState({});
+  const [editableFields, setEditableFields] = useState([]);
   const containerRef = useRef(null);
   const hasRenderedRef = useRef(false);
   const renderPromiseRef = useRef(null);
@@ -37,6 +39,13 @@ const ViewFilledFormPage = () => {
   useEffect(() => {
     fetchData();
   }, [userFillFormId]);
+
+  // Thêm useEffect để fetch thông tin fields từ API
+  useEffect(() => {
+    if (filledData?.formId) {
+      fetchFormFields(filledData.formId);
+    }
+  }, [filledData?.formId]);
 
   // Cleanup khi component unmount
   useEffect(() => {
@@ -67,6 +76,22 @@ const ViewFilledFormPage = () => {
       setIsRendering(false);
     };
   }, []);
+
+  // Hàm fetch thông tin fields từ API
+  const fetchFormFields = async (formId) => {
+    try {
+      const response = await formService.getFormFields(formId);
+      if (response.statusCode === 200) {
+        console.log("Form fields data:", response.data);
+        setFormInfo(prevInfo => ({
+          ...prevInfo,
+          fields: response.data.fields
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching form fields:", error);
+    }
+  };
 
   const fetchData = async () => {
     if (isFetchingRef.current) {
@@ -128,7 +153,7 @@ const ViewFilledFormPage = () => {
   };
 
   // Xử lý Word document với dữ liệu thực sử dụng JSZip
-  const processWordWithData = async (wordBlob, fieldValues) => {
+  const processWordWithData = async (wordBlob, fieldValues, makeEditable = false) => {
     try {
       setIsProcessing(true);
       
@@ -146,6 +171,8 @@ const ViewFilledFormPage = () => {
 
       // Tạo mapping từ fieldName sang value với xử lý đặc biệt cho checkbox
       const fieldMap = {};
+      const mappedFields = {};
+      
       fieldValues.forEach(field => {
         if (field.fieldType === 'c') {
           // Checkbox: true = ☑, false = ☐
@@ -154,7 +181,16 @@ const ViewFilledFormPage = () => {
           // Các field type khác: text, date, select, etc.
           fieldMap[field.fieldName] = field.value || '';
         }
+        // Store field information for editing later
+        mappedFields[field.fieldName] = {
+          fieldType: field.fieldType,
+          label: field.label || field.fieldName,
+          value: field.value
+        };
       });
+      
+      // Save field mappings for later use in edit mode
+      setFieldMappings(mappedFields);
       
       console.log('=== WORD PROCESSING DEBUG ===');
       console.log('Field mapping for Word processing:', fieldMap);
@@ -176,6 +212,8 @@ const ViewFilledFormPage = () => {
 
       let hasReplacements = false;
       let allPlaceholdersFound = [];
+      // Tracking all replacements for edit mode
+      const replacements = [];
       
       for (const filename of xmlFiles) {
         const file = loadedZip.file(filename);
@@ -305,6 +343,16 @@ const ViewFilledFormPage = () => {
               if (matchedFieldName !== '') {
                 console.log(`🎯 FINAL MATCH: Replacing "${cleanText}" with "${matchedValue}" (from field: ${matchedFieldName})`);
                 
+                // Add to replacements for edit mode
+                if (makeEditable) {
+                  replacements.push({
+                    placeholder: cleanText,
+                    fieldName: matchedFieldName,
+                    value: matchedValue,
+                    fieldType: mappedFields[matchedFieldName]?.fieldType || 'text'
+                  });
+                }
+                
                 // Escape XML special characters (including empty strings)
                 const escapedValue = (matchedValue || '')
                   .replace(/&/g, '&amp;')
@@ -313,8 +361,13 @@ const ViewFilledFormPage = () => {
                   .replace(/"/g, '&quot;')
                   .replace(/'/g, '&apos;');
                 
+                // For editable mode, we add data attributes
+                const replacement = makeEditable 
+                  ? `<span data-field="${matchedFieldName}" data-placeholder="${cleanText}">${escapedValue}</span>`
+                  : escapedValue;
+                
                 // Replace broken placeholder với escaped value (hoặc chuỗi rỗng)
-                content = content.replace(brokenMatch, escapedValue);
+                content = content.replace(brokenMatch, replacement);
                 hasReplacements = true;
                 allPlaceholdersFound.push(cleanText);
               } else {
@@ -377,6 +430,16 @@ const ViewFilledFormPage = () => {
               if (matchedFieldName !== '') {
                 console.log(`✅ Replacing normal placeholder ${fullPlaceholder} with "${matchedValue}" (from field: ${matchedFieldName})`);
                 
+                // Add to replacements for edit mode
+                if (makeEditable) {
+                  replacements.push({
+                    placeholder: fullPlaceholder,
+                    fieldName: matchedFieldName,
+                    value: matchedValue,
+                    fieldType: mappedFields[matchedFieldName]?.fieldType || 'text'
+                  });
+                }
+                
                 const escapedValue = (matchedValue || '')
                   .replace(/&/g, '&amp;')
                   .replace(/</g, '&lt;')
@@ -384,7 +447,12 @@ const ViewFilledFormPage = () => {
                   .replace(/"/g, '&quot;')
                   .replace(/'/g, '&apos;');
                 
-                content = content.replace(fullPlaceholder, escapedValue);
+                // For editable mode, we add data attributes
+                const replacement = makeEditable 
+                  ? `<span data-field="${matchedFieldName}" data-placeholder="${fullPlaceholder}">${escapedValue}</span>`
+                  : escapedValue;
+                
+                content = content.replace(fullPlaceholder, replacement);
                 hasReplacements = true;
                 allPlaceholdersFound.push(fullPlaceholder);
               } else {
@@ -414,6 +482,11 @@ const ViewFilledFormPage = () => {
       
       if (hasReplacements) {
         console.log('✅ Creating processed Word document with field values');
+        
+        // Store replacements for edit mode
+        if (makeEditable) {
+          setEditableFields(replacements);
+        }
         
         // Tạo blob mới từ zip đã được xử lý
         const processedBlob = await loadedZip.generateAsync({
@@ -508,6 +581,11 @@ const ViewFilledFormPage = () => {
                 setTotalPages(pages.length);
                 setCurrentPage(1);
               }
+              
+              // If in edit mode, make the spans editable
+              if (isEditMode) {
+                makeSpansEditable();
+              }
             }
           }, 100);
         }).catch(error => {
@@ -524,7 +602,129 @@ const ViewFilledFormPage = () => {
         clearTimeout(timeoutId);
       };
     }
-  }, [processedWordBlob, messageApi]);
+  }, [processedWordBlob, messageApi, isEditMode]);
+  
+  // Hàm để làm cho các spans có thể chỉnh sửa được
+  const makeSpansEditable = () => {
+    if (!containerRef.current) return;
+    
+    // Tìm tất cả spans có data-field attribute
+    const spans = containerRef.current.querySelectorAll('span[data-field]');
+    console.log(`Found ${spans.length} editable spans`);
+    
+    spans.forEach(span => {
+      const fieldName = span.getAttribute('data-field');
+      const fieldInfo = fieldMappings[fieldName];
+      
+      if (fieldInfo) {
+        // Thêm style để nhận biết được phần tử có thể chỉnh sửa
+        span.style.backgroundColor = '#f0f8ff';
+        span.style.border = '1px dashed #1890ff';
+        span.style.padding = '2px 4px';
+        span.style.margin = '0 2px';
+        span.style.borderRadius = '3px';
+        span.style.cursor = 'pointer';
+        
+        // Thêm contentEditable cho phép chỉnh sửa trực tiếp
+        span.contentEditable = true;
+        
+        // Thêm tooltip để hiển thị thông tin field
+        span.title = `${fieldInfo.label} - Click để chỉnh sửa`;
+        
+        // Thêm event listeners
+        span.addEventListener('focus', () => {
+          span.style.backgroundColor = '#e6f7ff';
+          span.style.border = '1px solid #1890ff';
+        });
+        
+        span.addEventListener('blur', () => {
+          span.style.backgroundColor = '#f0f8ff';
+          span.style.border = '1px dashed #1890ff';
+        });
+      }
+    });
+    
+    // Hiển thị thông báo hướng dẫn
+    messageApi.info('Click vào các trường có viền màu xanh để chỉnh sửa trực tiếp');
+  };
+  
+  // Hàm thu thập các giá trị đã chỉnh sửa
+  const collectEditedValues = () => {
+    if (!containerRef.current) return {};
+    
+    const editedValues = {};
+    
+    // Thu thập từ danh sách editableFields đã lưu
+    editableFields.forEach(field => {
+      const { element, fieldName, isFormula } = field;
+      
+      // Chỉ thu thập giá trị từ các phần tử có thể chỉnh sửa và các trường công thức
+      const value = element.textContent.trim();
+      editedValues[fieldName] = value;
+    });
+    
+    return editedValues;
+  };
+
+  // Hàm lưu các chỉnh sửa trực tiếp trên document
+  const handleSaveInlineEdit = async () => {
+    try {
+      setIsUpdating(true);
+      
+      // Thu thập giá trị đã chỉnh sửa
+      const editedValues = collectEditedValues();
+      console.log('Edited values:', editedValues);
+      
+      if (Object.keys(editedValues).length === 0) {
+        messageApi.info('Không có thay đổi nào để lưu');
+        setIsEditMode(false);
+        removeEditableElements();
+        return;
+      }
+      
+      // Chuyển đổi các giá trị thu thập được thành format API yêu cầu
+      const updatedFieldValues = filledData.parsedFieldValues.map(field => {
+        const newValue = editedValues[field.fieldName] !== undefined 
+          ? editedValues[field.fieldName] 
+          : field.value;
+        
+        return {
+          ...field,
+          value: newValue
+        };
+      });
+      
+      // Gọi API update
+      const response = await formService.updateFieldValues(userFillFormId, updatedFieldValues);
+      
+      if (response.statusCode === 200) {
+        messageApi.success('Cập nhật dữ liệu thành công!');
+        
+        // Cập nhật state với dữ liệu mới
+        setFilledData(prev => ({
+          ...prev,
+          parsedFieldValues: updatedFieldValues,
+          rawJsonFieldValue: JSON.stringify(updatedFieldValues, null, 2)
+        }));
+        
+        // Tắt chế độ chỉnh sửa
+        setIsEditMode(false);
+        removeEditableElements();
+        
+        // Reprocess Word document với dữ liệu mới
+        if (originalWordBlob) {
+          await processWordWithData(originalWordBlob, updatedFieldValues);
+        }
+      } else {
+        messageApi.error('Có lỗi xảy ra khi cập nhật dữ liệu');
+      }
+    } catch (error) {
+      console.error('Error saving inline edits:', error);
+      messageApi.error('Có lỗi xảy ra khi lưu chỉnh sửa');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   // Toolbar functions
   const handleZoomIn = () => {
@@ -745,160 +945,838 @@ const ViewFilledFormPage = () => {
     }
   };
 
-  // Hàm mở modal chỉnh sửa
+  // Hàm chuyển sang chế độ chỉnh sửa
   const handleEditForm = () => {
     if (!filledData?.parsedFieldValues) {
       messageApi.error('Không có dữ liệu để chỉnh sửa');
       return;
     }
 
-    // Tạo initial values cho form
-    const initialValues = {};
-    filledData.parsedFieldValues.forEach(field => {
-      if (field.fieldType === 'c') {
-        // Checkbox
-        initialValues[field.fieldName] = field.value === 'true';
-      } else if (field.fieldType === 'd' || field.fieldType === 'dt') {
-        // Date/DateTime
-        initialValues[field.fieldName] = field.value ? dayjs(field.value) : null;
-      } else {
-        // Text, Number, Select
-        initialValues[field.fieldName] = field.value || '';
-      }
-    });
-
-    editForm.setFieldsValue(initialValues);
-    setIsEditModalVisible(true);
+    setIsEditMode(true);
+    
+    // Không cần tạo lại document, chỉ cần đánh dấu các phần tử có thể chỉnh sửa
+    setTimeout(() => {
+      makeDocumentEditable();
+    }, 500);
   };
 
-  // Hàm cập nhật field values
-  // Function để tính toán công thức
-  const calculateFormula = (formula, values) => {
-    try {
-      // Replace field references [fieldName] with their values
-      let calculationFormula = formula;
-      Object.entries(values).forEach(([fieldName, value]) => {
-        const regex = new RegExp(`\\[${fieldName}\\]`, 'g');
-        calculationFormula = calculationFormula.replace(regex, value || '0');
-      });
-
-      // Evaluate the formula
-      const result = eval(calculationFormula);
-      return result;
-    } catch (error) {
-      console.error('Error calculating formula:', error);
-      return 0;
+  // Hàm hủy chế độ chỉnh sửa
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    
+    // Loại bỏ các phần tử có thể chỉnh sửa
+    removeEditableElements();
+    
+    // Render lại document không chỉnh sửa
+    hasRenderedRef.current = false;
+    if (originalWordBlob) {
+      processWordWithData(originalWordBlob, filledData.parsedFieldValues);
     }
   };
-
-  // Function để validate field values
-  const validateFieldValues = (values, formFields) => {
-    const errors = [];
-
-    formFields.forEach(field => {
-      const value = values[field.fieldName];
-
-      // Skip formula fields
-      if (field.fieldType === 'Formula') {
-        return;
-      }
-
-      // Check required fields
-      if (field.isRequired && (value === undefined || value === null || value === '')) {
-        errors.push(`${field.fieldName} là trường bắt buộc`);
-      }
-
-      // Check number fields
-      if (field.fieldType === 'Number' && value !== '' && value !== null) {
-        if (isNaN(value)) {
-          errors.push(`${field.fieldName} phải là số`);
-        }
-      }
+  
+  // Hàm để loại bỏ các phần tử có thể chỉnh sửa
+  const removeEditableElements = () => {
+    if (!containerRef.current) return;
+    
+    // Tìm tất cả các phần tử đã được đánh dấu để chỉnh sửa
+    const editableElements = containerRef.current.querySelectorAll('.editable-field');
+    
+    editableElements.forEach(element => {
+      // Loại bỏ contentEditable và các style
+      element.contentEditable = false;
+      element.classList.remove('editable-field');
+      element.style.backgroundColor = '';
+      element.style.border = '';
+      element.style.padding = '';
+      element.style.margin = '';
+      element.style.borderRadius = '';
+      element.style.cursor = '';
     });
-
-    return errors;
   };
-
-  const handleUpdateFieldValues = async (values) => {
+  
+  // Hàm để làm cho document có thể chỉnh sửa
+  const makeDocumentEditable = () => {
+    if (!containerRef.current || !filledData?.parsedFieldValues) return;
+    
     try {
-      setIsUpdating(true);
-
-      // Fetch form fields để lấy thông tin validation và formula
-      const formFieldsResponse = await formService.getFormFields(filledData.formId);
-      if (formFieldsResponse.statusCode !== 200) {
-        throw new Error('Không thể lấy thông tin form fields');
-      }
-
-      const formFields = formFieldsResponse.data.fields;
-
-      // Validate field values
-      const errors = validateFieldValues(values, formFields);
-      if (errors.length > 0) {
-        messageApi.error(errors.join(', '));
-        return;
-      }
-
-      // Calculate formula fields
-      const formulaFields = formFields.filter(field => field.fieldType === 'Formula');
-      formulaFields.forEach(field => {
-        values[field.fieldName] = calculateFormula(field.formula, values);
-      });
-
-      // Chuyển đổi values thành format API yêu cầu
-      const fieldValues = formFields.map(field => {
-        let newValue = values[field.fieldName];
-
-        // Xử lý theo từng field type
-        if (field.fieldType === 'c') {
-          // Checkbox
-          newValue = newValue ? 'true' : 'false';
-        } else if (field.fieldType === 'd') {
-          // Date
-          newValue = newValue ? newValue.format('YYYY-MM-DD') : '';
-        } else if (field.fieldType === 'dt') {
-          // DateTime
-          newValue = newValue ? newValue.format('YYYY-MM-DD HH:mm:ss') : '';
-        } else {
-          // Text, Number, Select, Formula
-          newValue = newValue?.toString() || '';
+      // Thêm CSS cho các phần tử có thể chỉnh sửa
+      const style = document.createElement('style');
+      style.innerHTML = `
+        .editable-field {
+          background-color: #f0f8ff !important;
+          border: 1px dashed #1890ff !important;
+          padding: 2px 4px !important;
+          margin: 0 2px !important;
+          border-radius: 3px !important;
+          cursor: pointer !important;
+          display: inline-block !important;
+          min-width: 10px !important;
         }
-
-        return {
-          fieldName: field.fieldName,
+        .editable-field:focus {
+          background-color: #e6f7ff !important;
+          border: 1px solid #1890ff !important;
+          outline: none !important;
+        }
+        .formula-field {
+          background-color: #f5f5f5 !important;
+          border: 1px dashed #d9d9d9 !important;
+          padding: 2px 4px !important;
+          margin: 0 2px !important;
+          border-radius: 3px !important;
+          cursor: default !important;
+          display: inline-block !important;
+          min-width: 10px !important;
+          color: #666 !important;
+        }
+        
+        /* Sửa lỗi layout cho bảng */
+        td .editable-field, td .formula-field {
+          display: inline !important;
+          width: 100% !important;
+        }
+        
+        /* Đảm bảo các ô trong bảng không bị vỡ layout */
+        td {
+          position: relative !important;
+        }
+        
+        /* Cho phép chỉnh sửa toàn bộ nội dung của ô */
+        td.editable-cell {
+          background-color: #f0f8ff !important;
+          border: 1px dashed #1890ff !important;
+          cursor: pointer !important;
+        }
+      `;
+      document.head.appendChild(style);
+      
+      // Map field values từ API để dễ tìm kiếm
+      const fieldValues = {};
+    filledData.parsedFieldValues.forEach(field => {
+        fieldValues[field.fieldName] = {
+          value: field.value,
           fieldType: field.fieldType,
-          label: field.fieldDescription || field.fieldName,
-          value: newValue
+          label: field.label || field.fieldName
         };
       });
-
-      // Gọi API update
-      const response = await formService.updateFieldValues(userFillFormId, fieldValues);
-
-      if (response.statusCode === 200) {
-        messageApi.success('Cập nhật dữ liệu thành công!');
-        
-        // Cập nhật state với dữ liệu mới
-        setFilledData(prev => ({
-          ...prev,
-          parsedFieldValues: fieldValues,
-          rawJsonFieldValue: JSON.stringify(fieldValues, null, 2)
-        }));
-
-        // Đóng modal
-        setIsEditModalVisible(false);
-        
-        // Reprocess Word document với dữ liệu mới
-        if (originalWordBlob) {
-          await processWordWithData(originalWordBlob, fieldValues);
-        }
-      } else {
-        messageApi.error('Có lỗi xảy ra khi cập nhật dữ liệu');
+      
+      // Tìm các trường formula từ API
+      const formulaFields = formInfo?.fields?.filter(field => field.fieldType === 'Formula') || [];
+      // Nếu không có dữ liệu từ API fields, sử dụng dữ liệu từ parsedFieldValues
+      if (formulaFields.length === 0) {
+        const formulaFieldsFromValues = filledData.parsedFieldValues.filter(field => field.fieldType === 'Formula');
+        formulaFields.push(...formulaFieldsFromValues.map(field => ({
+          fieldName: field.fieldName,
+          fieldType: 'Formula',
+          formula: '' // Không có công thức cụ thể
+        })));
       }
+      
+      const formulaFieldNames = new Set(formulaFields.map(field => field.fieldName));
+      
+      console.log("Mapped field values:", fieldValues);
+      console.log("Formula fields:", formulaFields);
+      
+      // Set để theo dõi các giá trị đã xử lý
+      const processedValues = new Set();
+      const processedFieldNames = new Set();
+      
+      // Danh sách các phần tử đã chỉnh sửa để theo dõi
+      const editableElements = [];
+
+      // PHƯƠNG PHÁP 0: Tìm kiếm trực tiếp các trường dựa trên fieldName trong các phần tử có data-field
+      console.log("Tìm kiếm các phần tử có data-field attribute...");
+      const dataFieldElements = containerRef.current.querySelectorAll('[data-field]');
+      if (dataFieldElements.length > 0) {
+        console.log(`Tìm thấy ${dataFieldElements.length} phần tử có data-field attribute`);
+        dataFieldElements.forEach(element => {
+          const fieldName = element.getAttribute('data-field');
+          if (fieldName && fieldValues[fieldName] && !processedFieldNames.has(fieldName)) {
+            const fieldInfo = fieldValues[fieldName];
+            console.log(`Tìm thấy phần tử với data-field="${fieldName}"`);
+            
+            // Kiểm tra nếu là trường formula
+            if (formulaFieldNames.has(fieldName) || fieldInfo.fieldType === 'Formula') {
+              element.classList.add('formula-field');
+              element.contentEditable = false;
+              element.dataset.fieldName = fieldName;
+              element.dataset.originalValue = fieldInfo.value;
+              element.dataset.isFormula = 'true';
+              element.title = `${fieldInfo.label} - Trường tự động tính toán`;
+              
+              // Tìm công thức tương ứng
+              const formulaField = formulaFields.find(f => f.fieldName === fieldName);
+              if (formulaField) {
+                element.dataset.formula = formulaField.formula || '';
+              }
+              
+              editableElements.push({
+                element,
+                fieldName,
+                originalValue: fieldInfo.value,
+                isFormula: true,
+                formula: formulaField?.formula || ''
+              });
+      } else {
+              element.classList.add('editable-field');
+              element.contentEditable = true;
+              element.dataset.fieldName = fieldName;
+              element.dataset.originalValue = fieldInfo.value;
+              element.title = `${fieldInfo.label} - Click để chỉnh sửa`;
+              
+              editableElements.push({
+                element,
+                fieldName,
+                originalValue: fieldInfo.value
+              });
+            }
+            
+            processedFieldNames.add(fieldName);
+            if (fieldInfo.value) {
+              processedValues.add(fieldInfo.value.trim());
+            }
+          }
+        });
+      }
+      
+      // PHƯƠNG PHÁP 1: Duyệt qua tất cả các phần tử văn bản
+      // Sử dụng selector mở rộng để bắt nhiều loại phần tử hơn
+      const textElements = containerRef.current.querySelectorAll('p, span, td, div, text, label, h1, h2, h3, h4, h5, h6, strong, em, b, i');
+      console.log(`Found ${textElements.length} potential text elements to check`);
+      
+      // Lọc qua tất cả các phần tử text
+      textElements.forEach(element => {
+        // Bỏ qua các phần tử không có nội dung text hoặc đã có class editable-field
+        if (!element.textContent || element.textContent.trim() === '' || 
+            element.classList?.contains('editable-field') || 
+            element.classList?.contains('formula-field') || 
+            element.querySelector('.editable-field') || 
+            element.querySelector('.formula-field')) return;
+        
+        // Kiểm tra nếu phần tử này chứa chính xác một giá trị từ field values
+        Object.entries(fieldValues).forEach(([fieldName, fieldInfo]) => {
+          // Bỏ qua nếu field này đã được xử lý
+          if (processedFieldNames.has(fieldName)) return;
+          
+          const fieldValue = fieldInfo.value?.trim();
+          
+          // Bỏ qua trường hợp không có giá trị hoặc giá trị rỗng hoặc đã xử lý
+          if (!fieldValue || fieldValue === '' || processedValues.has(fieldValue)) return;
+          
+          // So sánh chính xác text content với field value
+          if (element.textContent.trim() === fieldValue) {
+            console.log(`Found match for field ${fieldName}: "${fieldValue}"`);
+            
+            // Kiểm tra nếu là trường formula
+            if (formulaFieldNames.has(fieldName) || fieldInfo.fieldType === 'Formula') {
+              // Đánh dấu là trường formula (chỉ đọc)
+              element.classList.add('formula-field');
+              element.contentEditable = false;
+              element.dataset.fieldName = fieldName;
+              element.dataset.originalValue = fieldValue;
+              element.dataset.isFormula = 'true';
+              element.title = `${fieldInfo.label} - Trường tự động tính toán`;
+              
+              // Xử lý đặc biệt nếu element là td hoặc nằm trong td
+              const parentTd = element.tagName === 'TD' ? element : element.closest('td');
+              if (parentTd) {
+                parentTd.classList.add('formula-cell');
+              }
+              
+              // Tìm công thức tương ứng
+              const formulaField = formulaFields.find(f => f.fieldName === fieldName);
+              if (formulaField) {
+                element.dataset.formula = formulaField.formula || '';
+              }
+              
+              // Thêm vào danh sách để theo dõi
+              editableElements.push({
+                element,
+                fieldName,
+                originalValue: fieldValue,
+                isFormula: true,
+                formula: formulaField?.formula || ''
+              });
+            } else {
+              // Đánh dấu phần tử này có thể chỉnh sửa
+              element.classList.add('editable-field');
+              element.contentEditable = true;
+              element.dataset.fieldName = fieldName;
+              element.dataset.originalValue = fieldValue;
+              element.title = `${fieldInfo.label} - Click để chỉnh sửa`;
+              
+              // Xử lý đặc biệt nếu element là td hoặc nằm trong td
+              const parentTd = element.tagName === 'TD' ? element : element.closest('td');
+              if (parentTd) {
+                parentTd.classList.add('editable-cell');
+              }
+              
+              // Thêm vào danh sách để theo dõi
+              editableElements.push({
+                element,
+                fieldName,
+                originalValue: fieldValue
+              });
+            }
+            
+            // Đánh dấu đã xử lý
+            processedValues.add(fieldValue);
+            processedFieldNames.add(fieldName);
+            
+            // Debug log để xác nhận
+            console.log(`Made ${formulaFieldNames.has(fieldName) || fieldInfo.fieldType === 'Formula' ? 'formula' : 'editable'}: ${fieldName} = "${fieldValue}"`);
+          }
+          // Xử lý trường hợp đặc biệt cho các trường hiển thị trong bảng
+          else if (element.tagName === 'TD' && element.textContent.includes(fieldValue) && 
+                  !processedValues.has(fieldValue)) {
+            const text = element.textContent;
+            if (text === fieldValue) {
+              // Kiểm tra nếu là trường formula
+              if (formulaFieldNames.has(fieldName) || fieldInfo.fieldType === 'Formula') {
+                element.classList.add('formula-field');
+                element.contentEditable = false;
+                element.dataset.fieldName = fieldName;
+                element.dataset.originalValue = fieldValue;
+                element.dataset.isFormula = 'true';
+                element.title = `${fieldInfo.label} - Trường tự động tính toán`;
+                element.classList.add('formula-cell');
+                
+                // Tìm công thức tương ứng
+                const formulaField = formulaFields.find(f => f.fieldName === fieldName);
+                if (formulaField) {
+                  element.dataset.formula = formulaField.formula || '';
+                }
+                
+                editableElements.push({
+                  element,
+                  fieldName,
+                  originalValue: fieldValue,
+                  isFormula: true,
+                  formula: formulaField?.formula || ''
+                });
+              } else {
+                element.classList.add('editable-field');
+                element.contentEditable = true;
+                element.dataset.fieldName = fieldName;
+                element.dataset.originalValue = fieldValue;
+                element.title = `${fieldInfo.label} - Click để chỉnh sửa`;
+                element.classList.add('editable-cell');
+                
+                editableElements.push({
+                  element,
+                  fieldName,
+                  originalValue: fieldValue
+                });
+              }
+              
+              // Đánh dấu đã xử lý
+              processedValues.add(fieldValue);
+              processedFieldNames.add(fieldName);
+              
+              console.log(`Made table cell ${formulaFieldNames.has(fieldName) || fieldInfo.fieldType === 'Formula' ? 'formula' : 'editable'}: ${fieldName} = "${fieldValue}"`);
+            }
+          }
+          // Thêm kiểm tra cho trường hợp số trong ô bảng
+          else if (element.tagName === 'TD' && element.textContent.trim() === fieldValue) {
+            console.log(`Found exact match in TD for field ${fieldName}: "${fieldValue}"`);
+            
+            // Kiểm tra nếu là trường formula
+            if (formulaFieldNames.has(fieldName) || fieldInfo.fieldType === 'Formula') {
+              element.classList.add('formula-field');
+              element.contentEditable = false;
+              element.dataset.fieldName = fieldName;
+              element.dataset.originalValue = fieldValue;
+              element.dataset.isFormula = 'true';
+              element.title = `${fieldInfo.label} - Trường tự động tính toán`;
+              element.classList.add('formula-cell');
+            } else {
+              element.classList.add('editable-field');
+              element.contentEditable = true;
+              element.dataset.fieldName = fieldName;
+              element.dataset.originalValue = fieldValue;
+              element.title = `${fieldInfo.label} - Click để chỉnh sửa`;
+              element.classList.add('editable-cell');
+            }
+            
+            editableElements.push({
+              element,
+              fieldName,
+              originalValue: fieldValue,
+              isFormula: formulaFieldNames.has(fieldName) || fieldInfo.fieldType === 'Formula'
+            });
+            
+            // Đánh dấu đã xử lý
+            processedValues.add(fieldValue);
+            processedFieldNames.add(fieldName);
+          }
+        });
+      });
+      
+      // PHƯƠNG PHÁP 2: Tìm kiếm text nodes trực tiếp (chỉ nếu còn trường chưa xử lý)
+      const remainingFields = Object.keys(fieldValues).filter(fieldName => !processedFieldNames.has(fieldName));
+      
+      if (remainingFields.length > 0) {
+        console.log(`Still have ${remainingFields.length} fields to process, trying text nodes method...`);
+        
+        // Tìm tất cả text nodes trong document
+        const findTextNodes = (element) => {
+          let textNodes = [];
+          if (element) {
+            if (element.nodeType === Node.TEXT_NODE && element.nodeValue.trim() !== '') {
+              textNodes.push(element);
+            } else {
+              // Bỏ qua phần tử đã có class editable-field hoặc formula-field
+              if (element.classList && (element.classList.contains('editable-field') || element.classList.contains('formula-field'))) {
+                return [];
+              }
+              
+              const children = element.childNodes;
+              for (let i = 0; i < children.length; i++) {
+                textNodes = textNodes.concat(findTextNodes(children[i]));
+              }
+            }
+          }
+          return textNodes;
+        };
+        
+        const textNodes = findTextNodes(containerRef.current);
+        console.log(`Found ${textNodes.length} text nodes`);
+        
+        // Kiểm tra từng text node
+        textNodes.forEach(node => {
+          const nodeValue = node.nodeValue.trim();
+          if (nodeValue === '') return;
+          
+          // Kiểm tra nếu giá trị đã được xử lý
+          if (processedValues.has(nodeValue)) return;
+          
+          // Tìm kiếm giá trị trùng khớp trong các trường còn lại
+          remainingFields.forEach(fieldName => {
+            // Bỏ qua nếu field này đã được xử lý
+            if (processedFieldNames.has(fieldName)) return;
+            
+            const fieldInfo = fieldValues[fieldName];
+            const fieldValue = fieldInfo.value?.trim();
+            
+            // Bỏ qua nếu không có giá trị hoặc đã xử lý
+            if (!fieldValue || processedValues.has(fieldValue)) return;
+            
+            // Chỉ xử lý nếu nodeValue khớp chính xác với fieldValue
+            if (nodeValue === fieldValue) {
+              console.log(`Found text node match for ${fieldName}: "${fieldValue}"`);
+              
+              // Kiểm tra nếu node này là con của một phần tử editable-field hoặc formula-field
+              let parent = node.parentNode;
+              let isChildOfEditable = false;
+              while (parent) {
+                if (parent.classList && (parent.classList.contains('editable-field') || parent.classList.contains('formula-field'))) {
+                  isChildOfEditable = true;
+                  break;
+                }
+                parent = parent.parentNode;
+              }
+              
+              // Chỉ xử lý nếu không phải là con của phần tử editable-field hoặc formula-field
+              if (!isChildOfEditable) {
+                // Tạo span để bao bọc text node
+                const span = document.createElement('span');
+                span.textContent = nodeValue;
+                
+                // Kiểm tra nếu là trường formula
+                if (formulaFieldNames.has(fieldName) || fieldInfo.fieldType === 'Formula') {
+                  span.classList.add('formula-field');
+                  span.contentEditable = false;
+                  span.dataset.fieldName = fieldName;
+                  span.dataset.originalValue = fieldValue;
+                  span.dataset.isFormula = 'true';
+                  span.title = `${fieldInfo.label} - Trường tự động tính toán`;
+                  
+                  // Tìm công thức tương ứng
+                  const formulaField = formulaFields.find(f => f.fieldName === fieldName);
+                  if (formulaField) {
+                    span.dataset.formula = formulaField.formula || '';
+                  }
+                  
+                  // Thay thế text node bằng span
+                  if (node.parentNode) {
+                    node.parentNode.replaceChild(span, node);
+                    
+                    editableElements.push({
+                      element: span,
+                      fieldName,
+                      originalValue: fieldValue,
+                      isFormula: true,
+                      formula: formulaField?.formula || ''
+                    });
+                    
+                    // Đánh dấu đã xử lý
+                    processedValues.add(fieldValue);
+                    processedFieldNames.add(fieldName);
+                    
+                    console.log(`Wrapped text node as formula span: ${fieldName} = "${fieldValue}"`);
+                  }
+                } else {
+                  span.classList.add('editable-field');
+                  span.contentEditable = true;
+                  span.dataset.fieldName = fieldName;
+                  span.dataset.originalValue = fieldValue;
+                  span.title = `${fieldInfo.label} - Click để chỉnh sửa`;
+                  
+                  // Thay thế text node bằng span
+                  if (node.parentNode) {
+                    node.parentNode.replaceChild(span, node);
+                    
+                    editableElements.push({
+                      element: span,
+                      fieldName,
+                      originalValue: fieldValue
+                    });
+                    
+                    // Đánh dấu đã xử lý
+                    processedValues.add(fieldValue);
+                    processedFieldNames.add(fieldName);
+                    
+                    console.log(`Wrapped text node as editable span: ${fieldName} = "${fieldValue}"`);
+                  }
+                }
+              }
+            }
+          });
+        });
+      }
+      
+      // PHƯƠNG PHÁP 3: Sử dụng XPath (chỉ nếu vẫn còn trường chưa xử lý)
+      const finalRemainingFields = Object.keys(fieldValues).filter(fieldName => !processedFieldNames.has(fieldName));
+      
+      if (finalRemainingFields.length > 0) {
+        console.log(`Still have ${finalRemainingFields.length} fields, trying XPath approach...`);
+        
+        finalRemainingFields.forEach(fieldName => {
+          const fieldInfo = fieldValues[fieldName];
+          const fieldValue = fieldInfo.value?.trim();
+          
+          // Bỏ qua nếu không có giá trị hoặc đã xử lý
+          if (!fieldValue || fieldValue === '' || processedValues.has(fieldValue)) return;
+          
+          try {
+            // Tìm tất cả phần tử chứa chính xác text này
+            const xpath = `//text()[normalize-space(.) = '${fieldValue}']`;
+            const result = document.evaluate(xpath, containerRef.current, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+            
+            // Chỉ xử lý node đầu tiên tìm thấy
+            if (result.snapshotLength > 0) {
+              const textNode = result.snapshotItem(0);
+              
+              // Kiểm tra nếu node này là con của một phần tử editable-field hoặc formula-field
+              let parent = textNode.parentNode;
+              let isChildOfEditable = false;
+              while (parent) {
+                if (parent.classList && (parent.classList.contains('editable-field') || parent.classList.contains('formula-field'))) {
+                  isChildOfEditable = true;
+                  break;
+                }
+                parent = parent.parentNode;
+              }
+              
+              // Chỉ xử lý nếu không phải là con của phần tử editable-field hoặc formula-field
+              if (!isChildOfEditable) {
+                console.log(`Found XPath match for ${fieldName}: "${fieldValue}"`);
+                
+                // Kiểm tra nếu là text node và có parent
+                if (textNode.nodeType === Node.TEXT_NODE && textNode.parentNode) {
+                  // Tạo span để bao bọc text node
+                  const span = document.createElement('span');
+                  span.textContent = textNode.nodeValue;
+                  
+                  // Kiểm tra nếu là trường formula
+                  if (formulaFieldNames.has(fieldName) || fieldInfo.fieldType === 'Formula') {
+                    span.classList.add('formula-field');
+                    span.contentEditable = false;
+                    span.dataset.fieldName = fieldName;
+                    span.dataset.originalValue = fieldValue;
+                    span.dataset.isFormula = 'true';
+                    span.title = `${fieldInfo.label} - Trường tự động tính toán`;
+                    
+                    // Tìm công thức tương ứng
+                    const formulaField = formulaFields.find(f => f.fieldName === fieldName);
+                    if (formulaField) {
+                      span.dataset.formula = formulaField.formula || '';
+                    }
+                    
+                    // Thay thế text node bằng span
+                    textNode.parentNode.replaceChild(span, textNode);
+                    
+                    editableElements.push({
+                      element: span,
+                      fieldName,
+                      originalValue: fieldValue,
+                      isFormula: true,
+                      formula: formulaField?.formula || ''
+                    });
+                  } else {
+                    span.classList.add('editable-field');
+                    span.contentEditable = true;
+                    span.dataset.fieldName = fieldName;
+                    span.dataset.originalValue = fieldValue;
+                    span.title = `${fieldInfo.label} - Click để chỉnh sửa`;
+                    
+                    // Thay thế text node bằng span
+                    textNode.parentNode.replaceChild(span, textNode);
+                    
+                    editableElements.push({
+                      element: span,
+                      fieldName,
+                      originalValue: fieldValue
+                    });
+                  }
+                  
+                  // Đánh dấu đã xử lý
+                  processedValues.add(fieldValue);
+                  processedFieldNames.add(fieldName);
+                  
+                  console.log(`XPath wrapped text node as ${formulaFieldNames.has(fieldName) || fieldInfo.fieldType === 'Formula' ? 'formula' : 'editable'}: ${fieldName} = "${fieldValue}"`);
+                }
+              }
+            }
+          } catch (error) {
+            console.error(`Error using XPath for ${fieldName}:`, error);
+          }
+        });
+      }
+      
+      // PHƯƠNG PHÁP 4: Tạo phần tử mới cho các trường còn lại
+      // Cập nhật danh sách trường còn lại sau khi đã áp dụng tất cả các phương pháp khác
+      const remainingFieldsAfterXPath = Object.keys(fieldValues).filter(fieldName => !processedFieldNames.has(fieldName));
+      
+      // Chỉ hiển thị phần "Các trường bổ sung" nếu còn trường chưa được xử lý
+      // và trường đó không phải là trường đã được hiển thị trong tài liệu
+      if (remainingFieldsAfterXPath.length > 0) {
+        console.log(`Vẫn còn ${remainingFieldsAfterXPath.length} trường thực sự chưa được xử lý, tạo phần tử mới...`);
+        
+        // Kiểm tra xem các trường còn lại có thực sự cần hiển thị không
+        const fieldsToShow = remainingFieldsAfterXPath.filter(fieldName => {
+          // Kiểm tra xem giá trị của trường này có xuất hiện trong tài liệu không
+          const fieldValue = fieldValues[fieldName].value?.trim();
+          if (!fieldValue) return true; // Nếu không có giá trị, vẫn hiển thị
+          
+          // Tìm kiếm tất cả text nodes trong document
+          const allTextContent = containerRef.current.textContent || '';
+          
+          // Nếu giá trị không xuất hiện trong tài liệu, hiển thị nó
+          return !allTextContent.includes(fieldValue);
+        });
+        
+        // Chỉ tạo container nếu có trường cần hiển thị
+        if (fieldsToShow.length > 0) {
+          // Tạo một div container để chứa các trường còn lại
+          const missingFieldsContainer = document.createElement('div');
+          missingFieldsContainer.className = 'missing-fields-container';
+          missingFieldsContainer.style.marginTop = '20px';
+          missingFieldsContainer.style.padding = '15px';
+          missingFieldsContainer.style.border = '1px solid #f0f0f0';
+          missingFieldsContainer.style.borderRadius = '8px';
+          missingFieldsContainer.style.backgroundColor = '#fafafa';
+          
+          const missingFieldsTitle = document.createElement('h3');
+          missingFieldsTitle.textContent = 'Các trường bổ sung';
+          missingFieldsTitle.style.marginBottom = '15px';
+          missingFieldsContainer.appendChild(missingFieldsTitle);
+          
+          // Tạo phần tử cho từng trường còn lại
+          let hasAddedFields = false;
+          fieldsToShow.forEach(fieldName => {
+            const fieldInfo = fieldValues[fieldName];
+            
+            const fieldContainer = document.createElement('div');
+            fieldContainer.style.marginBottom = '10px';
+            fieldContainer.style.display = 'flex';
+            fieldContainer.style.alignItems = 'center';
+            
+            const fieldLabel = document.createElement('label');
+            fieldLabel.textContent = `${fieldInfo.label || fieldName}: `;
+            fieldLabel.style.marginRight = '10px';
+            fieldLabel.style.fontWeight = 'bold';
+            fieldLabel.style.minWidth = '150px';
+            
+            fieldContainer.appendChild(fieldLabel);
+            
+            // Kiểm tra nếu là trường formula
+            if (formulaFieldNames.has(fieldName) || fieldInfo.fieldType === 'Formula') {
+              const formulaSpan = document.createElement('span');
+              formulaSpan.textContent = fieldInfo.value || '';
+              formulaSpan.classList.add('formula-field');
+              formulaSpan.contentEditable = false;
+              formulaSpan.dataset.fieldName = fieldName;
+              formulaSpan.dataset.originalValue = fieldInfo.value || '';
+              formulaSpan.dataset.isFormula = 'true';
+              formulaSpan.title = `${fieldInfo.label} - Trường tự động tính toán`;
+              
+              // Tìm công thức tương ứng
+              const formulaField = formulaFields.find(f => f.fieldName === fieldName);
+              if (formulaField) {
+                formulaSpan.dataset.formula = formulaField.formula || '';
+              }
+              
+              fieldContainer.appendChild(formulaSpan);
+              
+              editableElements.push({
+                element: formulaSpan,
+                fieldName,
+                originalValue: fieldInfo.value || '',
+                isFormula: true,
+                formula: formulaField?.formula || ''
+              });
+        } else {
+              const editableSpan = document.createElement('span');
+              editableSpan.textContent = fieldInfo.value || '';
+              editableSpan.classList.add('editable-field');
+              editableSpan.contentEditable = true;
+              editableSpan.dataset.fieldName = fieldName;
+              editableSpan.dataset.originalValue = fieldInfo.value || '';
+              editableSpan.title = `${fieldInfo.label} - Click để chỉnh sửa`;
+              
+              fieldContainer.appendChild(editableSpan);
+              
+              editableElements.push({
+                element: editableSpan,
+                fieldName,
+                originalValue: fieldInfo.value || ''
+              });
+            }
+            
+            missingFieldsContainer.appendChild(fieldContainer);
+            processedFieldNames.add(fieldName);
+            if (fieldInfo.value) {
+              processedValues.add(fieldInfo.value.trim());
+            }
+            
+            hasAddedFields = true;
+          });
+          
+          // Chỉ thêm container vào document nếu có trường được thêm vào
+          if (hasAddedFields) {
+            containerRef.current.appendChild(missingFieldsContainer);
+          }
+        } else {
+          console.log('Tất cả các trường đã xuất hiện trong tài liệu, không cần hiển thị phần bổ sung');
+        }
+      }
+      
+      // Tóm tắt kết quả
+      const formulaCount = editableElements.filter(el => el.isFormula).length;
+      const editableCount = editableElements.length - formulaCount;
+      
+      console.log(`Tổng cộng ${editableElements.length} phần tử được xử lý (${editableCount} có thể chỉnh sửa, ${formulaCount} trường công thức)`);
+      console.log(`Đã xử lý ${processedFieldNames.size}/${Object.keys(fieldValues).length} trường`);
+      
+      if (editableElements.length > 0) {
+        messageApi.success(`Đã tìm thấy ${editableCount} trường có thể chỉnh sửa trực tiếp${formulaCount > 0 ? ` và ${formulaCount} trường công thức` : ''}`);
+      } else {
+        messageApi.warning('Không tìm thấy trường nào có thể chỉnh sửa trực tiếp. Vui lòng thử lại.');
+      }
+      
+      // Lưu lại danh sách các phần tử đã chỉnh sửa để sau này thu thập giá trị
+      setEditableFields(editableElements);
+      
+      // Thêm sự kiện lắng nghe cho các trường có thể chỉnh sửa để cập nhật công thức
+      setupFormulaListeners(editableElements, formulaFields);
+      
     } catch (error) {
-      console.error('Error updating field values:', error);
-      messageApi.error('Có lỗi xảy ra khi cập nhật dữ liệu');
-    } finally {
-      setIsUpdating(false);
+      console.error('Lỗi khi làm document có thể chỉnh sửa:', error);
+      messageApi.error('Có lỗi khi bật chế độ chỉnh sửa');
+    }
+  };
+  
+  // Hàm thiết lập listeners để cập nhật giá trị công thức khi các trường liên quan thay đổi
+  const setupFormulaListeners = (editableElements, formulaFields) => {
+    if (!formulaFields || formulaFields.length === 0) return;
+    
+    // Tạo map các phần tử theo fieldName để dễ truy cập
+    const elementsMap = {};
+    editableElements.forEach(item => {
+      elementsMap[item.fieldName] = item;
+    });
+    
+    // Với mỗi trường công thức, tìm các trường liên quan và thiết lập listeners
+    formulaFields.forEach(formulaField => {
+      const formula = formulaField.formula;
+      const fieldName = formulaField.fieldName;
+      
+      // Bỏ qua nếu không có công thức
+      if (!formula) return;
+      
+      // Phân tích công thức để tìm các trường liên quan
+      // Tìm tất cả các mẫu [FieldName] trong công thức
+      const dependentFieldsMatch = formula.match(/\[([^\]]+)\]/g) || [];
+      const dependentFields = dependentFieldsMatch.map(match => match.slice(1, -1));
+      
+      console.log(`Formula ${fieldName} depends on:`, dependentFields);
+      
+      // Thiết lập listeners cho các trường liên quan
+      dependentFields.forEach(depField => {
+        const depElement = elementsMap[depField]?.element;
+        if (depElement) {
+          // Thêm event listener để cập nhật giá trị công thức khi trường liên quan thay đổi
+          depElement.addEventListener('input', () => {
+            updateFormulaValue(fieldName, formula, elementsMap);
+          });
+          
+          depElement.addEventListener('blur', () => {
+            updateFormulaValue(fieldName, formula, elementsMap);
+          });
+        }
+      });
+    });
+  };
+  
+  // Hàm tính toán và cập nhật giá trị cho trường công thức
+  const updateFormulaValue = (formulaFieldName, formula, elementsMap) => {
+    try {
+      // Lấy phần tử công thức cần cập nhật
+      const formulaElement = elementsMap[formulaFieldName]?.element;
+      if (!formulaElement) return;
+      
+      // Tạo một bản sao của công thức để thay thế các giá trị
+      let calculationFormula = formula;
+      
+      // Thay thế tất cả các [FieldName] bằng giá trị thực tế
+      const fieldMatches = formula.match(/\[([^\]]+)\]/g) || [];
+      
+      fieldMatches.forEach(match => {
+        const fieldName = match.slice(1, -1); // Loại bỏ [ và ]
+        const fieldElement = elementsMap[fieldName]?.element;
+        
+        if (fieldElement) {
+          const fieldValue = fieldElement.textContent.trim();
+          // Chỉ thay thế nếu là số hợp lệ
+          const numValue = parseFloat(fieldValue);
+          
+          if (!isNaN(numValue)) {
+            calculationFormula = calculationFormula.replace(match, numValue);
+      } else {
+            calculationFormula = calculationFormula.replace(match, 0);
+          }
+        } else {
+          // Nếu không tìm thấy phần tử, thay thế bằng 0
+          calculationFormula = calculationFormula.replace(match, 0);
+        }
+      });
+      
+      console.log(`Calculating formula: ${calculationFormula}`);
+      
+      // Tính toán kết quả (sử dụng eval với cẩn trọng)
+      // eslint-disable-next-line no-eval
+      const result = eval(calculationFormula);
+      
+      // Làm tròn đến 2 chữ số thập phân
+      const roundedResult = Math.round(result * 100) / 100;
+      
+      // Cập nhật giá trị hiển thị
+      formulaElement.textContent = roundedResult.toString();
+      
+      console.log(`Updated formula ${formulaFieldName} to ${roundedResult}`);
+      
+    } catch (error) {
+      console.error(`Error updating formula ${formulaFieldName}:`, error);
     }
   };
 
@@ -937,13 +1815,13 @@ const ViewFilledFormPage = () => {
               Quay lại
             </Button>
             <Title level={2} style={{ display: 'inline', margin: 0 }}>
-              {filledData.formName} - Đã điền
+              {filledData.formName} - {isEditMode ? 'Đang chỉnh sửa' : 'Đã điền'}
             </Title>
           </div>
           
           {/* Action Buttons */}
           <Space size="middle">
-            {filledData?.status === 'Draft' && (
+            {filledData?.status === 'Draft' && !isEditMode && (
               <>
                 <Button 
                   type="default"
@@ -975,6 +1853,27 @@ const ViewFilledFormPage = () => {
               </>
             )}
             
+            {isEditMode && (
+              <>
+                <Button 
+                  onClick={handleCancelEdit}
+                  size="large"
+                >
+                  Hủy
+                </Button>
+                <Button 
+                  type="primary"
+                  icon={<SaveOutlined />}
+                  onClick={handleSaveInlineEdit}
+                  loading={isUpdating}
+                  size="large"
+                >
+                  Lưu thay đổi
+                </Button>
+              </>
+            )}
+            
+            {!isEditMode && (
             <Button 
               type="primary" 
               icon={<DownloadOutlined />} 
@@ -985,6 +1884,7 @@ const ViewFilledFormPage = () => {
             >
               Tải xuống PDF
             </Button>
+            )}
           </Space>
         </div>
 
@@ -1025,6 +1925,21 @@ const ViewFilledFormPage = () => {
           }}>
             <Spin size="small" style={{ marginRight: '8px' }} />
             <Text>Đang xử lý dữ liệu vào Word document...</Text>
+          </div>
+        )}
+
+        {isEditMode && (
+          <div style={{
+            marginBottom: '16px',
+            padding: '12px 16px',
+            background: '#fffbe6',
+            border: '1px solid #ffe58f',
+            borderRadius: '8px',
+          }}>
+            <Text>
+              <strong>Chỉ dẫn: </strong>
+              Click vào các trường có viền màu xanh để chỉnh sửa trực tiếp. Sau khi hoàn thành, nhấn "Lưu thay đổi" để cập nhật.
+            </Text>
           </div>
         )}
 
@@ -1134,165 +2049,6 @@ const ViewFilledFormPage = () => {
             }}
           />
         </div>
-
-        {/* Edit Modal */}
-        <Modal
-          title="Chỉnh sửa dữ liệu form"
-          open={isEditModalVisible}
-          onCancel={() => setIsEditModalVisible(false)}
-          footer={null}
-          width={800}
-          maskClosable={false}
-        >
-          <Form
-            form={editForm}
-            layout="vertical"
-            onFinish={handleUpdateFieldValues}
-            style={{ maxHeight: '500px', overflowY: 'auto' }}
-            onValuesChange={(changedValues, allValues) => {
-              // Fetch form fields để lấy thông tin formula
-              formService.getFormFields(filledData.formId).then(response => {
-                if (response.statusCode === 200) {
-                  const formFields = response.data.fields;
-                  const formulaFields = formFields.filter(field => field.fieldType === 'Formula');
-                  
-                  // Tính toán giá trị cho các trường formula
-                  const newValues = { ...allValues };
-                  formulaFields.forEach(field => {
-                    newValues[field.fieldName] = calculateFormula(field.formula, allValues);
-                  });
-                  
-                  // Cập nhật form với các giá trị mới
-                  editForm.setFieldsValue(newValues);
-                }
-              });
-            }}
-          >
-            {filledData?.parsedFieldValues?.map((field, index) => {
-              const renderField = () => {
-                switch (field.fieldType) {
-                  case 'c': // Checkbox
-                    return (
-                      <Form.Item
-                        key={field.fieldName}
-                        name={field.fieldName}
-                        label={field.label || field.fieldName}
-                        valuePropName="checked"
-                      >
-                        <Checkbox>{field.label || field.fieldName}</Checkbox>
-                      </Form.Item>
-                    );
-                  
-                  case 'd': // Date
-                    return (
-                      <Form.Item
-                        key={field.fieldName}
-                        name={field.fieldName}
-                        label={field.label || field.fieldName}
-                      >
-                        <DatePicker 
-                          style={{ width: '100%' }}
-                          format="DD/MM/YYYY"
-                          placeholder="Chọn ngày"
-                        />
-                      </Form.Item>
-                    );
-                  
-                  case 'dt': // DateTime
-                    return (
-                      <Form.Item
-                        key={field.fieldName}
-                        name={field.fieldName}
-                        label={field.label || field.fieldName}
-                      >
-                        <DatePicker 
-                          showTime
-                          style={{ width: '100%' }}
-                          format="DD/MM/YYYY HH:mm"
-                          placeholder="Chọn ngày và giờ"
-                        />
-                      </Form.Item>
-                    );
-                  
-                  case 'n': // Number
-                    return (
-                      <Form.Item
-                        key={field.fieldName}
-                        name={field.fieldName}
-                        label={field.label || field.fieldName}
-                      >
-                        <Input 
-                          type="number" 
-                          placeholder={`Nhập ${field.label || field.fieldName}`}
-                        />
-                      </Form.Item>
-                    );
-                  
-                  case 's': // Select
-                    return (
-                      <Form.Item
-                        key={field.fieldName}
-                        name={field.fieldName}
-                        label={field.label || field.fieldName}
-                      >
-                        <Select 
-                          placeholder={`Chọn ${field.label || field.fieldName}`}
-                          allowClear
-                        >
-                          {/* Tạm thời để trống, có thể cần thêm options từ API */}
-                          <Select.Option value={field.value}>{field.value}</Select.Option>
-                        </Select>
-                      </Form.Item>
-                    );
-                  
-                  case 'Formula': // Formula field
-                    return (
-                      <Form.Item
-                        key={field.fieldName}
-                        name={field.fieldName}
-                        label={field.fieldDescription || field.fieldName}
-                      >
-                        <Input 
-                          readOnly
-                          style={{ backgroundColor: '#f5f5f5' }}
-                        />
-                      </Form.Item>
-                    );
-                  
-                  default: // Text
-                    return (
-                      <Form.Item
-                        key={field.fieldName}
-                        name={field.fieldName}
-                        label={field.label || field.fieldName}
-                      >
-                        <Input 
-                          placeholder={`Nhập ${field.label || field.fieldName}`}
-                        />
-                      </Form.Item>
-                    );
-                }
-              };
-
-              return renderField();
-            })}
-            
-            <Form.Item style={{ marginTop: '24px', textAlign: 'right' }}>
-              <Space>
-                <Button onClick={() => setIsEditModalVisible(false)}>
-                  Hủy
-                </Button>
-                <Button 
-                  type="primary" 
-                  htmlType="submit" 
-                  loading={isUpdating}
-                >
-                  Cập nhật
-                </Button>
-              </Space>
-            </Form.Item>
-          </Form>
-        </Modal>
       </div>
     </AppLayout>
   );

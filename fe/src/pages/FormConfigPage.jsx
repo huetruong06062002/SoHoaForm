@@ -72,8 +72,8 @@ const FormConfigPage = () => {
   // Thêm hàm helper để lấy initial value cho formula
   const getInitialFormulaValue = (field) => {
     if (!field.formula) return "";
-    // Nếu là Select và có formula pattern {s_...} thì trả về "C"
-    if (field.fieldType === "Select" && isTemplatePattern(field.formula)) return "C";
+    // Nếu là Select và có formula pattern {s_...} thì trả về "N/A" và "C"
+    if (field.fieldType === "Select" && isTemplatePattern(field.formula)) return "N/A\nC";
     if (isTemplatePattern(field.formula)) return "";
     return field.formula;
   };
@@ -93,7 +93,7 @@ const FormConfigPage = () => {
           initialValues[`formula_${field.formFieldId}`] = getInitialFormulaValue(field);
           initialValues[`options_${field.formFieldId}`] = 
             field.fieldType === "Select" ? 
-              (isTemplatePattern(field.formula) ? "C" : getInitialFormulaValue(field)) : 
+              (isTemplatePattern(field.formula) ? "N/A\nC" : getInitialFormulaValue(field)) : 
               "";
           initialValues[`dependentVariables_${field.formFieldId}`] = 
             field.fieldType === "Boolean" ? getInitialFormulaValue(field) : "";
@@ -680,7 +680,7 @@ const FormConfigPage = () => {
                           Danh sách lựa chọn (mỗi dòng 1 lựa chọn):
                           <div style={{ fontSize: "12px", color: "#1890ff", marginTop: "4px" }}>
                             {record.fieldType === "Select" && isTemplatePattern(record.formula) ? (
-                              "Giá trị mặc định: C"
+                              "Giá trị mặc định: N/A, C"
                             ) : (
                               "Thêm các lựa chọn của bạn ở đây"
                             )}
@@ -702,7 +702,7 @@ const FormConfigPage = () => {
                       <TextArea
                         rows={4}
                         placeholder={record.fieldType === "Select" && isTemplatePattern(record.formula) ? 
-                          "C" : 
+                          "N/A\nC" : 
                           "Nhập mỗi lựa chọn trên một dòng"}
                       />
                     </Form.Item>
