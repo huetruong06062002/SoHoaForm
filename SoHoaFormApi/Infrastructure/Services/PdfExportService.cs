@@ -91,7 +91,7 @@ namespace SoHoaFormApi.Infrastructure.Services
                     };
                 }
 
-                // 🔍 DEBUG: Lấy field values từ API với logging chi tiết
+
                 List<FieldValueDto> fieldValues = new List<FieldValueDto>();
                 try
                 {
@@ -319,7 +319,6 @@ namespace SoHoaFormApi.Infrastructure.Services
                 if (fieldValues.Any())
                 {
                     await Task.Run(() => FillWordTemplateWithOffice(doc, fieldValues));
-                    // await Task.Run(() => AddDataToWordDocumentWithOffice(doc, form, fieldValues));
                 }
 
                 var tempPdfPath = Path.Combine(Path.GetTempPath(), $"temp_office_export_{Guid.NewGuid()}.pdf");
@@ -420,8 +419,8 @@ namespace SoHoaFormApi.Infrastructure.Services
         var radioCount = 0;
                     foreach (System.Text.RegularExpressions.Match match in matches)
                     {
-                        var placeholder = match.Value; // Full placeholder như {c_Purser}
-                        var fieldKey = match.Groups[1].Value; // Chỉ lấy phần trong {} như c_Purser
+                        var placeholder = match.Value; 
+                        var fieldKey = match.Groups[1].Value; 
 
                         // Bỏ qua nếu đã xử lý
                         if (processedPlaceholders.Contains(placeholder))
@@ -704,26 +703,46 @@ namespace SoHoaFormApi.Infrastructure.Services
         {
             try
             {
-                Console.WriteLine("🔄 Sử dụng Spire.Doc để fill data...");
+                Console.WriteLine("🔄 Sử dụng Spire.Doc để fill data vào template...");
 
                 var document = new Spire.Doc.Document();
                 document.LoadFromFile(wordFilePath);
 
                 HelperClass.SetupUnicodeFonts(document);
 
-                // 🎯 LUÔN CLEAN PLACEHOLDER - DÙ CÓ DATA HAY KHÔNG
-                await Task.Run(() => CleanAllPlaceholders(document, fieldValues ?? new List<FieldValueDto>()));
-
-                // Chỉ add data table nếu có data
+                // ✅ CHỈ FILL DATA VÀO TEMPLATE - KHÔNG THÊM DATA TABLE
                 if (fieldValues?.Any() == true)
                 {
-                    // await Task.Run(() => AddDataToWordDocumentWithSpire(document, form, fieldValues));
+                    Console.WriteLine($"🎯 Filling template với {fieldValues.Count} field values...");
+                    await Task.Run(() => FillWordTemplateWithSpire(document, fieldValues));
+                }
+                else
+                {
+                    Console.WriteLine("⚠️ No field values - chỉ clean placeholders");
+                    await Task.Run(() => CleanAllPlaceholders(document, fieldValues ?? new List<FieldValueDto>()));
+                }
+
+                // ✅ KIỂM TRA SAU KHI FILL
+                Console.WriteLine("🔍 Checking remaining placeholders after fill...");
+                var remainingText = document.GetText();
+                var remainingMatches = new System.Text.RegularExpressions.Regex(@"\{([^}]+)\}").Matches(remainingText);
+                if (remainingMatches.Count > 0)
+                {
+                    Console.WriteLine($"⚠️ Still have {remainingMatches.Count} unreplaced placeholders:");
+                    foreach (System.Text.RegularExpressions.Match match in remainingMatches.Cast<System.Text.RegularExpressions.Match>().Take(10))
+                    {
+                        Console.WriteLine($"  - {match.Value}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("✅ All placeholders have been replaced");
                 }
 
                 using (var stream = new MemoryStream())
                 {
                     document.SaveToStream(stream, FileFormat.PDF);
-                    Console.WriteLine("✅ Spire.Doc conversion với data fill thành công");
+                    Console.WriteLine("✅ Spire.Doc conversion thành công");
                     return stream.ToArray();
                 }
             }
@@ -740,7 +759,12 @@ namespace SoHoaFormApi.Infrastructure.Services
                 Console.WriteLine($"🧹 Processing ALL placeholders with {fieldValues.Count} field values...");
 
                 // 1. TẠO DICTIONARY TỪ FIELD VALUES
-                var fieldDict = fieldValues.ToDictionary(f => f.FieldName, f => f.Value?.ToString() ?? "");
+                 var fieldDict = fieldValues
+            .GroupBy(f => f.FieldName)
+            .ToDictionary(
+                g => g.Key, 
+                g => g.Last().Value?.ToString() ?? ""
+            );
 
                 // 2. TÌM TẤT CẢ PLACEHOLDER TRONG DOCUMENT
                 var documentText = document.GetText();
@@ -769,42 +793,36 @@ namespace SoHoaFormApi.Infrastructure.Services
                     var replacementValue = GetReplacementValue(fieldKey, fieldDict);
 
                     // 4. BẮT BUỘC THAY THẾ - DÙNG NHIỀU PHƯƠNG PHÁP
-                    var replaceSuccess = false;
-
-                    // Method 1: Standard replace
                     var replaceCount = document.Replace(placeholder, replacementValue, true, true);
+
                     if (replaceCount > 0)
                     {
-                        Console.WriteLine($"  ✅ Standard replace: {placeholder} → '{replacementValue}' ({replaceCount} times)");
-                        replaceSuccess = true;
+                        Console.WriteLine($"  ✅ Replaced: {placeholder} → '{replacementValue}' ({replaceCount} times)");
                         if (string.IsNullOrEmpty(replacementValue)) emptyCount++; else successCount++;
                     }
                     else
                     {
-                        // Method 2: Case insensitive
+                        // Thử case insensitive
                         var replaceCount2 = document.Replace(placeholder, replacementValue, false, true);
                         if (replaceCount2 > 0)
                         {
                             Console.WriteLine($"  ✅ Case insensitive: {placeholder} → '{replacementValue}' ({replaceCount2} times)");
-                            replaceSuccess = true;
                             if (string.IsNullOrEmpty(replacementValue)) emptyCount++; else successCount++;
                         }
                         else
                         {
-                            // Method 3: Force manual replace
+                            // Manual replace cho những trường hợp đặc biệt
                             var manualCount = ForceManualReplace(document, placeholder, replacementValue);
                             if (manualCount > 0)
                             {
                                 Console.WriteLine($"  🔧 Manual replace: {placeholder} → '{replacementValue}' ({manualCount} times)");
-                                replaceSuccess = true;
                                 if (string.IsNullOrEmpty(replacementValue)) emptyCount++; else successCount++;
                             }
+                            else
+                            {
+                                Console.WriteLine($"  ❌ FAILED to replace: {placeholder}");
+                            }
                         }
-                    }
-
-                    if (!replaceSuccess)
-                    {
-                        Console.WriteLine($"  ❌ ALL METHODS FAILED for: {placeholder}");
                     }
 
                     processedPlaceholders.Add(placeholder);
@@ -894,55 +912,95 @@ namespace SoHoaFormApi.Infrastructure.Services
             {
                 Console.WriteLine($"🎯 Starting to fill Word template with {fieldValues.Count} field values...");
 
-                // Tạo dictionary để lookup nhanh
-                var fieldDict = fieldValues.ToDictionary(f => f.FieldName, f => f.Value?.ToString() ?? "");
+                // GROUP BY FIELD NAME VÀ LẤY VALUE CUỐI CÙNG
+                 var fieldDict = fieldValues
+                .GroupBy(f => f.FieldName)
+                .ToDictionary(
+                    g => g.Key, 
+                    g => g.Last().Value?.ToString() ?? ""
+                );
 
-                Console.WriteLine($"📚 Created field dictionary with {fieldDict.Count} entries");
+                Console.WriteLine($"📚 Field dictionary entries:");
+                foreach (var kvp in fieldDict.Take(10))
+                {
+                    Console.WriteLine($"  - '{kvp.Key}': '{kvp.Value}'");
+                }
 
-                // Fill Find & Replace cho các placeholder
+                // 1. TÌM TẤT CẢ PLACEHOLDER TRONG DOCUMENT
+                var documentText = document.GetText();
+                var placeholderPattern = @"\{([^}]+)\}";
+                var regex = new System.Text.RegularExpressions.Regex(placeholderPattern);
+                var matches = regex.Matches(documentText);
+
+                Console.WriteLine($"🔍 Found {matches.Count} placeholders in document:");
+                foreach (System.Text.RegularExpressions.Match match in matches.Cast<System.Text.RegularExpressions.Match>().Take(10))
+                {
+                    Console.WriteLine($"  - {match.Value}");
+                }
+
+                var processedPlaceholders = new HashSet<string>();
                 int successCount = 0;
                 int failCount = 0;
 
-                foreach (var field in fieldValues)
+                foreach (System.Text.RegularExpressions.Match match in matches)
                 {
-                    try
+                    var placeholder = match.Value; // Full placeholder như {X_TraineeName}
+                    var fieldKey = match.Groups[1].Value; // Chỉ lấy phần trong {} như X_TraineeName
+
+                    // Bỏ qua nếu đã xử lý
+                    if (processedPlaceholders.Contains(placeholder))
+                        continue;
+
+                    Console.WriteLine($"🔍 Processing placeholder: {placeholder}");
+
+                    // 2. LẤY REPLACEMENT VALUE
+                    var replacementValue = GetReplacementValue(fieldKey, fieldDict);
+
+                    // 3. THAY THẾ VỚI NHIỀU PHƯƠNG PHÁP
+                    var replaceCount = 0;
+
+                    // Method 1: Standard replace
+                    replaceCount = document.Replace(placeholder, replacementValue, true, true);
+                    if (replaceCount > 0)
                     {
-                        var placeholder = $"{{{field.FieldName}}}"; // {TraineeName}, {TraineeID}, etc.
-                        var value = FormatFieldValue(field);
-
-                        Console.WriteLine($"🔍 Attempting to replace: {placeholder} → {value}");
-
-                        // Find & Replace với Spire.Doc
-                        var replaceCount = document.Replace(placeholder, value, true, true);
-
+                        Console.WriteLine($"  ✅ Standard replace: {placeholder} → '{replacementValue}' ({replaceCount} times)");
+                        successCount++;
+                    }
+                    else
+                    {
+                        // Method 2: Case insensitive
+                        replaceCount = document.Replace(placeholder, replacementValue, false, true);
                         if (replaceCount > 0)
                         {
-                            Console.WriteLine($"  ✅ Successfully replaced {placeholder} = {value} ({replaceCount} replacements)");
+                            Console.WriteLine($"  ✅ Case insensitive: {placeholder} → '{replacementValue}' ({replaceCount} times)");
                             successCount++;
                         }
                         else
                         {
-                            Console.WriteLine($"  ⚠️ Placeholder {placeholder} not found in document");
-                            failCount++;
+                            // Method 3: Manual replace
+                            var manualCount = ForceManualReplace(document, placeholder, replacementValue);
+                            if (manualCount > 0)
+                            {
+                                Console.WriteLine($"  🔧 Manual replace: {placeholder} → '{replacementValue}' ({manualCount} times)");
+                                successCount++;
+                            }
+                            else
+                            {
+                                Console.WriteLine($"  ❌ FAILED to replace: {placeholder}");
+                                failCount++;
+                            }
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"  ❌ Error replacing {field.FieldName}: {ex.Message}");
-                        failCount++;
-                    }
+
+                    processedPlaceholders.Add(placeholder);
                 }
 
-                Console.WriteLine($"📊 Replacement summary: {successCount} success, {failCount} failed");
-
-                // Fill special checkbox logic
-                FillCheckboxLogicWithSpire(document, fieldDict);
-
-                Console.WriteLine("✅ Spire.Doc template fill completed");
+                Console.WriteLine($"📊 Template fill summary: {successCount} success, {failCount} failed");
+                Console.WriteLine("✅ Word template fill completed");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Error filling Word template with Spire.Doc: {ex.Message}");
+                Console.WriteLine($"❌ Error filling Word template: {ex.Message}");
                 Console.WriteLine($"❌ Stack trace: {ex.StackTrace}");
                 throw;
             }
@@ -1029,110 +1087,94 @@ namespace SoHoaFormApi.Infrastructure.Services
         {
             try
             {
+                Console.WriteLine($"🔍 Getting replacement for: '{fieldKey}'");
+
                 // Phân tích prefix để xác định loại field
+                // ✅ HANDLE X_ PREFIX (có thể là prefix tùy chỉnh)
+                if (fieldKey.StartsWith("X_"))
+                {
+                    var actualFieldName = fieldKey.Substring(2); // Bỏ "X_"
+                    var value = fieldDict.GetValueOrDefault(actualFieldName, "");
+                    Console.WriteLine($"  🔤 X_ field: {actualFieldName} = '{value}'");
+                    return value;
+                }
                 if (fieldKey.StartsWith("c_") || fieldKey.StartsWith("b_"))
-                {// Checkbox/Boolean field
-                    var actualFieldName = fieldKey.Substring(2); // Bỏ "c_" hoặc "b_"
-                    Console.WriteLine($"  🔍 Checkbox field: {actualFieldName}");
-
+                {
+                    // Checkbox/Boolean field
+                    var actualFieldName = fieldKey.Substring(2);
                     var value = fieldDict.GetValueOrDefault(actualFieldName, "false");
-                    Console.WriteLine($"  📊 Raw value: '{value}'");
 
-                    // ✅ SỬA LẠI LOGIC CHECKBOX
-                    bool isChecked = false;
-
-                    // Kiểm tra nhiều format
-                    if (bool.TryParse(value, out var boolValue))
-                    {
-                        isChecked = boolValue;
-                    }
-                    else if (value.ToLower() == "true" || value == "1" || value.ToLower() == "yes")
-                    {
-                        isChecked = true;
-                    }
-                    else if (value.ToLower() == "false" || value == "0" || value.ToLower() == "no" || string.IsNullOrEmpty(value))
-                    {
-                        isChecked = false;
-                    }
-
+                    bool isChecked = HelperClass.ParseBooleanValue(value);
                     var result = isChecked ? "☑" : "☐";
-                    Console.WriteLine($"  ✅ Checkbox result: {value} → {result} (isChecked: {isChecked})");
+
+                    Console.WriteLine($"  ☑ Checkbox: {actualFieldName} = '{value}' → {result}");
                     return result;
                 }
-                else if (fieldKey.StartsWith("rd_"))
+                else if (fieldKey.StartsWith("rd_") || fieldKey.StartsWith("r_"))
                 {
-                    // Radio box field
-                    var actualFieldName = fieldKey.Substring(3); // Bỏ "rd_"
-                    Console.WriteLine($"  📻 Radio field: {actualFieldName}");
-
+                    // Radio field
+                    var actualFieldName = fieldKey.Substring(fieldKey.IndexOf('_') + 1);
                     var value = fieldDict.GetValueOrDefault(actualFieldName, "false");
-                    Console.WriteLine($"  📊 Raw radio value: '{value}'");
 
-                    bool isSelected = false;
+                    bool isSelected = HelperClass.ParseBooleanValue(value);
+                    var result = isSelected ? "●" : "○";
 
-                    // Kiểm tra nhiều format cho radio selection
-                    if (bool.TryParse(value, out var boolValue))
-                    {
-                        isSelected = boolValue;
-                    }
-                    else if (value.ToLower() == "true" || value == "1" || value.ToLower() == "yes" || value.ToLower() == "selected")
-                    {
-                        isSelected = true;
-                    }
-                    else if (value.ToLower() == "false" || value == "0" || value.ToLower() == "no" || string.IsNullOrEmpty(value))
-                    {
-                        isSelected = false;
-                    }
-
-                    var result = isSelected ? "●" : "○"; // Radio selected: ● , unselected: ○
-                    Console.WriteLine($"  ✅ Radio result: {value} → {result} (isSelected: {isSelected})");
+                    Console.WriteLine($"  📻 Radio: {actualFieldName} = '{value}' → {result}");
                     return result;
                 }
                 else if (fieldKey.StartsWith("t_"))
                 {
                     // Text field
-                    var actualFieldName = fieldKey.Substring(2); // Bỏ "t_"
-                    return fieldDict.GetValueOrDefault(actualFieldName, ""); // Luôn trả về, có thể rỗng
+                    var actualFieldName = fieldKey.Substring(2);
+                    var value = fieldDict.GetValueOrDefault(actualFieldName, "");
+                    Console.WriteLine($"  📝 Text: {actualFieldName} = '{value}'");
+                    return value;
                 }
-                else if (fieldKey.StartsWith("n_"))
+                else if (fieldKey.StartsWith("n_") || fieldKey.StartsWith("f_"))
                 {
-                    // Number/Numeric field
-                    var actualFieldName = fieldKey.Substring(2); // Bỏ "n_"
-                    return fieldDict.GetValueOrDefault(actualFieldName, ""); // Luôn trả về, có thể rỗng
+                    // Number field
+                    var actualFieldName = fieldKey.Substring(2);
+                    var value = fieldDict.GetValueOrDefault(actualFieldName, "");
+                    Console.WriteLine($"  🔢 Number: {actualFieldName} = '{value}'");
+                    return value;
                 }
-                else if (fieldKey.StartsWith("f_"))
-                {
-                    var actualFieldName = fieldKey.Substring(2); // Bỏ "f_"
-                    return fieldDict.GetValueOrDefault(actualFieldName, ""); // Luôn trả về, có thể rỗng
-                }
-                else if (fieldKey.StartsWith("dt_") || fieldKey.StartsWith("d_"))
+                else if (fieldKey.StartsWith("d_") || fieldKey.StartsWith("dt_"))
                 {
                     // Date field
-                    var actualFieldName = fieldKey.Substring(fieldKey.IndexOf('_') + 1);
+                    var prefixLength = fieldKey.StartsWith("dt_") ? 3 : 2;
+                    var actualFieldName = fieldKey.Substring(prefixLength);
                     var dateValue = fieldDict.GetValueOrDefault(actualFieldName, "");
 
                     if (!string.IsNullOrEmpty(dateValue) && DateTime.TryParse(dateValue, out var date))
                     {
-                        return date.ToString("dd/MM/yyyy");
+                        var formatted = date.ToString("dd/MM/yyyy");
+                        Console.WriteLine($"  📅 Date: {actualFieldName} = '{dateValue}' → {formatted}");
+                        return formatted;
                     }
-                    return ""; // Trả về rỗng thay vì giá trị gốc
+
+                    Console.WriteLine($"  📅 Date: {actualFieldName} = '{dateValue}' (raw)");
+                    return dateValue;
                 }
                 else if (fieldKey.StartsWith("s_"))
                 {
                     // Select field
                     var actualFieldName = fieldKey.Substring(2);
-                    return fieldDict.GetValueOrDefault(actualFieldName, ""); // Luôn trả về, có thể rỗng
+                    var value = fieldDict.GetValueOrDefault(actualFieldName, "");
+                    Console.WriteLine($"  📋 Select: {actualFieldName} = '{value}'");
+                    return value;
                 }
                 else
                 {
-                    // Không có prefix, thử trực tiếp
-                    return fieldDict.GetValueOrDefault(fieldKey, ""); // Luôn trả về, có thể rỗng
+                    // Không có prefix - thử trực tiếp
+                    var value = fieldDict.GetValueOrDefault(fieldKey, "");
+                    Console.WriteLine($"  🔧 Direct: {fieldKey} = '{value}'");
+                    return value;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Error getting replacement for {fieldKey}: {ex.Message}");
-                return ""; // Trả về rỗng khi có lỗi
+                Console.WriteLine($"❌ Error processing {fieldKey}: {ex.Message}");
+                return "";
             }
         }
 
@@ -1367,27 +1409,27 @@ namespace SoHoaFormApi.Infrastructure.Services
 
 
                     case "radio":
-            case "radiobox":
-            case "rd":
-            case "r":
-                bool isSelected = false;
-                
-                if (bool.TryParse(value, out var radioBoolValue))
-                {
-                    isSelected = radioBoolValue;
-                }
-                else if (value.ToLower() == "true" || value == "1" || value.ToLower() == "yes" || value.ToLower() == "selected")
-                {
-                    isSelected = true;
-                }
-                else if (value.ToLower() == "false" || value == "0" || value.ToLower() == "no" || string.IsNullOrEmpty(value))
-                {
-                    isSelected = false;
-                }
-                
-                var radioResult = isSelected ? "●" : "○"; // Radio selected: ● , unselected: ○
-                Console.WriteLine($"  📻 Radio formatted: {value} → {radioResult} (isSelected: {isSelected})");
-                return radioResult;    
+                    case "radiobox":
+                    case "rd":
+                    case "r":
+                        bool isSelected = false;
+
+                        if (bool.TryParse(value, out var radioBoolValue))
+                        {
+                            isSelected = radioBoolValue;
+                        }
+                        else if (value.ToLower() == "true" || value == "1" || value.ToLower() == "yes" || value.ToLower() == "selected")
+                        {
+                            isSelected = true;
+                        }
+                        else if (value.ToLower() == "false" || value == "0" || value.ToLower() == "no" || string.IsNullOrEmpty(value))
+                        {
+                            isSelected = false;
+                        }
+
+                        var radioResult = isSelected ? "●" : "○"; // Radio selected: ● , unselected: ○
+                        Console.WriteLine($"  📻 Radio formatted: {value} → {radioResult} (isSelected: {isSelected})");
+                        return radioResult;
 
                     case "select":
                     case "dropdown":

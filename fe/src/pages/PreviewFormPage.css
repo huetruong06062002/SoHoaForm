@@ -1167,3 +1167,67 @@ input[type="checkbox"] {
     box-shadow: 0 0 0 1px #000;
   }
 }
+
+/* Fix for numbered lists in table cells */
+td ol {
+  counter-reset: none;
+  list-style-type: none !important;
+  padding-left: 20px;
+  margin: 0;
+}
+
+td li {
+  counter-increment: none;
+  position: relative;
+  display: block !important;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+/* Force proper display of ordered lists */
+ol {
+  list-style-type: none !important;
+  padding-left: 20px !important;
+  margin: 0 !important;
+  counter-reset: none !important;
+}
+
+li {
+  display: block !important;
+  margin-bottom: 8px !important;
+  line-height: 1.4 !important;
+  counter-increment: none !important;
+}
+
+/* Special fix for the specific case in screenshots */
+table td {
+  counter-reset: none;
+}
+
+table td span:first-line:contains("1."),
+table td p:first-line:contains("1.") {
+  counter-increment: none;
+  position: relative;
+}
+
+/* Override the display of "1." at the beginning of lines */
+table td span:first-line:contains("1.")::before,
+table td p:first-line:contains("1.")::before {
+  content: none;
+  font-weight: normal;
+  margin-right: 0;
+}
+
+/* Hide the original "1." */
+table td span:first-line:contains("1.") span:first-child,
+table td p:first-line:contains("1.") span:first-child {
+  visibility: visible;
+  width: auto;
+  display: inline;
+}
+
+/* Force list-style-position to be outside */
+ol, ul {
+  list-style-position: outside !important;
+  list-style-type: none !important;
+}

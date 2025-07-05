@@ -22,10 +22,15 @@ const formService = {
   },
 
   getWordFile: async (formId) => {
-    const response = await apiClient.get(`/User/form/${formId}/word-file`, {
-      responseType: 'blob'
-    });
-    return response.data;
+    try {
+      const response = await apiClient.get(`/User/form/${formId}/word-file`, {
+        responseType: 'arraybuffer'
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting Word file:', error);
+      throw error;
+    }
   },
 
   // API để lấy file Word đã điền với dữ liệu thực tế

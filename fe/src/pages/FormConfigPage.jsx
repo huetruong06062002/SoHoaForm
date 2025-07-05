@@ -44,6 +44,7 @@ const FormConfigPage = () => {
   const [fields, setFields] = useState([]);
   const [expandedRowKeys, setExpandedRowKeys] = useState([]);
   const [configChanges, setConfigChanges] = useState({});
+  const [selectWarnings, setSelectWarnings] = useState({});
 
   const getRandomFieldsExample = (currentRecord) => {
     // Lấy các field khác currentRecord để làm ví dụ
@@ -286,13 +287,28 @@ const FormConfigPage = () => {
         originalFormula: record.formula,
       });
 
+      // Xử lý đặc biệt cho trường Select với template pattern
+      const isSelectWithTemplate = record.fieldType === "Select" && isTemplatePattern(record.formula);
+      const defaultSelectValue = "N/A\nC";
+      const hasSelectValueChanged = isSelectWithTemplate && 
+        (options === undefined || options === null || options.trim() !== defaultSelectValue);
+      
+      // Kiểm tra nếu người dùng xóa hết dữ liệu trong trường Select
+      if (record.fieldType === "Select" && isSelectWithTemplate && 
+          (options === "" || (options && options.trim() === ""))) {
+        // Hiển thị thông báo xác nhận
+        message.info("Khi xóa hết dữ liệu, giá trị mặc định sẽ là N/A và C");
+      }
+
       // Kiểm tra nếu không có thay đổi nào
       if (
         isRequired === record.isRequired &&
         ((record.fieldType !== "Text" && record.fieldType !== "Textarea") ||
           isUpperCase === record.isUpperCase) &&
-        (record.fieldType !== "Select" || !options || options.trim() === record.formula) &&
-        (record.fieldType !== "Formula" || !formula || formula.trim() === record.formula)
+        (record.fieldType !== "Select" || 
+          (!isSelectWithTemplate && (options === undefined || options === null || options.trim() === record.formula))) &&
+        (record.fieldType !== "Formula" || !formula || formula.trim() === record.formula) &&
+        !hasSelectValueChanged
       ) {
         message.info("Không có thay đổi nào để lưu");
         return;
@@ -333,19 +349,27 @@ const FormConfigPage = () => {
       }
 
       // Gọi API updateSelectOptions nếu là field Select và có thay đổi options
-      if (record.fieldType === "Select" && options && options.trim() !== record.formula) {
+      if (record.fieldType === "Select" && 
+          (hasSelectValueChanged || 
+           (!isSelectWithTemplate && options && options.trim() !== record.formula))) {
         console.log("Updating select options...");
-        if (!options) {
-          message.warning("Vui lòng nhập các lựa chọn");
-          return;
+        
+        // Cho phép options trống (xóa các lựa chọn mặc định)
+        let optionsToSave = options || "";
+        
+        // Nếu là trường Select với template pattern và người dùng xóa hết dữ liệu, đặt lại giá trị mặc định
+        if (isSelectWithTemplate && (optionsToSave === "" || optionsToSave.trim() === "")) {
+          optionsToSave = defaultSelectValue;
+          message.info("Đã đặt lại giá trị mặc định N/A và C");
         }
-        console.log("options", options);
+        
+        console.log("options", optionsToSave);
 
         const selectResponse = await formService.updateSelectOptions(
           formId,
           record.fieldId,
           {
-            options
+            options: optionsToSave
           }
         );
         if (selectResponse.statusCode !== 200) {
@@ -389,21 +413,25 @@ const FormConfigPage = () => {
                 ...field,
                 isRequired: isRequired,
                 isUpperCase: isUpperCase,
-                formula: record.fieldType === "Select" && options ? 
-                  options.split('\n')
-                    .map(opt => opt.trim())
-                    .filter(opt => opt)
-                    .map(opt => `"${opt}"`)
-                    .join(',')
+                formula: record.fieldType === "Select" && (options !== undefined) ? 
+                  (options === "" && isSelectWithTemplate ? defaultSelectValue : 
+                    (options === "" ? "" : 
+                      options.split('\n')
+                        .map(opt => opt.trim())
+                        .filter(opt => opt)
+                        .map(opt => `"${opt}"`)
+                        .join(',')))
                   : record.fieldType === "Formula" && formula ?
                     formula.trim()
                     : field.formula,
-                options: record.fieldType === "Select" && options ? 
-                  options.split('\n')
-                    .map(opt => opt.trim())
-                    .filter(opt => opt)
-                    .map(opt => `"${opt}"`)
-                    .join(',')
+                options: record.fieldType === "Select" && (options !== undefined) ? 
+                  (options === "" && isSelectWithTemplate ? defaultSelectValue : 
+                    (options === "" ? "" : 
+                      options.split('\n')
+                        .map(opt => opt.trim())
+                        .filter(opt => opt)
+                        .map(opt => `"${opt}"`)
+                        .join(',')))
                   : field.options
               }
             : field
@@ -704,8 +732,60 @@ const FormConfigPage = () => {
                         placeholder={record.fieldType === "Select" && isTemplatePattern(record.formula) ? 
                           "N/A\nC" : 
                           "Nhập mỗi lựa chọn trên một dòng"}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          console.log("TextArea onChange:", {
+                            fieldName: record.fieldName,
+                            value: value,
+                            isEmpty: !value || value.trim() === "",
+                            isTemplate: isTemplatePattern(record.formula),
+                            formula: record.formula
+                          });
+                          
+                          // Kiểm tra nếu người dùng xóa hết dữ liệu
+                          if (!value || value.trim() === "") {
+                            // Kiểm tra nếu là trường Select
+                            if (record.fieldType === "Select") {
+                              // Hiển thị cảnh báo trong state
+                              setSelectWarnings(prev => ({
+                                ...prev,
+                                [record.formFieldId]: true
+                              }));
+                              // Hiển thị thông báo
+                              message.warning(`Lưu ý: Khi xóa hết dữ liệu ở trường "${record.fieldName}", giá trị mặc định sẽ là N/A và C`, 5);
+                            }
+                          } else {
+                            // Xóa cảnh báo nếu có giá trị
+                            setSelectWarnings(prev => ({
+                              ...prev,
+                              [record.formFieldId]: false
+                            }));
+                          }
+                          
+                          // Đánh dấu có thay đổi để hiển thị nút lưu
+                          setConfigChanges((prev) => ({
+                            ...prev,
+                            [record.formFieldId]: true,
+                          }));
+                        }}
                       />
                     </Form.Item>
+                    {selectWarnings[record.formFieldId] && (
+                      <div style={{ 
+                        color: '#ff4d4f', 
+                        backgroundColor: '#fff2f0', 
+                        border: '1px solid #ffccc7',
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        marginBottom: '12px',
+                        fontSize: '13px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}>
+                        <InfoCircleOutlined style={{ marginRight: '8px', color: '#ff4d4f' }} />
+                        Lưu ý: Khi xóa hết dữ liệu, giá trị mặc định sẽ là N/A và C
+                      </div>
+                    )}
                     <div style={{ marginTop: "16px" }}>
                       <Form.Item
                         name={`isRequired_${record.formFieldId}`}
@@ -861,7 +941,7 @@ const FormConfigPage = () => {
         } else if (record.fieldType?.toLowerCase() === "formula") {
           description = "Tính toán tự động";
         } else if (record.fieldType?.toLowerCase() === "select") {
-          description = "Chọn từ danh sách (Bắt buộc)";
+          description = "Chọn từ danh sách";
         } else {
           description = "Văn bản tự do";
         }

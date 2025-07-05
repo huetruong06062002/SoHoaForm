@@ -12,7 +12,6 @@ import FormConfigPage from './pages/FormConfigPage';
 import PreviewFormPage from './pages/PreviewFormPage';
 import AllFormPage from './pages/AllFormPage';
 import FormHistoryPage from './pages/FormHistoryPage';
-import AssessmentForm from './components/AssessmentForm';
 import ViewFilledFormPage from './pages/ViewFilledFormPage';
 import FillFormPage from './pages/FillFormPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';

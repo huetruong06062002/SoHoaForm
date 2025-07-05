@@ -139,6 +139,7 @@ public class AdminService : IAdminService
       };
 
       await _unitOfWork._formRepository.AddAsync(newForm);
+      await _unitOfWork.SaveChangesAsync();
       var formFieldsCreated = await ProcessWordFileAndCreateFields(request.WordFile, newForm.Id);
       await _unitOfWork.SaveChangesAsync();
       await _unitOfWork.CommitTransaction();
@@ -178,27 +179,38 @@ public class AdminService : IAdminService
   }
 
   //Xử lý đọc file word và tạo feilds
-  private async Task<int> ProcessWordFileAndCreateFields(IFormFile wordFile, Guid formId)
+  private async Task<int>  ProcessWordFileAndCreateFields(IFormFile wordFile, Guid formId)
   {
     try
     {
+       Console.WriteLine($"🔧 Starting ProcessWordFileAndCreateFields for FormId: {formId}");
       var fieldsCreated = 0;
       var tempFilePath = Path.GetTempFileName();
-
+      Console.WriteLine($"💾 Created temp file: {tempFilePath}");
       // Lưu file tạm để đọc
       using (var stream = new FileStream(tempFilePath, FileMode.Create))
       {
         await wordFile.CopyToAsync(stream);
       }
+       Console.WriteLine($"📄 Copied {wordFile.Length} bytes to temp file");
 
       // Đọc file Word bằng DocX
       using (var document = DocX.Load(tempFilePath))
       {
+         Console.WriteLine("📖 Word document loaded successfully");
         // Tìm các placeholder hoặc form fields trong Word
         var fieldPatterns = ExtractFieldsFromDocument(document);
+        Console.WriteLine($"🔍 Extracted {fieldPatterns.Count} field patterns");
+
+               if (fieldPatterns.Count == 0)
+            {
+                Console.WriteLine("⚠️ No field patterns found in document");
+                return 0;
+            }
 
         foreach (var pattern in fieldPatterns)
         {
+          Console.WriteLine($"🔧 Processing pattern: {pattern.Name} (Type: {pattern.Type})");
 
           // xác định type
           var fieldType = DetermineFieldType(pattern.Name);
@@ -228,6 +240,7 @@ public class AdminService : IAdminService
           await _unitOfWork._formFieldRepository.AddAsync(formField);
           fieldsCreated++;
         }
+        await _unitOfWork.SaveChangesAsync();
       }
 
       // Xóa file tạm
@@ -251,52 +264,63 @@ public class AdminService : IAdminService
 
     try
     {
-      //Đọc tất cả text trong document
-      var documentText = document.Text;
+        var documentText = document.Text;
+        Console.WriteLine($"🔍 Document text preview: {documentText.Substring(0, Math.Min(500, documentText.Length))}");
 
-      //Tìm các placeholder pattern như {TenField}, [TenField], {{TenField}}
-      var placeholderRegex = new System.Text.RegularExpressions.Regex(@"\{([^}]+)\}|\[([^\]]+)\]|\{\{([^}]+)\}\}");
-      var matches = placeholderRegex.Matches(documentText);
+        var placeholderRegex = new System.Text.RegularExpressions.Regex(@"\{([^}]+)\}|\[([^\]]+)\]|\{\{([^}]+)\}\}");
+        var matches = placeholderRegex.Matches(documentText);
 
-      var order = 0;
+        Console.WriteLine($"🔍 Found {matches.Count} placeholders:");
 
-      foreach (System.Text.RegularExpressions.Match match in matches)
-      {
-        var fieldName = match.Groups[1].Value ?? match.Groups[2].Value ?? match.Groups[3].Value;
+        var order = 0;
+        var seenFields = new HashSet<string>(); // Track để tránh duplicate
 
-        if (!string.IsNullOrEmpty(fieldName))
+        foreach (System.Text.RegularExpressions.Match match in matches)
         {
-          //Gán isRequired mặc định là false
-          var isRequired = false;
+            var fieldName = match.Groups[1].Value ?? match.Groups[2].Value ?? match.Groups[3].Value;
 
-          // Phân tích tên field để xác định type
-          var fieldType = DetermineFieldType(fieldName, match.Value);
+            if (!string.IsNullOrEmpty(fieldName))
+            {
+                // ✅ KHÔNG TRIM HOẶC MODIFY TÊN FIELD
+                var cleanFieldName = fieldName.Trim();
+                
+                Console.WriteLine($"  - Found field: '{cleanFieldName}'");
 
-          patterns.Add(new FieldPattern
-          {
-            Name = fieldName.Trim(),
-            Type = fieldType,
-            Description = $"Trường {fieldName} từ file Word",
-            IsRequired = isRequired,
-            IsUpperCase = fieldName.Contains("UPPER") || fieldName.ToLower().Contains("upper"),
-            Formula = match.Value, // Lưu nguyên pattern gốc
-            Order = order++
-          });
+                // ✅ KIỂM TRA DUPLICATE BẰNG EXACT NAME
+                if (!seenFields.Contains(cleanFieldName))
+                {
+                    var isRequired = cleanFieldName.Contains("*") || cleanFieldName.ToLower().Contains("required");
+                    var fieldType = DetermineFieldType(cleanFieldName, match.Value);
+
+                    patterns.Add(new FieldPattern
+                    {
+                        Name = cleanFieldName, // ✅ GIỮ NGUYÊN TÊN CHÍNH XÁC
+                        Type = fieldType,
+                        Description = $"Trường {cleanFieldName} từ file Word",
+                        IsRequired = isRequired,
+                        IsUpperCase = cleanFieldName.Contains("UPPER") || cleanFieldName.ToLower().Contains("upper"),
+                        Formula = match.Value,
+                        Order = order++
+                    });
+
+                    seenFields.Add(cleanFieldName);
+                    Console.WriteLine($"    ✅ Added field: '{cleanFieldName}' (Type: {fieldType})");
+                }
+                else
+                {
+                    Console.WriteLine($"    ⚠️ Duplicate field ignored: '{cleanFieldName}'");
+                }
+            }
         }
 
-        //Group by Name và giữ thứ tự đầu tiên
-        patterns = patterns.GroupBy(p => p.Name.ToLower())
-                           .Select(g => g.OrderBy(x => x.Order).First()) // Lấy field đầu tiên theo thứ tự
-                           .OrderBy(p => p.Order) // Sắp xếp theo thứ tự xuất hiện
-                           .ToList();
-      }
+        Console.WriteLine($"📊 Total unique fields extracted: {patterns.Count}");
+        return patterns;
     }
-    catch (System.Exception ex)
+    catch (Exception ex)
     {
-
-      throw;
+        Console.WriteLine($"❌ Error extracting fields: {ex.Message}");
+        return patterns;
     }
-    return patterns;
   }
 
   //Xác định type của field dựa trên tên

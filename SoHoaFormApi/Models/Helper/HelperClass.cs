@@ -220,6 +220,21 @@ namespace SoHoaFormApi.Models.Helper
             }
         }
 
+        public static bool ParseBooleanValue(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return false;
+
+            var lowerValue = value.ToLower().Trim();
+
+            return lowerValue == "true" ||
+                   lowerValue == "1" ||
+                   lowerValue == "yes" ||
+                   lowerValue == "selected" ||
+                   lowerValue == "checked" ||
+                   (bool.TryParse(value, out var boolVal) && boolVal);
+        }
+
+
     }
 
 
